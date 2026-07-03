@@ -40,6 +40,8 @@ You need a Supabase project instance.
    NEXT_PUBLIC_SUPABASE_URL=https://your-project-ref.supabase.co
    NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-public-key
    SUPABASE_SERVICE_ROLE_KEY=your-service-role-key-for-admin-privileges
+
+   Contact Prathamesh for all keys and db releted things
    ```
    *Note: `.env.local` is listed in `.gitignore` and must never be committed to version control.*
 
@@ -65,14 +67,3 @@ Open [http://localhost:3000](http://localhost:3000) in your browser to view the 
 - **Build for Production**: `npm run build`
 - **Run Type Checks**: `npx tsc --noEmit`
 - **Lint Code**: `npm run lint`
-
----
-
-## 📄 Receipt Generation Architecture
-
-Receipts are generated immediately upon donation entry (regardless of the verification status):
-1. The collector enters a donation.
-2. The endpoint `/api/donations` saves the entry, triggers a PostgreSQL receipt number (e.g., `DS-2026-00001`), and calls the utility function `generateReceiptPDF`.
-3. The generated PDF is uploaded to Supabase Storage inside the `receipts/{mandal_id}/{receipt_number}.pdf` path.
-4. The public download URL is saved back to the database row and returned to the collector's success screen immediately.
-5. In the Admin Dashboard, admins and managers can view the donation lists and download the generated receipt directly with the `↓ Receipt` link.
