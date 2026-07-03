@@ -1,36 +1,78 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# IntelliDon 🎗️
 
-## Getting Started
+IntelliDon is a modern web application designed for Mandals to easily record donations, collect payments via cash or dynamic UPI QR codes, and automatically generate and distribute digital receipts instantly to donors.
 
-First, run the development server:
+---
 
+## 🚀 Tech Stack & Versions
+
+- **Framework**: Next.js `16.2.9` (App Router)
+- **Language**: TypeScript / JavaScript (ES6+)
+- **Styling**: Tailwind CSS `v4` & PostCSS
+- **Backend & Database**: Supabase (PostgreSQL with Realtime capabilities)
+- **PDF Generation**: `pdf-lib` (Pure JS, runs serverless without browser dependencies/Puppeteer)
+- **QR Generation**: `qrcode` / `@types/qrcode`
+- **Node.js Recommended**: Node.js `18.x` or `20.x` (LTS versions)
+
+---
+
+## 🛠️ Local Setup Instructions
+
+Follow these steps to set up the project on your local machine:
+
+### 1. Prerequisites
+Make sure you have [Node.js](https://nodejs.org/) installed (version 18+ or 20+).
+
+### 2. Clone and Install Dependencies
+Navigate to the project folder and run:
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+npm install
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+### 3. Configure Environment Variables
+You need a Supabase project instance.
+1. Copy the example environment template file to create a local environment file:
+   ```bash
+   cp .env.example .env.local
+   ```
+2. Open `.env.local` and fill in your Supabase project credentials:
+   ```env
+   NEXT_PUBLIC_SUPABASE_URL=https://your-project-ref.supabase.co
+   NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-public-key
+   SUPABASE_SERVICE_ROLE_KEY=your-service-role-key-for-admin-privileges
+   ```
+   *Note: `.env.local` is listed in `.gitignore` and must never be committed to version control.*
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+### 4. Supabase Setup Required
+Ensure your Supabase project contains:
+- A database schema with tables for `mandals`, `events`, `donations`, and `users`.
+- A public Storage Bucket named **`receipts`** to store the generated PDF receipts:
+  - Go to your Supabase Dashboard → **Storage**.
+  - Create a new bucket named `receipts`.
+  - Toggle **Public bucket** ON (so that generated receipt links can be accessed by donors without requiring authentication).
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+### 5. Run the Development Server
+```bash
+npm run dev
+```
+Open [http://localhost:3000](http://localhost:3000) in your browser to view the application.
 
-## Learn More
+---
 
-To learn more about Next.js, take a look at the following resources:
+## 🧑‍💻 Useful Commands
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+- **Start Dev Server**: `npm run dev`
+- **Build for Production**: `npm run build`
+- **Run Type Checks**: `npx tsc --noEmit`
+- **Lint Code**: `npm run lint`
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+---
 
-## Deploy on Vercel
+## 📄 Receipt Generation Architecture
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Receipts are generated immediately upon donation entry (regardless of the verification status):
+1. The collector enters a donation.
+2. The endpoint `/api/donations` saves the entry, triggers a PostgreSQL receipt number (e.g., `DS-2026-00001`), and calls the utility function `generateReceiptPDF`.
+3. The generated PDF is uploaded to Supabase Storage inside the `receipts/{mandal_id}/{receipt_number}.pdf` path.
+4. The public download URL is saved back to the database row and returned to the collector's success screen immediately.
+5. In the Admin Dashboard, admins and managers can view the donation lists and download the generated receipt directly with the `↓ Receipt` link.
