@@ -1,0 +1,72 @@
+import { createClient } from '@supabase/supabase-js'
+import { NextResponse } from 'next/server'
+
+const supabaseAdmin = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL,
+  process.env.SUPABASE_SERVICE_ROLE_KEY
+)
+
+// GET — fetch the collector's mandal + active events
+// The collector screen needs mandal_id and event_id to submit a donation
+export async function GET(request) {
+  try {
+    const { searchParams } = new URL(request.url)
+    const user_id = searchParams.get('user_id')
+
+    if (!user_id) {
+      return NextResponse.json({ error: 'user_id is required' }, { status: 400 })
+    }
+
+    // Get the collector's user row to find their mandal
+    const { data: userRow, error: userError } = await supabaseAdmin
+      .from('users')
+      .select('id, full_name, role, mandal_id')
+      .eq('id', user_id)
+      .single()
+
+    if (userError || !userRow) {
+      return NextResponse.json({ error: 'User not found' }, { status: 404 })
+    }
+
+    if (!['collector', 'admin', 'manager'].includes(userRow.role)) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
+    }
+
+    // Get the mandal details
+    const { data: mandal, error: mandalError } = await supabaseAdmin
+      .from('mandals')
+      .select('id, name, city, status')
+      .eq('id', userRow.mandal_id)
+      .single()
+
+    if (mandalError || !mandal) {
+      return NextResponse.json({ error: 'Mandal not found' }, { status: 404 })
+    }
+
+    // Get active events for this mandal
+    const { data: events, error: eventsError } = await supabaseAdmin
+      .from('events')
+      .select('id, name, year, upi_id, upi_qr_url')
+      .eq('mandal_id', userRow.mandal_id)
+      .eq('is_active', true)
+      .order('year', { ascending: false })
+
+    if (eventsError) {
+      return NextResponse.json({ error: 'Could not fetch events' }, { status: 500 })
+    }
+
+    return NextResponse.json({
+      user: {
+        id: userRow.id,
+        full_name: userRow.full_name,
+        role: userRow.role
+      },
+      mandal,
+      events
+    })
+
+  } catch (err) {
+    console.error('Unexpected error:', err)
+    return NextResponse.json({ error: 'Something went wrong' }, { status: 500 })
+  }
+}
