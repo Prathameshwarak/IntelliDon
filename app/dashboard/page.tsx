@@ -74,6 +74,8 @@ export default function DashboardPage() {
   const [donationsLoading, setDonationsLoading] = useState(false)
   const [verifyingId, setVerifyingId] = useState<string | null>(null)
   const [activeScreenshot, setActiveScreenshot] = useState<string | null>(null)
+  const [reviewingId, setReviewingId] = useState<string | null>(null)
+  const [screenshotChecked, setScreenshotChecked] = useState(false)
 
   // Events state
   const [events, setEvents] = useState<Event[]>([])
@@ -159,16 +161,23 @@ export default function DashboardPage() {
     })
     const data = await res.json()
     if (data.success) {
-      showToast('Donation verified', 'success')
-      const donation = donations.find(d => d.id === donationId)
+      showToast('Donation verified — receipt generated', 'success')
       setDonations(prev => prev.map(d =>
-        d.id === donationId ? { ...d, status: 'verified' } : d
+        d.id === donationId
+          ? { ...d, status: 'verified', pdf_url: data.pdf_url || d.pdf_url }
+          : d
       ))
-      setSummary(prev => prev && donation ? {
-        ...prev,
-        verified_amount: prev.verified_amount + Number(donation.amount),
-        pending_count: prev.pending_count - 1
-      } : prev)
+      setSummary(prev => prev && donations.find(d => d.id === donationId)
+        ? {
+            ...prev,
+            verified_amount: prev.verified_amount + Number(donations.find(d => d.id === donationId)?.amount || 0),
+            pending_count: prev.pending_count - 1
+          }
+        : prev
+      )
+      // Close the review panel
+      setReviewingId(null)
+      setScreenshotChecked(false)
     } else {
       showToast(data.error || 'Could not verify', 'error')
     }
@@ -404,68 +413,209 @@ export default function DashboardPage() {
               </div>
             ) : (
               <div className="flex flex-col gap-3">
-                {donations.map(d => (
-                  <div key={d.id} className="bg-gray-800 border border-gray-700 rounded-xl p-4">
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <p className="font-medium text-white text-sm">{d.donor_name}</p>
-                          <span className={`text-xs font-medium px-2 py-0.5 rounded-full
-                            ${d.status === 'verified'
-                              ? 'bg-green-900/50 text-green-400'
-                              : 'bg-yellow-900/50 text-yellow-400'}`}>
-                            {d.status}
-                          </span>
-                          <span className="text-xs text-gray-500">{paymentModeLabel(d.payment_mode)}</span>
+                {donations.map(d => {
+
+                  const isReviewing = reviewingId === d.id
+                  const isSelfDonation = d.payment_mode === 'upi_self'
+
+                  return (
+                    <div key={d.id}
+                      className={`bg-gray-800 border rounded-xl overflow-hidden transition-all
+                        ${isReviewing ? 'border-orange-500' : 'border-gray-700'}`}>
+
+                      {/* ── Main row ── */}
+                      <div className="p-4 flex items-start justify-between gap-3">
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <p className="font-medium text-white text-sm">{d.donor_name}</p>
+                            <span className={`text-xs font-medium px-2 py-0.5 rounded-full
+                              ${d.status === 'verified'
+                                ? 'bg-green-900/50 text-green-400'
+                                : 'bg-yellow-900/50 text-yellow-400'}`}>
+                              {d.status}
+                            </span>
+                            <span className="text-xs text-gray-500">
+                              {d.payment_mode === 'cash' ? '💵 Cash'
+                              : d.payment_mode === 'upi_collector' ? '📱 UPI'
+                              : '🌐 Online'}
+                            </span>
+                          </div>
+                          <p className="text-xs text-gray-400 mt-1">
+                            {d.donor_phone}{d.donor_address ? ` · ${d.donor_address}` : ''}
+                          </p>
+                          <p className="text-xs text-gray-500 mt-1">
+                            {d.users?.full_name ? `By ${d.users.full_name} · ` : ''}{formatDate(d.created_at)}
+                          </p>
+                          <p className="text-xs font-mono text-gray-600 mt-1">{d.receipt_number}</p>
                         </div>
-                        <p className="text-xs text-gray-400 mt-1">
-                          {d.donor_phone}{d.donor_address ? ` · ${d.donor_address}` : ''}
-                        </p>
-                        <p className="text-xs text-gray-500 mt-1">
-                          {d.users?.full_name ? `By ${d.users.full_name} · ` : ''}{formatDate(d.created_at)}
-                        </p>
-                        <p className="text-xs font-mono text-gray-600 mt-1">{d.receipt_number}</p>
+
+                        <div className="text-right flex-shrink-0 flex flex-col items-end gap-2">
+                          <p className="text-xl font-bold text-white">{formatAmount(d.amount)}</p>
+
+                          {/* ── Cash / UPI collector: simple verify button ── */}
+                          {d.status === 'pending'
+                            && CAN.verifyDonation(userRole)
+                            && !isSelfDonation
+                            && (
+                            <button
+                              onClick={() => verifyDonation(d.id)}
+                              disabled={verifyingId === d.id}
+                              className="text-xs bg-green-700 hover:bg-green-600 disabled:opacity-50
+                                text-white px-3 py-1.5 rounded-lg transition-colors"
+                            >
+                              {verifyingId === d.id ? '...' : '✓ Verify'}
+                            </button>
+                          )}
+
+                          {/* ── Self donation: open review panel first ── */}
+                          {d.status === 'pending'
+                            && CAN.verifyDonation(userRole)
+                            && isSelfDonation
+                            && !isReviewing
+                            && (
+                            <button
+                              onClick={() => {
+                                setReviewingId(d.id)
+                                setScreenshotChecked(false)
+                              }}
+                              className="text-xs bg-orange-600 hover:bg-orange-500
+                                text-white px-3 py-1.5 rounded-lg transition-colors"
+                            >
+                              Review →
+                            </button>
+                          )}
+
+                          {/* Close review panel */}
+                          {isReviewing && (
+                            <button
+                              onClick={() => {
+                                setReviewingId(null)
+                                setScreenshotChecked(false)
+                              }}
+                              className="text-xs text-gray-500 hover:text-gray-300 transition-colors"
+                            >
+                              ✕ Close
+                            </button>
+                          )}
+
+                          {/* Receipt download */}
+                          {d.pdf_url && (
+                            <a
+                              href={d.pdf_url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-xs bg-gray-700 hover:bg-gray-600 text-white px-3 py-1.5 rounded-lg transition-colors"
+                            >
+                              ↓ Receipt
+                            </a>
+                          )}
+                        </div>
                       </div>
-                      <div className="text-right flex-shrink-0 flex flex-col items-end gap-2">
-                        <p className="text-xl font-bold text-white">{formatAmount(d.amount)}</p>
 
-                        {/* Verify button — both admin and manager can verify */}
-                        {d.status === 'pending' && CAN.verifyDonation(userRole) && (
-                          <button
-                            onClick={() => verifyDonation(d.id)}
-                            disabled={verifyingId === d.id}
-                            className="text-xs bg-green-700 hover:bg-green-600 disabled:opacity-50
-                              text-white px-3 py-1.5 rounded-lg transition-colors"
-                          >
-                            {verifyingId === d.id ? '...' : '✓ Verify'}
-                          </button>
-                        )}
+                      {/* ── Review panel — expands below the main row ── */}
+                      {isReviewing && (
+                        <div className="border-t border-orange-500/30 bg-gray-900 p-4 flex flex-col gap-4">
 
-                        {/* Receipt download link */}
-                        {d.pdf_url && (
-                          <a
-                            href={d.pdf_url}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="text-xs bg-gray-700 hover:bg-gray-600 text-white px-3 py-1.5 rounded-lg transition-colors"
-                          >
-                            ↓ Receipt
-                          </a>
-                        )}
+                          {/* Screenshot */}
+                          {d.screenshot_url ? (
+                            <div className="flex flex-col gap-2">
+                              <p className="text-xs font-medium text-gray-300">Payment Screenshot</p>
+                              <img
+                                src={d.screenshot_url}
+                                alt="Payment screenshot"
+                                className="w-full max-w-xs rounded-xl border border-gray-700 object-contain"
+                                onError={(e) => {
+                                  (e.target as HTMLImageElement).style.display = 'none'
+                                }}
+                              />
+                              <a
+                                href={d.screenshot_url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-xs text-blue-400 hover:text-blue-300"
+                              >
+                                Open full size ↗
+                              </a>
+                            </div>
+                          ) : (
+                            <div className="bg-gray-800 border border-gray-700 rounded-xl p-4 text-center">
+                              <p className="text-gray-500 text-xs">No screenshot uploaded by donor</p>
+                            </div>
+                          )}
 
-                        {/* Screenshot — visible for UPI payments */}
-                        {d.screenshot_url && (
-                          <button
-                            onClick={() => setActiveScreenshot(d.screenshot_url!)}
-                            className="text-xs text-blue-400 hover:text-blue-300 transition-colors"
-                          >
-                            View screenshot
-                          </button>
-                        )}
-                      </div>
+                          {/* Donation summary */}
+                          <div className="bg-gray-800 rounded-xl px-4 py-3 flex flex-col gap-1.5 text-xs">
+                            <div className="flex justify-between">
+                              <span className="text-gray-400">Donor</span>
+                              <span className="text-white font-medium">{d.donor_name}</span>
+                            </div>
+                            <div className="flex justify-between">
+                              <span className="text-gray-400">Phone</span>
+                              <span className="text-white">{d.donor_phone}</span>
+                            </div>
+                            <div className="flex justify-between">
+                              <span className="text-gray-400">Amount</span>
+                              <span className="text-white font-bold">{formatAmount(d.amount)}</span>
+                            </div>
+                            <div className="flex justify-between">
+                              <span className="text-gray-400">Receipt no.</span>
+                              <span className="text-white font-mono">{d.receipt_number}</span>
+                            </div>
+                          </div>
+
+                          {/* Confirmation checkbox */}
+                          <label className="flex items-start gap-3 cursor-pointer group">
+                            <div className="relative flex-shrink-0 mt-0.5">
+                              <input
+                                type="checkbox"
+                                checked={screenshotChecked}
+                                onChange={e => setScreenshotChecked(e.target.checked)}
+                                className="sr-only"
+                              />
+                              <div className={`w-5 h-5 rounded border-2 flex items-center justify-center transition-colors
+                                ${screenshotChecked
+                                  ? 'bg-green-600 border-green-600'
+                                  : 'border-gray-500 bg-gray-800 group-hover:border-gray-400'}`}>
+                                {screenshotChecked && (
+                                  <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                                  </svg>
+                                )}
+                              </div>
+                            </div>
+                            <span className="text-xs text-gray-300 leading-relaxed">
+                              I have reviewed the payment screenshot and confirm that
+                              <span className="text-white font-medium"> ₹{Number(d.amount).toLocaleString('en-IN')}</span> was
+                              received from <span className="text-white font-medium">{d.donor_name}</span>
+                            </span>
+                          </label>
+
+                          {/* Confirm verify button — only appears after checkbox */}
+                          {screenshotChecked && (
+                            <button
+                              onClick={() => verifyDonation(d.id)}
+                              disabled={verifyingId === d.id}
+                              className="w-full bg-green-600 hover:bg-green-700 disabled:opacity-50
+                                text-white font-semibold py-3.5 rounded-xl text-sm transition-colors"
+                            >
+                              {verifyingId === d.id
+                                ? 'Verifying & generating receipt...'
+                                : '✓ Confirm Verified — Generate Receipt'}
+                            </button>
+                          )}
+
+                          {!screenshotChecked && (
+                            <p className="text-xs text-gray-600 text-center">
+                              Tick the checkbox above to confirm before verifying
+                            </p>
+                          )}
+
+                        </div>
+                      )}
+
                     </div>
-                  </div>
-                ))}
+                  )
+                })}
               </div>
             )}
           </div>
