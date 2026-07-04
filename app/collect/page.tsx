@@ -179,14 +179,22 @@ export default function CollectPage() {
           <p className="text-xs text-gray-400">Intellidon</p>
           <p className="text-sm font-medium">{mandal?.name}</p>
         </div>
-        <div className="text-right">
+        <div className="text-right flex flex-col items-end gap-1">
           <p className="text-xs text-gray-400">{collectorName}</p>
-          <button
-            onClick={() => supabase.auth.signOut().then(() => router.push('/login'))}
-            className="text-xs text-red-400 hover:text-red-300"
-          >
-            Sign out
-          </button>
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => router.push('/share')}
+              className="text-xs text-orange-400 hover:text-orange-300 transition-colors"
+            >
+              🔗 Share
+            </button>
+            <button
+              onClick={() => supabase.auth.signOut().then(() => router.push('/login'))}
+              className="text-xs text-red-400 hover:text-red-300 transition-colors"
+            >
+              Sign out
+            </button>
+          </div>
         </div>
       </div>
 

@@ -330,7 +330,7 @@ export default function DashboardPage() {
           <p className="text-xs text-gray-400">Intellidon</p>
           <p className="text-base font-semibold">{mandalName}</p>
         </div>
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-3">
           <span className={`text-xs font-medium px-2.5 py-1 rounded-full capitalize
             ${userRole === 'admin'
               ? 'bg-orange-900/50 text-orange-400'
@@ -338,8 +338,14 @@ export default function DashboardPage() {
             {userRole === 'admin' ? 'Adhyaksha' : 'Khajindar'}
           </span>
           <button
+            onClick={() => router.push('/share')}
+            className="text-xs bg-gray-700 hover:bg-gray-600 text-white px-3 py-1.5 rounded-lg transition-colors"
+          >
+            🔗 Share Link
+          </button>
+          <button
             onClick={() => supabase.auth.signOut().then(() => router.push('/login'))}
-            className="text-xs text-red-400 hover:text-red-300"
+            className="text-xs text-red-400 hover:text-red-300 transition-colors"
           >
             Sign out
           </button>
