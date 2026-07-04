@@ -300,7 +300,7 @@ export default function PublicDonatePage() {
             <div>
               <h1 className="text-xl font-semibold text-gray-900">Pay via UPI</h1>
               <p className="text-sm text-gray-500 mt-1">
-                Scan the QR code using any UPI app (GPay, PhonePe, Paytm)
+                Scan the QR code or tap the button below to open your UPI app directly
               </p>
             </div>
 
@@ -312,20 +312,44 @@ export default function PublicDonatePage() {
               </div>
               <div className="flex justify-between text-sm mt-1">
                 <span className="text-gray-500">Amount</span>
-                <span className="text-gray-900 font-bold text-lg">₹{Number(amount).toLocaleString('en-IN')}</span>
+                <span className="text-gray-900 font-bold text-lg">
+                  ₹{Number(amount).toLocaleString('en-IN')}
+                </span>
               </div>
             </div>
 
-            {/* QR */}
-            <div className="bg-white border border-gray-200 rounded-xl p-5 flex flex-col items-center gap-3">
+            {/* QR + Open in UPI App */}
+            <div className="bg-white border border-gray-200 rounded-xl p-5 flex flex-col items-center gap-4">
               {event.upi_id ? (
-                <UpiQR
-                  upiId={event.upi_id}
-                  name={mandal?.name || ''}
-                  amount={Number(amount)}
-                  note={`${event.name} ${event.year} Donation`}
-                  size={200}
-                />
+                <>
+                  <UpiQR
+                    upiId={event.upi_id}
+                    name={mandal?.name || ''}
+                    amount={Number(amount)}
+                    note={`${event.name} ${event.year} Donation`}
+                    size={200}
+                  />
+
+                  {/* Open in UPI App button — works on mobile only */}
+                  {/* On desktop this link does nothing, so we hide it */}
+                  <a
+                    href={`upi://pay?pa=${encodeURIComponent(event.upi_id)}&pn=${encodeURIComponent(mandal?.name || '')}&am=${Number(amount).toFixed(2)}&cu=INR&tn=${encodeURIComponent(`${event.name} ${event.year} Donation`)}`}
+                    className="w-full flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700
+                      text-white font-semibold py-3.5 rounded-xl text-sm transition-colors md:hidden"
+                  >
+                    <span>📱</span>
+                    <span>Open in UPI App</span>
+                  </a>
+
+                  {/* Desktop fallback hint */}
+                  <p className="text-xs text-gray-400 text-center hidden md:block">
+                    Scan the QR with your phone's camera or any UPI app
+                  </p>
+
+                  <p className="text-xs text-gray-400 text-center md:hidden">
+                    Or scan the QR above with any UPI app
+                  </p>
+                </>
               ) : (
                 <div className="w-48 h-48 bg-gray-100 rounded-xl flex items-center justify-center">
                   <p className="text-gray-400 text-xs text-center px-4">
@@ -333,8 +357,14 @@ export default function PublicDonatePage() {
                   </p>
                 </div>
               )}
-              <p className="text-xs text-gray-400 text-center">
-                The amount is pre-filled. Do not change it in your UPI app.
+            </div>
+
+            {/* Important note */}
+            <div className="bg-orange-50 border border-orange-100 rounded-xl px-4 py-3">
+              <p className="text-xs text-orange-700 font-medium mb-1">Important</p>
+              <p className="text-xs text-orange-600 leading-relaxed">
+                After payment is done, come back to this page and tap "I have paid" below.
+                You will need to upload a screenshot of your payment confirmation.
               </p>
             </div>
 
@@ -342,7 +372,7 @@ export default function PublicDonatePage() {
               onClick={() => setStep('screenshot')}
               className="w-full bg-green-600 hover:bg-green-700 text-white font-semibold py-4 rounded-xl text-base transition-colors"
             >
-              I have paid — Upload Screenshot →
+              ✓ I have paid — Continue →
             </button>
 
             <button
