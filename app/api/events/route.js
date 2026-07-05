@@ -1,6 +1,5 @@
 import { createClient } from '@supabase/supabase-js'
 import { NextResponse } from 'next/server'
-import { canUseFeature } from '@/lib/subscription'
 
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL,
@@ -98,11 +97,6 @@ export async function POST(request) {
       return NextResponse.json({ error: 'Mandal is not active' }, { status: 403 })
     }
 
-    const isSubscribed = await canUseFeature(mandal_id, 'events')
-    if (!isSubscribed) {
-      return NextResponse.json({ error: 'Subscription expired or inactive. Upgrade to create events.' }, { status: 403 })
-    }
-
     // Determine initial is_active — true only if start_date is today or past
     const today = new Date().toISOString().split('T')[0]
     const isActiveNow = start_date <= today
@@ -177,11 +171,6 @@ export async function PATCH(request) {
       return NextResponse.json({ error: 'Event not found' }, { status: 404 })
     }
 
-    const isSubscribed = await canUseFeature(event.mandal_id, 'events')
-    if (!isSubscribed) {
-      return NextResponse.json({ error: 'Subscription expired or inactive. Upgrade to activate events.' }, { status: 403 })
-    }
-
     const today = new Date().toISOString().split('T')[0]
 
     // Cannot reactivate an expired event
@@ -241,11 +230,6 @@ export async function PUT(request) {
 
     if (!event) {
       return NextResponse.json({ error: 'Event not found' }, { status: 404 })
-    }
-
-    const isSubscribed = await canUseFeature(event.mandal_id, 'events')
-    if (!isSubscribed) {
-      return NextResponse.json({ error: 'Subscription expired or inactive. Upgrade to edit events.' }, { status: 403 })
     }
 
     const today = new Date().toISOString().split('T')[0]
