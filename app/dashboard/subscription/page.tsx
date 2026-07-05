@@ -26,7 +26,9 @@ export default function SubscriptionPage() {
 
   // Subscription State
   const [subStatus, setSubStatus] = useState<SubscriptionStatus | null>(null)
-  const [selectedPlan, setSelectedPlan] = useState<'monthly' | 'yearly'>('monthly')
+  const [availablePlans, setAvailablePlans] = useState<any[]>([])
+  const [selectedPlanCode, setSelectedPlanCode] = useState('monthly')
+  const [selectedPlanPrice, setSelectedPlanPrice] = useState(399)
   const [transactionId, setTransactionId] = useState('')
   const [screenshot, setScreenshot] = useState<File | null>(null)
   const [screenshotPreview, setScreenshotPreview] = useState<string | null>(null)
@@ -71,6 +73,7 @@ export default function SubscriptionPage() {
   useEffect(() => {
     if (mandalId) {
       fetchStatus()
+      fetchPlans()
     }
   }, [mandalId])
 
@@ -83,6 +86,23 @@ export default function SubscriptionPage() {
       }
     } catch (err) {
       console.error('Error fetching subscription status:', err)
+    }
+  }
+
+  async function fetchPlans() {
+    try {
+      const res = await fetch('/api/plans')
+      const data = await res.json()
+      if (data.success && data.plans) {
+        setAvailablePlans(data.plans)
+        if (data.plans.length > 0) {
+          const defaultPlan = data.plans.find((p: any) => p.code === 'monthly') || data.plans[0]
+          setSelectedPlanCode(defaultPlan.code)
+          setSelectedPlanPrice(defaultPlan.price)
+        }
+      }
+    } catch (err) {
+      console.error('Error fetching plans:', err)
     }
   }
 
@@ -131,14 +151,13 @@ export default function SubscriptionPage() {
       }
 
       // 2. Submit renewal request
-      const amount = selectedPlan === 'monthly' ? 399 : 3999
       const res = await fetch('/api/subscription/renew', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           mandal_id: mandalId,
-          plan: selectedPlan,
-          amount,
+          plan: selectedPlanCode,
+          amount: selectedPlanPrice,
           payment_notes: `Txn ID: ${transactionId}`,
           screenshot_url: screenshotUrl
         })
@@ -170,7 +189,6 @@ export default function SubscriptionPage() {
     )
   }
 
-  const selectedPlanPrice = selectedPlan === 'monthly' ? 399 : 3999
 
   return (
     <div className="min-h-screen bg-gray-950 text-white">
@@ -235,49 +253,37 @@ export default function SubscriptionPage() {
             <p className="text-xs text-gray-400">Select a plan to renew or extend your current subscription. Renewal stacked on top of active plan validity.</p>
             
             <div className="flex flex-col gap-3">
-              {/* Monthly Card */}
-              <div 
-                onClick={() => setSelectedPlan('monthly')}
-                className={`p-4 rounded-xl border cursor-pointer transition-all duration-200
-                  ${selectedPlan === 'monthly' 
-                    ? 'bg-orange-950/20 border-orange-500 shadow-md shadow-orange-950/20' 
-                    : 'bg-gray-900 border-gray-800 hover:border-gray-700'}`}
-              >
-                <div className="flex justify-between items-center">
-                  <span className="font-semibold text-sm text-white">Premium Monthly</span>
-                  <span className="text-base font-bold text-white">₹399<span className="text-xs text-gray-400 font-normal">/mo</span></span>
-                </div>
-                <ul className="text-[11px] text-gray-400 mt-3 list-disc pl-4 flex flex-col gap-1">
-                  <li>Unlimited event collections & tracking</li>
-                  <li>Direct QR self-donations</li>
-                  <li>Team size up to 15 members</li>
-                  <li>Verify offline cash instantly</li>
-                  <li>Print & share PDF receipts</li>
-                </ul>
-              </div>
-
-              {/* Yearly Card */}
-              <div 
-                onClick={() => setSelectedPlan('yearly')}
-                className={`p-4 rounded-xl border cursor-pointer relative overflow-hidden transition-all duration-200
-                  ${selectedPlan === 'yearly' 
-                    ? 'bg-orange-950/20 border-orange-500 shadow-md shadow-orange-950/20' 
-                    : 'bg-gray-900 border-gray-800 hover:border-gray-700'}`}
-              >
-                <div className="absolute top-0 right-0 bg-orange-600 text-white text-[9px] font-bold px-2 py-0.5 rounded-bl">
-                  Save 15%
-                </div>
-                <div className="flex justify-between items-center">
-                  <span className="font-semibold text-sm text-white">Premium Yearly</span>
-                  <span className="text-base font-bold text-white">₹3,999<span className="text-xs text-gray-400 font-normal">/yr</span></span>
-                </div>
-                <ul className="text-[11px] text-gray-400 mt-3 list-disc pl-4 flex flex-col gap-1">
-                  <li>Everything in Monthly Plan</li>
-                  <li>Uncapped collections & audit archives</li>
-                  <li>Priority manager support</li>
-                  <li>No receipt storage limitations</li>
-                </ul>
-              </div>
+              {availablePlans.map((p) => {
+                const isSelected = selectedPlanCode === p.code
+                return (
+                  <div 
+                    key={p.id || p.code}
+                    onClick={() => {
+                      setSelectedPlanCode(p.code)
+                      setSelectedPlanPrice(p.price)
+                    }}
+                    className={`p-4 rounded-xl border cursor-pointer transition-all duration-200
+                      ${isSelected 
+                        ? 'bg-orange-950/20 border-orange-500 shadow-md shadow-orange-950/20' 
+                        : 'bg-gray-900 border-gray-800 hover:border-gray-700'}`}
+                  >
+                    <div className="flex justify-between items-center">
+                      <span className="font-semibold text-sm text-white">{p.name}</span>
+                      <span className="text-base font-bold text-white">₹{p.price.toLocaleString()}<span className="text-xs text-gray-400 font-normal">/{p.duration_days === 30 ? 'mo' : p.duration_days === 365 ? 'yr' : `${p.duration_days}d`}</span></span>
+                    </div>
+                    {p.description && <p className="text-[11px] text-gray-500 mt-1.5">{p.description}</p>}
+                    {p.features && p.features.length > 0 && (
+                      <div className="flex gap-1 flex-wrap mt-3">
+                        {p.features.map((f: string) => (
+                          <span key={f} className="bg-gray-950 border border-gray-850 px-1.5 py-0.5 rounded text-[9px] text-gray-400 capitalize">
+                            {f}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )
+              })}
             </div>
           </div>
 
