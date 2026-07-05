@@ -4,6 +4,7 @@
 import { createClient } from '@supabase/supabase-js'
 import { NextResponse } from 'next/server'
 import { generateReceiptPDF } from '@/lib/generateReceiptPDF'
+import { canUseFeature } from '@/lib/subscription'
 
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL,
@@ -39,6 +40,11 @@ export async function PATCH(request) {
         { error: 'Only admin or manager can verify or reject donations' },
         { status: 403 }
       )
+    }
+
+    const isSubscribed = await canUseFeature(verifier.mandal_id, 'donations')
+    if (!isSubscribed) {
+      return NextResponse.json({ error: 'Subscription expired or inactive. Upgrade to verify donations.' }, { status: 403 })
     }
 
     // ── Mode 1: Bulk verification for a collector ───────────────────

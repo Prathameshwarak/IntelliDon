@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js'
 import { NextResponse } from 'next/server'
+import { canUseFeature } from '@/lib/subscription'
 
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL,
@@ -32,6 +33,11 @@ export async function POST(request) {
 
     if (!mandal_id || !full_name || !phone || !email || !password || !role) {
       return NextResponse.json({ error: 'All fields are required' }, { status: 400 })
+    }
+
+    const isSubscribed = await canUseFeature(mandal_id, 'team')
+    if (!isSubscribed) {
+      return NextResponse.json({ error: 'Subscription expired or inactive. Upgrade to add team members.' }, { status: 403 })
     }
 
     if (!['collector', 'manager'].includes(role)) {

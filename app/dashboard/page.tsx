@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
+import UpgradeModal from '@/components/UpgradeModal'
 
 // ── Types ──────────────────────────────────────────────────────
 type Tab = 'donations' | 'history' | 'events' | 'team'
@@ -93,6 +94,7 @@ export default function DashboardPage() {
   const [historyCollectorFilter, setHistoryCollectorFilter] = useState('all')
   const [historyTypeFilter, setHistoryTypeFilter] = useState('all')
   const [subscription, setSubscription] = useState<any>(null)
+  const [showUpgradeModal, setShowUpgradeModal] = useState(false)
 
   // Events state
   const [events, setEvents] = useState<Event[]>([])
@@ -192,6 +194,10 @@ export default function DashboardPage() {
   }
 
   async function verifyDonation(donationId: string) {
+    if (subscription?.expired) {
+      setShowUpgradeModal(true)
+      return
+    }
     if (!CAN.verifyDonation(userRole)) return
     setVerifyingId(donationId)
     const res = await fetch('/api/donations/verify', {
@@ -250,6 +256,10 @@ export default function DashboardPage() {
   }
 
   async function verifyCollectorBulk(collectorId: string, paymentMode: 'cash' | 'upi_collector') {
+    if (subscription?.expired) {
+      setShowUpgradeModal(true)
+      return
+    }
     if (!CAN.verifyDonation(userRole)) return
     if (!confirm(`Are you sure you want to verify all pending ${paymentMode === 'cash' ? 'Cash' : 'UPI'} collections for this collector?`)) return
     
@@ -288,6 +298,10 @@ export default function DashboardPage() {
   }
 
   async function createEvent() {
+    if (subscription?.expired) {
+      setShowUpgradeModal(true)
+      return
+    }
     if (!CAN.createEvent(userRole)) return
     setDateError('')
 
@@ -337,6 +351,10 @@ export default function DashboardPage() {
   }
 
   async function toggleEvent(eventId: string, currentActive: boolean) {
+    if (subscription?.expired) {
+      setShowUpgradeModal(true)
+      return
+    }
     if (!CAN.toggleEvent(userRole)) return
     const res = await fetch('/api/events', {
       method: 'PATCH',
@@ -383,6 +401,10 @@ export default function DashboardPage() {
   }
 
   async function updateEvent() {
+    if (subscription?.expired) {
+      setShowUpgradeModal(true)
+      return
+    }
     if (!CAN.createEvent(userRole) || !editingEventId) return
     setDateError('')
 
@@ -447,6 +469,10 @@ export default function DashboardPage() {
   }
 
   async function addMember() {
+    if (subscription?.expired) {
+      setShowUpgradeModal(true)
+      return
+    }
     if (!CAN.addMember(userRole)) return
     if (!memberName || !memberPhone || !memberEmail || !memberPassword) {
       showToast('All fields required', 'error'); return
@@ -1544,6 +1570,7 @@ export default function DashboardPage() {
           </div>
         )}
 
+        <UpgradeModal isOpen={showUpgradeModal} onClose={() => setShowUpgradeModal(false)} />
       </div>
     </div>
   )
