@@ -18,9 +18,17 @@ export async function GET(request) {
 
     const status = await checkSubscription(mandal_id)
 
+    // Fetch full history of subscription attempts
+    const { data: history } = await supabaseAdmin
+      .from('subscriptions')
+      .select('*')
+      .eq('mandal_id', mandal_id)
+      .order('created_at', { ascending: false })
+
     return NextResponse.json({
       success: true,
-      ...status
+      ...status,
+      history: history || []
     })
 
   } catch (err) {

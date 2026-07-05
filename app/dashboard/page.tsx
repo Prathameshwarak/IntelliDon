@@ -92,6 +92,7 @@ export default function DashboardPage() {
   const [historySearch, setHistorySearch] = useState('')
   const [historyCollectorFilter, setHistoryCollectorFilter] = useState('all')
   const [historyTypeFilter, setHistoryTypeFilter] = useState('all')
+  const [subscription, setSubscription] = useState<any>(null)
 
   // Events state
   const [events, setEvents] = useState<Event[]>([])
@@ -150,6 +151,25 @@ export default function DashboardPage() {
     }
     init()
   }, [router])
+
+  async function fetchSubscriptionStatus() {
+    if (!mandalId) return
+    try {
+      const res = await fetch(`/api/subscription/status?mandal_id=${mandalId}`)
+      const data = await res.json()
+      if (data.success) {
+        setSubscription(data)
+      }
+    } catch (err) {
+      console.error('Error fetching subscription status:', err)
+    }
+  }
+
+  useEffect(() => {
+    if (mandalId) {
+      fetchSubscriptionStatus()
+    }
+  }, [mandalId])
 
   // ── Load data on tab change ───────────────────────────────────
   useEffect(() => {
@@ -644,6 +664,46 @@ export default function DashboardPage() {
       </div>
 
       <div className="max-w-4xl mx-auto px-4 py-6">
+
+        {/* Subscription Status Card Banner */}
+        {subscription && (
+          <div className={`border rounded-xl p-4 mb-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 transition-all
+            ${subscription.expired 
+              ? 'bg-red-950/20 border-red-900/50 text-red-300' 
+              : subscription.plan === 'trial' 
+                ? 'bg-orange-950/20 border-orange-900/40 text-orange-300' 
+                : 'bg-green-950/20 border-green-900/40 text-green-300'}`}>
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2">
+                <span className={`text-xs font-semibold px-2 py-0.5 rounded-full uppercase tracking-wider
+                  ${subscription.expired 
+                    ? 'bg-red-900/50 text-white' 
+                    : subscription.plan === 'trial' 
+                      ? 'bg-orange-600 text-white' 
+                      : 'bg-green-600 text-white'}`}>
+                  {subscription.plan} Plan
+                </span>
+                <span className="text-xs font-medium">
+                  {subscription.expired ? 'Expired' : 'Active'}
+                </span>
+              </div>
+              <p className="text-sm font-medium mt-1.5 text-white">
+                {subscription.expired 
+                  ? 'Your subscription has expired. Please upgrade or renew to keep accessing all features.' 
+                  : `${subscription.daysRemaining} days left in your plan. Expires on ${new Date(subscription.endsAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}.`}
+              </p>
+            </div>
+            <button
+              onClick={() => router.push('/dashboard/subscription')}
+              className={`text-xs font-semibold px-4.5 py-2.5 rounded-xl transition-all flex-shrink-0
+                ${subscription.expired
+                  ? 'bg-red-650 hover:bg-red-700 text-white shadow-lg shadow-red-950/30'
+                  : 'bg-gray-800 hover:bg-gray-700 text-white border border-gray-700'}`}
+            >
+              {subscription.expired ? 'Upgrade / Renew Now' : 'Manage Subscription'}
+            </button>
+          </div>
+        )}
 
         {/* Role notice for manager */}
         {userRole === 'manager' && (
