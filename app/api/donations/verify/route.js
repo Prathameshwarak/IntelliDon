@@ -14,11 +14,11 @@ const supabaseAdmin = createClient(
 export async function PATCH(request) {
   try {
     const body = await request.json()
-    const { donation_id, verified_by } = body
+    const { donation_id, collector_id, payment_mode, verified_by, status = 'verified', rejection_reason } = body
 
-    if (!donation_id || !verified_by) {
+    if (!verified_by) {
       return NextResponse.json(
-        { error: 'donation_id and verified_by are required' },
+        { error: 'verified_by is required' },
         { status: 400 }
       )
     }
@@ -36,9 +36,68 @@ export async function PATCH(request) {
 
     if (!['admin', 'manager'].includes(verifier.role)) {
       return NextResponse.json(
-        { error: 'Only admin or manager can verify donations' },
+        { error: 'Only admin or manager can verify or reject donations' },
         { status: 403 }
       )
+    }
+
+    // ── Mode 1: Bulk verification for a collector ───────────────────
+    if (collector_id && payment_mode) {
+      if (!['cash', 'upi_collector'].includes(payment_mode)) {
+        return NextResponse.json({ error: 'Invalid payment mode for bulk verification' }, { status: 400 })
+      }
+
+      // Fetch pending donations for this collector and payment mode
+      const { data: pendingDonations, error: fetchErr } = await supabaseAdmin
+        .from('donations')
+        .select('id')
+        .eq('collected_by', collector_id)
+        .eq('payment_mode', payment_mode)
+        .eq('status', 'pending')
+        .eq('mandal_id', verifier.mandal_id)
+
+      if (fetchErr) {
+        console.error('Fetch pending donations error:', fetchErr)
+        return NextResponse.json({ error: 'Could not fetch pending donations' }, { status: 500 })
+      }
+
+      if (!pendingDonations || pendingDonations.length === 0) {
+        return NextResponse.json({ error: 'No pending donations found to verify' }, { status: 400 })
+      }
+
+      const donationIds = pendingDonations.map(d => d.id)
+
+      // Bulk update
+      const { error: updateError } = await supabaseAdmin
+        .from('donations')
+        .update({
+          status: 'verified',
+          verified_by,
+          verified_at: new Date().toISOString()
+        })
+        .in('id', donationIds)
+
+      if (updateError) {
+        console.error('Bulk update error:', updateError)
+        return NextResponse.json({ error: 'Could not bulk verify donations' }, { status: 500 })
+      }
+
+      return NextResponse.json({
+        success: true,
+        verified_ids: donationIds
+      })
+    }
+
+    // ── Mode 2: Single donation verification or rejection ──────────
+    if (!donation_id) {
+      return NextResponse.json(
+        { error: 'donation_id or (collector_id and payment_mode) is required' },
+        { status: 400 }
+      )
+    }
+
+    if (!['verified', 'rejected'].includes(status)) {
+      return NextResponse.json({ error: 'Invalid status value' }, { status: 400 })
     }
 
     // Fetch full donation with related data
@@ -77,29 +136,37 @@ export async function PATCH(request) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
     }
 
-    if (donation.status === 'verified') {
+    if (donation.status === 'verified' && status === 'verified') {
       return NextResponse.json({ error: 'Already verified' }, { status: 400 })
     }
 
-    // Mark as verified
+    // Update status and optional rejection reason
+    const updateData = {
+      status,
+      verified_by,
+      verified_at: new Date().toISOString()
+    }
+    if (status === 'rejected') {
+      updateData.rejection_reason = rejection_reason || 'No reason provided'
+    } else {
+      updateData.rejection_reason = null // Clear if verified
+    }
+
     const { error: updateError } = await supabaseAdmin
       .from('donations')
-      .update({
-        status: 'verified',
-        verified_by,
-        verified_at: new Date().toISOString()
-      })
+      .update(updateData)
       .eq('id', donation_id)
 
     if (updateError) {
-      return NextResponse.json({ error: 'Could not verify donation' }, { status: 500 })
+      console.error('Update error:', updateError)
+      return NextResponse.json({ error: 'Could not update donation status' }, { status: 500 })
     }
 
     // For upi_self donations — generate receipt now (wasn't done at entry time)
     // For cash/upi_collector — receipt was already generated at entry, just return existing url
     let pdfUrl = donation.pdf_url
 
-    if (donation.payment_mode === 'upi_self' && !pdfUrl) {
+    if (status === 'verified' && donation.payment_mode === 'upi_self' && !pdfUrl) {
       try {
         const mandal = donation.mandals
         const event = donation.events
@@ -143,13 +210,13 @@ export async function PATCH(request) {
         }
       } catch (pdfErr) {
         console.error('PDF generation on verify error:', pdfErr)
-        // Don't fail the verify — just log
       }
     }
 
     return NextResponse.json({
       success: true,
-      pdf_url: pdfUrl || null
+      status,
+      pdf_url: status === 'verified' ? (pdfUrl || null) : null
     })
 
   } catch (err) {
