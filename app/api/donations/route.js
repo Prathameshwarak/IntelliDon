@@ -214,6 +214,8 @@ export async function GET(request) {
         screenshot_url,
         pdf_url,
         created_at,
+        collected_by,
+        rejection_reason,
         users!collected_by (
           full_name
         )
@@ -224,7 +226,39 @@ export async function GET(request) {
     if (event_id) query = query.eq('event_id', event_id)
     if (status) query = query.eq('status', status)
 
-    const { data: donations, error } = await query
+    let { data: donations, error } = await query
+
+    if (error && error.message && error.message.includes('column donations.rejection_reason does not exist')) {
+      // Fallback query without rejection_reason
+      let fallbackQuery = supabaseAdmin
+        .from('donations')
+        .select(`
+          id,
+          receipt_number,
+          donor_name,
+          donor_phone,
+          donor_address,
+          amount,
+          payment_mode,
+          status,
+          screenshot_url,
+          pdf_url,
+          created_at,
+          collected_by,
+          users!collected_by (
+            full_name
+          )
+        `)
+        .eq('mandal_id', mandal_id)
+        .order('created_at', { ascending: false })
+
+      if (event_id) fallbackQuery = fallbackQuery.eq('event_id', event_id)
+      if (status) fallbackQuery = fallbackQuery.eq('status', status)
+
+      const fallbackResult = await fallbackQuery
+      donations = fallbackResult.data
+      error = fallbackResult.error
+    }
 
     if (error) {
       console.error('Fetch donations error:', error)
