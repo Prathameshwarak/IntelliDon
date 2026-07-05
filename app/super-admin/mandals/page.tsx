@@ -194,6 +194,9 @@ export default function SuperAdminMandalsPage() {
               <Link href="/super-admin/subscriptions" className="hover:text-slate-900 dark:hover:text-white transition-colors">
                 Subscriptions
               </Link>
+              <Link href="/super-admin/plan" className="hover:text-slate-900 dark:hover:text-white transition-colors">
+                Plans
+              </Link>
             </nav>
 
             <div className="hidden sm:flex flex-col text-right">

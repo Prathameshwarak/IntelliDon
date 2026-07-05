@@ -353,6 +353,9 @@ export default function SuperAdminSubscriptionsPage() {
               <span className="text-white border-b-2 border-orange-500 pb-1">
                 Subscriptions
               </span>
+              <Link href="/super-admin/plan" className="hover:text-white transition-colors">
+                Plans
+              </Link>
             </nav>
             <button 
               onClick={handleSignOut}

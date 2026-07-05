@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
@@ -13,6 +13,34 @@ export default function LoginPage() {
   const [success, setSuccess] = useState(false);
   const [adminName, setAdminName] = useState("");
   const [mandalName, setMandalName] = useState("");
+
+  useEffect(() => {
+    async function checkUser() {
+      try {
+        const { data: { user } } = await supabase.auth.getUser()
+        if (user) {
+          const { data: userProfile } = await supabase
+            .from("users")
+            .select("role")
+            .eq("id", user.id)
+            .single()
+          
+          if (userProfile) {
+            if (userProfile.role === "super_admin") {
+              router.push("/super-admin/mandals")
+            } else if (["admin", "manager"].includes(userProfile.role)) {
+              router.push("/dashboard")
+            } else if (userProfile.role === "collector") {
+              router.push("/collect")
+            }
+          }
+        }
+      } catch (err) {
+        console.error("Error auto-redirecting user from login:", err)
+      }
+    }
+    checkUser()
+  }, [router])
 
   // Form State
   const [email, setEmail] = useState("");
