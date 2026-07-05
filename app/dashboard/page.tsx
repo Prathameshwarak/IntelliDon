@@ -48,6 +48,7 @@ type Member = {
   full_name: string
   phone: string
   role: string
+  is_active: boolean
 }
 
 // ── Role capability map — single source of truth ───────────────
@@ -114,6 +115,19 @@ export default function DashboardPage() {
   const [memberPassword, setMemberPassword] = useState('')
   const [memberRole, setMemberRole] = useState<'collector' | 'manager'>('collector')
   const [memberSubmitting, setMemberSubmitting] = useState(false)
+
+  // Edit / Reset Password states
+  const [editUser, setEditUser] = useState<Member | null>(null)
+  const [editName, setEditName] = useState('')
+  const [editPhone, setEditPhone] = useState('')
+  const [editRole, setEditRole] = useState<'collector' | 'manager'>('collector')
+  const [editSubmitting, setEditSubmitting] = useState(false)
+
+  const [resetPasswordUser, setResetPasswordUser] = useState<Member | null>(null)
+  const [tempPassword, setTempPassword] = useState('')
+  const [generatedPassword, setGeneratedPassword] = useState('')
+  const [showPasswordUpdatedModal, setShowPasswordUpdatedModal] = useState(false)
+  const [resetPasswordSubmitting, setResetPasswordSubmitting] = useState(false)
 
   // ── Auth guard ────────────────────────────────────────────────
   useEffect(() => {
@@ -420,8 +434,18 @@ export default function DashboardPage() {
   }
 
   // ── Team ──────────────────────────────────────────────────────
+  async function getAuthHeaders() {
+    const { data: { session } } = await supabase.auth.getSession()
+    const token = session?.access_token
+    return {
+      'Content-Type': 'application/json',
+      ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+    }
+  }
+
   async function fetchTeam() {
-    const res = await fetch(`/api/team?mandal_id=${mandalId}`)
+    const headers = await getAuthHeaders()
+    const res = await fetch(`/api/team?mandal_id=${mandalId}`, { headers })
     const data = await res.json()
     if (!data.error) setMembers(data.members)
   }
@@ -433,9 +457,10 @@ export default function DashboardPage() {
     }
     if (memberPassword.length < 8) { showToast('Password must be at least 8 characters', 'error'); return }
     setMemberSubmitting(true)
+    const headers = await getAuthHeaders()
     const res = await fetch('/api/team', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers,
       body: JSON.stringify({ mandal_id: mandalId, full_name: memberName, phone: memberPhone, email: memberEmail, password: memberPassword, role: memberRole })
     })
     const data = await res.json()
@@ -451,9 +476,10 @@ export default function DashboardPage() {
   async function removeMember(memberId: string) {
     if (!CAN.removeMember(userRole)) return
     if (!confirm('Remove this member? They will lose access immediately.')) return
+    const headers = await getAuthHeaders()
     const res = await fetch('/api/team', {
       method: 'DELETE',
-      headers: { 'Content-Type': 'application/json' },
+      headers,
       body: JSON.stringify({ user_id: memberId })
     })
     const data = await res.json()
@@ -461,6 +487,142 @@ export default function DashboardPage() {
       setMembers(prev => prev.filter(m => m.id !== memberId))
       showToast('Member removed', 'success')
     } else showToast('Could not remove member', 'error')
+  }
+
+  async function toggleMemberStatus(member: Member) {
+    if (!CAN.removeMember(userRole)) return
+    const newStatus = !member.is_active
+    const actionLabel = newStatus ? 'activate' : 'deactivate'
+    if (!confirm(`Are you sure you want to ${actionLabel} this member?`)) return
+
+    try {
+      const headers = await getAuthHeaders()
+      const res = await fetch('/api/team', {
+        method: 'PATCH',
+        headers,
+        body: JSON.stringify({
+          action: 'toggle_status',
+          user_id: member.id,
+          is_active: newStatus
+        })
+      })
+      const data = await res.json()
+      if (data.success) {
+        showToast(`Member ${newStatus ? 'activated' : 'deactivated'} successfully`, 'success')
+        setMembers(prev => prev.map(m => m.id === member.id ? { ...m, is_active: newStatus } : m))
+      } else {
+        showToast(data.error || `Could not ${actionLabel} member`, 'error')
+      }
+    } catch (err) {
+      showToast('Something went wrong', 'error')
+    }
+  }
+
+  function openEditModal(member: Member) {
+    setEditUser(member)
+    setEditName(member.full_name)
+    setEditPhone(member.phone)
+    setEditRole(member.role as 'collector' | 'manager')
+  }
+
+  async function updateMember() {
+    if (!editUser) return
+    if (!editName || !editPhone || !editRole) {
+      showToast('All fields required', 'error'); return
+    }
+    setEditSubmitting(true)
+    try {
+      const headers = await getAuthHeaders()
+      const res = await fetch('/api/team', {
+        method: 'PATCH',
+        headers,
+        body: JSON.stringify({
+          action: 'edit',
+          user_id: editUser.id,
+          full_name: editName,
+          phone: editPhone,
+          role: editRole
+        })
+      })
+      const data = await res.json()
+      if (data.success) {
+        showToast('Member details updated', 'success')
+        setMembers(prev => prev.map(m => m.id === editUser.id ? data.member : m))
+        setEditUser(null)
+      } else {
+        showToast(data.error || 'Could not update member', 'error')
+      }
+    } catch (err) {
+      showToast('Something went wrong', 'error')
+    }
+    setEditSubmitting(false)
+  }
+
+  function openResetPasswordModal(member: Member) {
+    setResetPasswordUser(member)
+    setTempPassword('')
+  }
+
+  function handleGeneratePassword() {
+    const length = 11;
+    const uppercase = 'ABCDEFGHJKLMNPQRSTUVWXYZ';
+    const lowercase = 'abcdefghijkmnopqrstuvwxyz';
+    const numbers = '23456789';
+    const symbols = '#@$%&*!';
+    
+    let chars = '';
+    const firstUpper = uppercase[Math.floor(Math.random() * uppercase.length)];
+    const firstLower = lowercase[Math.floor(Math.random() * lowercase.length)];
+    const firstNumber = numbers[Math.floor(Math.random() * numbers.length)];
+    const firstSymbol = symbols[Math.floor(Math.random() * symbols.length)];
+    
+    const all = uppercase + lowercase + numbers + symbols;
+    for (let i = 4; i < length; i++) {
+      chars += all[Math.floor(Math.random() * all.length)];
+    }
+    
+    const passwordArray = [firstUpper, firstLower, firstNumber, firstSymbol, ...chars.split('')];
+    const generated = passwordArray.sort(() => 0.5 - Math.random()).join('');
+    
+    setTempPassword(generated)
+  }
+
+  async function resetPassword() {
+    if (!resetPasswordUser) return
+    const hasLength = tempPassword.length >= 8
+    const hasUpper = /[A-Z]/.test(tempPassword)
+    const hasLower = /[a-z]/.test(tempPassword)
+    const hasNumber = /[0-9]/.test(tempPassword)
+    const hasSpecial = /[^A-Za-z0-9]/.test(tempPassword)
+
+    if (!hasLength || !hasUpper || !hasLower || !hasNumber || !hasSpecial) {
+      showToast('Password does not meet complexity requirements', 'error')
+      return
+    }
+    setResetPasswordSubmitting(true)
+    try {
+      const headers = await getAuthHeaders()
+      const res = await fetch('/api/team/reset-password', {
+        method: 'PATCH',
+        headers,
+        body: JSON.stringify({
+          user_id: resetPasswordUser.id,
+          new_password: tempPassword
+        })
+      })
+      const data = await res.json()
+      if (data.success) {
+        showToast('Password reset successfully.', 'success')
+        setGeneratedPassword(tempPassword)
+        setResetPasswordUser(null)
+        setShowPasswordUpdatedModal(true)
+      } else {
+        showToast(data.error || 'Could not reset password', 'error')
+      }
+    } catch (err) {
+      showToast('Something went wrong', 'error')
+    }
+    setResetPasswordSubmitting(false)
   }
 
   // ── Helpers ───────────────────────────────────────────────────
@@ -569,6 +731,14 @@ export default function DashboardPage() {
     }
   })
   distinctCollectors.sort((a, b) => a.name.localeCompare(b.name))
+
+  // Password complexity check states
+  const passLength = tempPassword.length >= 8
+  const passUpper = /[A-Z]/.test(tempPassword)
+  const passLower = /[a-z]/.test(tempPassword)
+  const passNumber = /[0-9]/.test(tempPassword)
+  const passSpecial = /[^A-Za-z0-9]/.test(tempPassword)
+  const isPasswordStrong = passLength && passUpper && passLower && passNumber && passSpecial
 
   // Available tabs depend on role
   const availableTabs: Tab[] = [
@@ -1233,10 +1403,12 @@ export default function DashboardPage() {
               <p className="text-gray-500 text-sm text-center py-8">No team members yet.</p>
             ) : (
               members.map(m => (
-                <div key={m.id} className="bg-gray-800 border border-gray-700 rounded-xl p-4 flex items-center justify-between">
+                <div key={m.id} className={`bg-gray-800 border rounded-xl p-4 flex items-center justify-between flex-wrap gap-3 transition-colors ${
+                  m.is_active === false ? 'border-gray-800 bg-gray-900/40 opacity-75' : 'border-gray-700'
+                }`}>
                   <div>
                     <div className="flex items-center gap-2 flex-wrap">
-                      <p className="font-medium text-white text-sm">{m.full_name}</p>
+                      <p className={`font-medium text-sm ${m.is_active === false ? 'text-gray-500 line-through' : 'text-white'}`}>{m.full_name}</p>
                       <span className={`text-xs px-2 py-0.5 rounded-full font-medium
                         ${m.role === 'admin' ? 'bg-orange-900/50 text-orange-400'
                         : m.role === 'manager' ? 'bg-blue-900/50 text-blue-400'
@@ -1247,18 +1419,48 @@ export default function DashboardPage() {
                         : m.role === 'collector' ? 'Sevak'
                         : m.role}
                       </span>
+                      {m.is_active === false && (
+                        <span className="text-[10px] px-2 py-0.5 rounded-full font-semibold bg-gray-900/60 text-gray-400 border border-gray-800">
+                          Deactivated
+                        </span>
+                      )}
                     </div>
                     <p className="text-xs text-gray-400 mt-1">{m.phone}</p>
                   </div>
-                  {/* Cannot remove yourself, another admin, or super_admin */}
-                  {m.id !== userId && !['admin', 'super_admin'].includes(m.role) && (
-                    <button
-                      onClick={() => removeMember(m.id)}
-                      className="text-xs text-red-400 hover:text-red-300 transition-colors"
-                    >
-                      Remove
-                    </button>
-                  )}
+                  {/* Cannot edit/remove/reset yourself, another admin, or super_admin */}
+                  {m.id !== userId && !['admin', 'super_admin'].includes(m.role) ? (
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <button
+                        onClick={() => openEditModal(m)}
+                        className="text-xs bg-gray-700/60 hover:bg-gray-700 text-gray-200 px-2.5 py-1.5 rounded-lg transition-colors font-medium cursor-pointer"
+                      >
+                        Edit
+                      </button>
+                      <button
+                        onClick={() => openResetPasswordModal(m)}
+                        className="text-xs bg-orange-600/80 hover:bg-orange-600 text-white px-2.5 py-1.5 rounded-lg transition-colors font-medium cursor-pointer"
+                      >
+                        Reset Password
+                      </button>
+                      <button
+                        onClick={() => toggleMemberStatus(m)}
+                        className={`text-xs px-2.5 py-1.5 rounded-lg transition-colors font-medium cursor-pointer ${
+                          m.is_active === false
+                            ? 'bg-emerald-600/80 hover:bg-emerald-600 text-white'
+                            : 'bg-red-950/60 hover:bg-red-900/65 text-red-200 border border-red-900/30'
+                        }`}
+                      >
+                        {m.is_active === false ? 'Activate' : 'Deactivate'}
+                      </button>
+                      <button
+                        onClick={() => removeMember(m.id)}
+                        className="text-xs text-red-400/60 hover:text-red-400 transition-colors font-medium ml-1 cursor-pointer"
+                        title="Delete Permanently"
+                      >
+                        Remove
+                      </button>
+                    </div>
+                  ) : null}
                 </div>
               ))
             )}
@@ -1478,6 +1680,210 @@ export default function DashboardPage() {
                   className="px-3 py-1.5 bg-red-600 hover:bg-red-500 disabled:opacity-50 text-white rounded-lg text-xs font-medium transition-colors"
                 >
                   {submittingRejection ? 'Rejecting...' : 'Reject Donation'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ── Reset Password Modal Popup ── */}
+        {resetPasswordUser && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm animate-fade-in">
+            <div className="bg-gray-900 border border-gray-800 rounded-2xl w-full max-w-sm p-5 shadow-2xl">
+              <h3 className="text-sm font-semibold text-white mb-4">Reset Password</h3>
+              
+              <div className="mb-4 space-y-2">
+                <div>
+                  <label className="text-[10px] uppercase font-bold text-gray-500 tracking-wider">User:</label>
+                  <p className="text-sm font-medium text-white">{resetPasswordUser.full_name}</p>
+                </div>
+                <div>
+                  <label className="text-[10px] uppercase font-bold text-gray-500 tracking-wider">Role:</label>
+                  <p className="text-xs font-medium text-gray-300 capitalize">
+                    {resetPasswordUser.role === 'manager' ? 'Khajindar (Manager)' : resetPasswordUser.role === 'collector' ? 'Sevak (Collector)' : resetPasswordUser.role}
+                  </p>
+                </div>
+              </div>
+
+              <div className="mb-5">
+                <label className="block text-[10px] uppercase font-bold text-gray-500 tracking-wider mb-2">New Temporary Password:</label>
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={tempPassword}
+                    onChange={e => setTempPassword(e.target.value)}
+                    placeholder="Enter password (min 8 chars)"
+                    className="flex-1 bg-gray-950 border border-gray-800 rounded-lg px-3 py-2 text-xs text-white placeholder-gray-600 focus:outline-none focus:border-orange-500"
+                  />
+                  <button
+                    type="button"
+                    onClick={handleGeneratePassword}
+                    className="px-2.5 py-2 bg-gray-800 hover:bg-gray-700 text-gray-200 text-xs font-medium rounded-lg transition-colors border border-gray-700 cursor-pointer"
+                  >
+                    Generate Random
+                  </button>
+                </div>
+                <div className="mt-3 space-y-1 bg-gray-950/45 border border-gray-800/80 rounded-lg p-2.5">
+                  <p className="text-[9px] text-gray-500 font-bold mb-1.5 uppercase tracking-wider">Password Requirements:</p>
+                  
+                  <div className="flex items-center gap-1.5 text-[10px] transition-colors">
+                    <span className={tempPassword ? (passLength ? 'text-emerald-400 font-medium' : 'text-red-400') : 'text-gray-500'}>
+                      {tempPassword ? (passLength ? '✓' : '✗') : '•'} At least 8 characters
+                    </span>
+                  </div>
+
+                  <div className="flex items-center gap-1.5 text-[10px] transition-colors">
+                    <span className={tempPassword ? (passUpper ? 'text-emerald-400 font-medium' : 'text-red-400') : 'text-gray-500'}>
+                      {tempPassword ? (passUpper ? '✓' : '✗') : '•'} Uppercase letter (A-Z)
+                    </span>
+                  </div>
+
+                  <div className="flex items-center gap-1.5 text-[10px] transition-colors">
+                    <span className={tempPassword ? (passLower ? 'text-emerald-400 font-medium' : 'text-red-400') : 'text-gray-500'}>
+                      {tempPassword ? (passLower ? '✓' : '✗') : '•'} Lowercase letter (a-z)
+                    </span>
+                  </div>
+
+                  <div className="flex items-center gap-1.5 text-[10px] transition-colors">
+                    <span className={tempPassword ? (passNumber ? 'text-emerald-400 font-medium' : 'text-red-400') : 'text-gray-500'}>
+                      {tempPassword ? (passNumber ? '✓' : '✗') : '•'} A number (0-9)
+                    </span>
+                  </div>
+
+                  <div className="flex items-center gap-1.5 text-[10px] transition-colors">
+                    <span className={tempPassword ? (passSpecial ? 'text-emerald-400 font-medium' : 'text-red-400') : 'text-gray-500'}>
+                      {tempPassword ? (passSpecial ? '✓' : '✗') : '•'} Special character (e.g. #, @, $, !, %, &, *)
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex gap-2 justify-end">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setResetPasswordUser(null)
+                    setTempPassword('')
+                  }}
+                  disabled={resetPasswordSubmitting}
+                  className="px-4 py-2 bg-gray-800 hover:bg-gray-700 text-gray-300 hover:text-gray-200 rounded-lg text-xs font-semibold transition-colors cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={resetPassword}
+                  disabled={resetPasswordSubmitting || !isPasswordStrong}
+                  className="px-4 py-2 bg-orange-600 hover:bg-orange-500 disabled:opacity-50 text-white rounded-lg text-xs font-semibold transition-colors cursor-pointer"
+                >
+                  {resetPasswordSubmitting ? 'Resetting...' : 'Reset Password'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ── Password Updated Modal Popup ── */}
+        {showPasswordUpdatedModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm animate-fade-in">
+            <div className="bg-gray-900 border border-gray-800 rounded-2xl w-full max-w-sm p-5 shadow-2xl text-center">
+              <div className="w-12 h-12 bg-green-900/30 text-green-400 border border-green-800/30 rounded-full flex items-center justify-center mx-auto mb-3">
+                <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                </svg>
+              </div>
+              <h3 className="text-sm font-semibold text-white mb-1">Password Updated</h3>
+              <p className="text-xs text-gray-400 mb-4">Please share this password securely with the team member.</p>
+              
+              <div className="bg-gray-950 border border-gray-800 rounded-xl p-3 mb-5 flex items-center justify-between gap-2">
+                <span className="font-mono text-sm font-bold text-orange-400 select-all tracking-wider">{generatedPassword}</span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    navigator.clipboard.writeText(generatedPassword)
+                    showToast('Password copied to clipboard', 'success')
+                  }}
+                  className="text-xs text-orange-500 hover:text-orange-400 font-semibold cursor-pointer"
+                >
+                  Copy Button
+                </button>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setShowPasswordUpdatedModal(false)
+                  setGeneratedPassword('')
+                }}
+                className="w-full py-2.5 bg-orange-500 hover:bg-orange-600 text-white rounded-lg text-xs font-semibold transition-colors cursor-pointer"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* ── Edit Member Modal Popup ── */}
+        {editUser && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm animate-fade-in">
+            <div className="bg-gray-900 border border-gray-800 rounded-2xl w-full max-w-sm p-5 shadow-2xl">
+              <h3 className="text-sm font-semibold text-white mb-4">Edit Team Member</h3>
+              
+              <div className="space-y-4 mb-5">
+                <div>
+                  <label className="block text-[10px] uppercase font-bold text-gray-500 tracking-wider mb-1.5">Full Name</label>
+                  <input
+                    type="text"
+                    value={editName}
+                    onChange={e => setEditName(e.target.value)}
+                    placeholder="Enter full name"
+                    className="w-full bg-gray-950 border border-gray-800 rounded-lg px-3 py-2 text-xs text-white placeholder-gray-600 focus:outline-none focus:border-orange-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[10px] uppercase font-bold text-gray-500 tracking-wider mb-1.5">Phone Number</label>
+                  <input
+                    type="tel"
+                    value={editPhone}
+                    onChange={e => setEditPhone(e.target.value)}
+                    placeholder="Enter phone number"
+                    className="w-full bg-gray-950 border border-gray-800 rounded-lg px-3 py-2 text-xs text-white placeholder-gray-600 focus:outline-none focus:border-orange-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[10px] uppercase font-bold text-gray-500 tracking-wider mb-1.5">Role</label>
+                  <div className="grid grid-cols-2 gap-2">
+                    {(['collector', 'manager'] as const).map(r => (
+                      <button
+                        key={r}
+                        type="button"
+                        onClick={() => setEditRole(r)}
+                        className={`py-2 rounded-lg text-xs font-semibold border capitalize transition-colors cursor-pointer
+                          ${editRole === r ? 'bg-orange-500 border-orange-500 text-white' : 'bg-gray-950 border-gray-800 text-gray-400 hover:border-gray-700'}`}
+                      >
+                        {r === 'collector' ? 'Sevak (Collector)' : 'Khajindar (Manager)'}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex gap-2 justify-end">
+                <button
+                  type="button"
+                  onClick={() => setEditUser(null)}
+                  disabled={editSubmitting}
+                  className="px-4 py-2 bg-gray-800 hover:bg-gray-700 text-gray-300 hover:text-gray-200 rounded-lg text-xs font-semibold transition-colors cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={updateMember}
+                  disabled={editSubmitting || !editName.trim() || !editPhone.trim()}
+                  className="px-4 py-2 bg-orange-500 hover:bg-orange-600 disabled:opacity-50 text-white rounded-lg text-xs font-semibold transition-colors cursor-pointer"
+                >
+                  {editSubmitting ? 'Saving...' : 'Save Changes'}
                 </button>
               </div>
             </div>
