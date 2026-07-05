@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
@@ -13,34 +13,6 @@ export default function LoginPage() {
   const [success, setSuccess] = useState(false);
   const [adminName, setAdminName] = useState("");
   const [mandalName, setMandalName] = useState("");
-
-  useEffect(() => {
-    async function checkUser() {
-      try {
-        const { data: { user } } = await supabase.auth.getUser()
-        if (user) {
-          const { data: userProfile } = await supabase
-            .from("users")
-            .select("role")
-            .eq("id", user.id)
-            .single()
-          
-          if (userProfile) {
-            if (userProfile.role === "super_admin") {
-              router.push("/super-admin/mandals")
-            } else if (["admin", "manager"].includes(userProfile.role)) {
-              router.push("/dashboard")
-            } else if (userProfile.role === "collector") {
-              router.push("/collect")
-            }
-          }
-        }
-      } catch (err) {
-        console.error("Error auto-redirecting user from login:", err)
-      }
-    }
-    checkUser()
-  }, [router])
 
   // Form State
   const [email, setEmail] = useState("");
@@ -109,11 +81,12 @@ export default function LoginPage() {
       }
 
       // 2. Fetch the corresponding user profile & mandal details for personalization
-      const { data: userProfile, error: profileError } = await supabase
+      let { data: userProfile, error: profileError } = await supabase
         .from("users")
         .select(`
           full_name,
           role,
+          is_active,
           mandals (
             name
           )
@@ -121,14 +94,47 @@ export default function LoginPage() {
         .eq("id", data.user.id)
         .single();
 
+      // Fallback: If is_active column doesn't exist yet, retry without it
+      if (profileError && profileError.message.includes("is_active")) {
+        const { data: fallbackProfile, error: fallbackError } = await supabase
+          .from("users")
+          .select(`
+            full_name,
+            role,
+            mandals (
+              name
+            )
+          `)
+          .eq("id", data.user.id)
+          .single();
+
+        if (!fallbackError && fallbackProfile) {
+          userProfile = {
+            ...fallbackProfile,
+            is_active: true
+          };
+          profileError = null;
+        }
+      }
+
       let userRole = "";
       if (!profileError && userProfile) {
+        // Check if account is deactivated
+        if (userProfile.is_active === false) {
+          await supabase.auth.signOut();
+          setErrorMsg("Your account has been deactivated. Please contact your Adhyaksha.");
+          setLoading(false);
+          return;
+        }
+
         setAdminName(userProfile.full_name || "");
         userRole = userProfile.role || "";
-        // @ts-ignore
-        if (userProfile.mandals) {
-          // @ts-ignore
-          setMandalName(userProfile.mandals.name || "");
+        const mandalsData = userProfile.mandals as unknown as { name: string }[] | { name: string } | null;
+        if (mandalsData) {
+          const mandalObj = Array.isArray(mandalsData) ? mandalsData[0] : mandalsData;
+          if (mandalObj) {
+            setMandalName(mandalObj.name || "");
+          }
         }
       }
 
@@ -146,10 +152,11 @@ export default function LoginPage() {
         }
       }, 1800);
 
-    } catch (err: any) {
+    } catch (err: unknown) {
+      const error = err as { message?: string };
       // Use console.warn instead of console.error to avoid popping up Next.js developer overlay
-      console.warn("Login authentication warning:", err.message || err);
-      setErrorMsg(err.message || "Invalid email or password.");
+      console.warn("Login authentication warning:", error.message || error);
+      setErrorMsg(error.message || "Invalid email or password.");
       setLoading(false);
     }
   };
