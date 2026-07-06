@@ -650,6 +650,23 @@ export default function DashboardPage() {
   const selfDonations = donations.filter(d => d.payment_mode === 'upi_self')
   const nonSelfDonations = donations.filter(d => d.payment_mode !== 'upi_self')
 
+  // Calculate stats for non-self (collector) donations
+  const collectorTotalCount = nonSelfDonations.length
+  const collectorTotalAmount = nonSelfDonations.reduce((sum, d) => sum + Number(d.amount), 0)
+  const collectorVerifiedAmount = nonSelfDonations
+    .filter(d => d.status === 'verified')
+    .reduce((sum, d) => sum + Number(d.amount), 0)
+  const collectorPendingCount = nonSelfDonations.filter(d => d.status === 'pending').length
+
+  // Calculate stats for self donations
+  const selfTotalCount = selfDonations.length
+  const selfTotalAmount = selfDonations.reduce((sum, d) => sum + Number(d.amount), 0)
+  const selfVerifiedAmount = selfDonations
+    .filter(d => d.status === 'verified')
+    .reduce((sum, d) => sum + Number(d.amount), 0)
+  const selfPendingCount = selfDonations.filter(d => d.status === 'pending').length
+
+
   interface CollectorGroup {
     id: string
     name: string
@@ -824,18 +841,52 @@ export default function DashboardPage() {
 
         {/* Summary cards */}
         {tab === 'donations' && summary && (
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
-            {[
-              { label: 'Total donations', value: summary.total_count },
-              { label: 'Total collected', value: formatAmount(summary.total_amount) },
-              { label: 'Verified', value: formatAmount(summary.verified_amount) },
-              { label: 'Pending verify', value: summary.pending_count },
-            ].map(card => (
-              <div key={card.label} className="bg-gray-800 rounded-xl p-4">
-                <p className="text-xs text-gray-400 mb-1">{card.label}</p>
-                <p className="text-xl font-semibold text-white">{card.value}</p>
+          <div className="flex flex-col gap-6 mb-6">
+            {/* Collector Collections Summary */}
+            <div>
+              <div className="flex items-center gap-2 mb-2 px-1">
+                <span className="text-sm">👥</span>
+                <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wider">
+                  Collector Collections
+                </h3>
               </div>
-            ))}
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                {[
+                  { label: 'Total donations', value: collectorTotalCount },
+                  { label: 'Total collected', value: formatAmount(collectorTotalAmount) },
+                  { label: 'Verified', value: formatAmount(collectorVerifiedAmount) },
+                  { label: 'Pending verify', value: collectorPendingCount },
+                ].map(card => (
+                  <div key={card.label} className="bg-gray-800 rounded-xl p-4">
+                    <p className="text-xs text-gray-400 mb-1">{card.label}</p>
+                    <p className="text-xl font-semibold text-white">{card.value}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Direct Self-Donations Summary */}
+            <div>
+              <div className="flex items-center gap-2 mb-2 px-1">
+                <span className="text-sm">🌐</span>
+                <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wider">
+                  Direct Self-Donations
+                </h3>
+              </div>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                {[
+                  { label: 'Total self donations', value: selfTotalCount },
+                  { label: 'Total collected', value: formatAmount(selfTotalAmount) },
+                  { label: 'Verified', value: formatAmount(selfVerifiedAmount) },
+                  { label: 'Pending verify', value: selfPendingCount },
+                ].map(card => (
+                  <div key={card.label} className="bg-gray-800 rounded-xl p-4">
+                    <p className="text-xs text-gray-400 mb-1">{card.label}</p>
+                    <p className="text-xl font-semibold text-white">{card.value}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
           </div>
         )}
 
