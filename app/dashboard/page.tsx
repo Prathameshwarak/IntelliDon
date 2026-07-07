@@ -5,7 +5,7 @@ import { supabase } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
 
 // ── Types ──────────────────────────────────────────────────────
-type Tab = 'donations' | 'history' | 'events' | 'team'
+type Tab = 'donations' | 'ranking' | 'history' | 'events' | 'team'
 
 type Donation = {
   id: string
@@ -93,6 +93,8 @@ export default function DashboardPage() {
   const [historySearch, setHistorySearch] = useState('')
   const [historyCollectorFilter, setHistoryCollectorFilter] = useState('all')
   const [historyTypeFilter, setHistoryTypeFilter] = useState('all')
+  //line added by pratham:
+  const [rankingSubTab, setRankingSubTab] = useState<'collectors' | 'donors'>('collectors')
 
   // Events state
   const [events, setEvents] = useState<Event[]>([])
@@ -711,6 +713,41 @@ export default function DashboardPage() {
   })
 
   const collectorList = Object.values(collectorGroups).sort((a, b) => a.name.localeCompare(b.name))
+
+//new Line added by pratham
+// Ranking: collectors sorted by total amount collected (cash + UPI), descending
+  const rankingList = [...Object.values(collectorGroups)]
+    .map(c => ({ ...c, totalAmount: c.totalCash + c.totalUpi }))
+    .sort((a, b) => b.totalAmount - a.totalAmount)
+  const topRankingAmount = rankingList.length > 0 ? rankingList[0].totalAmount : 0
+
+  //line added by pratham  start line
+  // Donor Ranking: group ALL donations (collector + self) by donor phone, sorted by total donated descending
+  interface DonorGroup {
+    phone: string
+    name: string
+    totalAmount: number
+    donationCount: number
+  }
+
+  const donorGroupsMap: Record<string, DonorGroup> = {}
+
+  donations.forEach(d => {
+    const key = d.donor_phone || d.donor_name || 'unknown'
+    if (!donorGroupsMap[key]) {
+      donorGroupsMap[key] = {
+        phone: d.donor_phone,
+        name: d.donor_name,
+        totalAmount: 0,
+        donationCount: 0
+      }
+    }
+    donorGroupsMap[key].totalAmount += Number(d.amount)
+    donorGroupsMap[key].donationCount += 1
+  })
+
+  const donorRankingList = Object.values(donorGroupsMap).sort((a, b) => b.totalAmount - a.totalAmount) //End
+
   const visibleCollectorList = collectorList.filter(c => c.pendingCash > 0 || c.pendingUpi > 0)
   const pendingSelfCount = selfDonations.filter(d => d.status === 'pending').length
 
@@ -760,6 +797,7 @@ export default function DashboardPage() {
   // Available tabs depend on role
   const availableTabs: Tab[] = [
     'donations',
+    'ranking',
     'history',
     ...(CAN.seeEventsTab(userRole) ? ['events' as Tab] : []),
     ...(CAN.seeTeamTab(userRole) ? ['team' as Tab] : []),
@@ -803,13 +841,13 @@ export default function DashboardPage() {
       )}
 
       {/* Header */}
-      <div className="bg-gray-900 border-b border-gray-800 px-6 py-4 flex items-center justify-between">
-        <div>
+      <div className="bg-gray-900 border-b border-gray-800 px-3 sm:px-6 py-3 sm:py-4 flex flex-wrap items-center justify-between gap-2">
+        <div className="min-w-0">
           <p className="text-xs text-gray-400">Intellidon</p>
-          <p className="text-base font-semibold">{mandalName}</p>
+          <p className="text-sm sm:text-base font-semibold truncate max-w-[160px] sm:max-w-none">{mandalName}</p>
         </div>
-        <div className="flex items-center gap-3">
-          <span className={`text-xs font-medium px-2.5 py-1 rounded-full capitalize
+        <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
+          <span className={`text-[10px] sm:text-xs font-medium px-2 sm:px-2.5 py-1 rounded-full capitalize
             ${userRole === 'admin'
               ? 'bg-orange-900/50 text-orange-400'
               : 'bg-blue-900/50 text-blue-400'}`}>
@@ -817,20 +855,20 @@ export default function DashboardPage() {
           </span>
           <button
             onClick={() => router.push('/share')}
-            className="text-xs bg-gray-700 hover:bg-gray-600 text-white px-3 py-1.5 rounded-lg transition-colors"
+            className="text-[10px] sm:text-xs bg-gray-700 hover:bg-gray-600 text-white px-2 sm:px-3 py-1.5 rounded-lg transition-colors whitespace-nowrap"
           >
-            🔗 Share Link
+            🔗 <span className="hidden sm:inline">Share Link</span>
           </button>
           <button
             onClick={() => supabase.auth.signOut().then(() => router.push('/login'))}
-            className="text-xs text-red-400 hover:text-red-300 transition-colors"
+            className="text-[10px] sm:text-xs text-red-400 hover:text-red-300 transition-colors whitespace-nowrap"
           >
             Sign out
           </button>
         </div>
-      </div>
+      </div>  
 
-      <div className="max-w-4xl mx-auto px-4 py-6">
+      <div className="max-w-4xl mx-auto px-3 sm:px-4 py-4 sm:py-6">
 
         {/* Role notice for manager */}
         {userRole === 'manager' && (
@@ -891,12 +929,12 @@ export default function DashboardPage() {
         )}
 
         {/* Tabs — only show tabs the role has access to */}
-        <div className="flex gap-1 bg-gray-900 rounded-xl p-1 border border-gray-800 mb-6 w-fit">
+        <div className="flex gap-1 bg-gray-900 rounded-xl p-1 border border-gray-800 mb-6 w-full sm:w-fit overflow-x-auto">
           {availableTabs.map(t => (
             <button
               key={t}
               onClick={() => setTab(t)}
-              className={`px-5 py-2 rounded-lg text-sm font-medium capitalize transition-colors
+              className={`px-3 sm:px-5 py-2 rounded-lg text-xs sm:text-sm font-medium capitalize transition-colors whitespace-nowrap flex-shrink-0
                 ${tab === t ? 'bg-orange-500 text-white' : 'text-gray-400 hover:text-white'}`}
             >
               {t}
@@ -975,8 +1013,7 @@ export default function DashboardPage() {
                         </div>
 
                         {/* Action buttons & Arrow */}
-                        <div className="flex items-center gap-2 self-end md:self-auto" onClick={e => e.stopPropagation()}>
-                          {hasPendingCash && CAN.verifyDonation(userRole) && (
+                        <div className="flex items-center gap-2 flex-wrap justify-end self-end md:self-auto" onClick= {e => e.stopPropagation()}>
                             <button
                               onClick={() => verifyCollectorBulk(c.id, 'cash')}
                               disabled={bulkVerifyingCollector === c.id}
@@ -984,7 +1021,7 @@ export default function DashboardPage() {
                             >
                               {bulkVerifyingCollector === c.id && bulkVerifyingMode === 'cash' ? '...' : '✓ Verify Cash'}
                             </button>
-                          )}
+                          
 
                           {hasPendingUpi && CAN.verifyDonation(userRole) && (
                             <button
@@ -1076,6 +1113,116 @@ export default function DashboardPage() {
           </div>
         )}
 
+      
+        {/* ── TAB: Ranking (Collectors + Donors) ── */}
+        {tab === 'ranking' && (
+          <div className="flex flex-col gap-4">
+
+            {/* Sub-tab toggle */}
+            <div className="flex gap-1 bg-gray-900 rounded-xl p-1 border border-gray-800 w-full sm:w-fit">
+              {(['collectors', 'donors'] as const).map(st => (
+                <button
+                  key={st}
+                  onClick={() => setRankingSubTab(st)}
+                  className={`flex-1 sm:flex-none px-3 sm:px-5 py-2 rounded-lg text-xs sm:text-sm font-medium capitalize transition-colors whitespace-nowrap
+                    ${rankingSubTab === st ? 'bg-orange-500 text-white' : 'text-gray-400 hover:text-white'}`}
+                >
+                  {st === 'collectors' ? '👥 Collectors' : '🎗️ Donors'}
+                </button>
+              ))}
+            </div>
+
+            {/* ── Collector Ranking ── */}
+            {rankingSubTab === 'collectors' && (
+              donationsLoading ? (
+                <p className="text-gray-400 text-sm text-center py-12">Loading ranking...</p>
+              ) : rankingList.length === 0 ? (
+                <div className="text-center py-12 bg-gray-900/30 border border-gray-800 rounded-xl">
+                  <p className="text-gray-500 text-sm">No collector activity yet.</p>
+                </div>
+              ) : (
+                <div className="flex flex-col gap-3">
+                  <p className="text-xs text-gray-400 font-medium px-1 uppercase tracking-wider">
+                    Leaderboard — by total amount collected
+                  </p>
+                  {rankingList.map((c, index) => {
+                    const rank = index + 1
+                    const medal = rank === 1 ? '🥇' : rank === 2 ? '🥈' : rank === 3 ? '🥉' : null
+                    return (
+                      <div
+                        key={c.id}
+                        className={`bg-gray-900 border rounded-xl p-4 flex items-center gap-4
+                          ${rank === 1 ? 'border-yellow-500/40 shadow-lg' : 'border-gray-800'}`}
+                      >
+                        <div className={`w-10 h-10 flex-shrink-0 rounded-full flex items-center justify-center text-sm font-bold
+                          ${rank <= 3 ? 'bg-gray-800' : 'bg-gray-800 text-gray-400'}`}>
+                          {medal ? <span className="text-xl">{medal}</span> : <span>#{rank}</span>}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center justify-between gap-2 mb-1.5">
+                            <span className="text-sm font-semibold text-white truncate">{c.name}</span>
+                            <span className="text-sm font-bold text-white flex-shrink-0">{formatAmount(c.totalAmount)}</span>
+                          </div>
+                          <div className="flex gap-3 mt-1.5 text-[11px] text-gray-500">
+                            <span>💵 Cash: {formatAmount(c.totalCash)}</span>
+                            <span>📱 UPI: {formatAmount(c.totalUpi)}</span>
+                            <span>{c.donations.length} donation{c.donations.length !== 1 ? 's' : ''}</span>
+                          </div>
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              )
+            )}
+
+            {/* ── Donor Ranking ── */}
+            {rankingSubTab === 'donors' && (
+              donationsLoading ? (
+                <p className="text-gray-400 text-sm text-center py-12">Loading ranking...</p>
+              ) : donorRankingList.length === 0 ? (
+                <div className="text-center py-12 bg-gray-900/30 border border-gray-800 rounded-xl">
+                  <p className="text-gray-500 text-sm">No donor activity yet.</p>
+                </div>
+              ) : (
+                <div className="flex flex-col gap-3">
+                  <p className="text-xs text-gray-400 font-medium px-1 uppercase tracking-wider">
+                    Top Donors — by total amount donated
+                  </p>
+                  {donorRankingList.map((d, index) => {
+                    const rank = index + 1
+                    const medal = rank === 1 ? '🥇' : rank === 2 ? '🥈' : rank === 3 ? '🥉' : null
+                    return (
+                      <div
+                        key={d.phone + index}
+                        className={`bg-gray-900 border rounded-xl p-4 flex items-center gap-4
+                          ${rank === 1 ? 'border-yellow-500/40 shadow-lg' : 'border-gray-800'}`}
+                      >
+                        <div className={`w-10 h-10 flex-shrink-0 rounded-full flex items-center justify-center text-sm font-bold
+                          ${rank <= 3 ? 'bg-gray-800' : 'bg-gray-800 text-gray-400'}`}>
+                          {medal ? <span className="text-xl">{medal}</span> : <span>#{rank}</span>}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center justify-between gap-2 mb-1.5">
+                            <span className="text-sm font-semibold text-white truncate">{d.name}</span>
+                            <span className="text-sm font-bold text-white flex-shrink-0">{formatAmount(d.totalAmount)}</span>
+                          </div>
+                          <div className="flex gap-3 mt-1.5 text-[11px] text-gray-500">
+                            <span>{d.phone}</span>
+                            <span>{d.donationCount} donation{d.donationCount !== 1 ? 's' : ''}</span>
+                          </div>
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              )
+            )}
+
+          </div>
+        )}
+
+
         {/* ── TAB: Collection History ── */}
         {tab === 'history' && (
           <div className="flex flex-col gap-4">
@@ -1098,13 +1245,13 @@ export default function DashboardPage() {
               </div>
 
               {/* Filters (Collector & Type) */}
-              <div className="flex gap-2 flex-wrap md:flex-nowrap">
+              <div className="flex flex-col sm:flex-row gap-2 w-full md:w-auto">
                 
                 {/* Collector filter dropdown */}
                 <select
                   value={historyCollectorFilter}
                   onChange={e => setHistoryCollectorFilter(e.target.value)}
-                  className="bg-gray-950 border border-gray-800 rounded-lg px-3 py-2 text-xs text-gray-300 focus:outline-none focus:border-orange-500 transition-colors"
+                  className="flex-1 bg-gray-950 border border-gray-800 rounded-lg px-3 py-2 text-xs text-gray-300 focus:outline-none focus:border-orange-500 transition-colors"
                 >
                   <option value="all">All Collectors</option>
                   <option value="self">Self-Donations (Online)</option>
@@ -1117,7 +1264,7 @@ export default function DashboardPage() {
                 <select
                   value={historyTypeFilter}
                   onChange={e => setHistoryTypeFilter(e.target.value)}
-                  className="bg-gray-950 border border-gray-800 rounded-lg px-3 py-2 text-xs text-gray-300 focus:outline-none focus:border-orange-500 transition-colors"
+                  className="flex-1 bg-gray-950 border border-gray-800 rounded-lg px-3 py-2 text-xs text-gray-300 focus:outline-none focus:border-orange-500 transition-colors"
                 >
                   <option value="all">All Modes</option>
                   <option value="cash">💵 Cash</option>
