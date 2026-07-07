@@ -841,13 +841,13 @@ export default function DashboardPage() {
       )}
 
       {/* Header */}
-      <div className="bg-gray-900 border-b border-gray-800 px-6 py-4 flex items-center justify-between">
-        <div>
+      <div className="bg-gray-900 border-b border-gray-800 px-3 sm:px-6 py-3 sm:py-4 flex flex-wrap items-center justify-between gap-2">
+        <div className="min-w-0">
           <p className="text-xs text-gray-400">Intellidon</p>
-          <p className="text-base font-semibold">{mandalName}</p>
+          <p className="text-sm sm:text-base font-semibold truncate max-w-[160px] sm:max-w-none">{mandalName}</p>
         </div>
-        <div className="flex items-center gap-3">
-          <span className={`text-xs font-medium px-2.5 py-1 rounded-full capitalize
+        <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
+          <span className={`text-[10px] sm:text-xs font-medium px-2 sm:px-2.5 py-1 rounded-full capitalize
             ${userRole === 'admin'
               ? 'bg-orange-900/50 text-orange-400'
               : 'bg-blue-900/50 text-blue-400'}`}>
@@ -855,20 +855,20 @@ export default function DashboardPage() {
           </span>
           <button
             onClick={() => router.push('/share')}
-            className="text-xs bg-gray-700 hover:bg-gray-600 text-white px-3 py-1.5 rounded-lg transition-colors"
+            className="text-[10px] sm:text-xs bg-gray-700 hover:bg-gray-600 text-white px-2 sm:px-3 py-1.5 rounded-lg transition-colors whitespace-nowrap"
           >
-            🔗 Share Link
+            🔗 <span className="hidden sm:inline">Share Link</span>
           </button>
           <button
             onClick={() => supabase.auth.signOut().then(() => router.push('/login'))}
-            className="text-xs text-red-400 hover:text-red-300 transition-colors"
+            className="text-[10px] sm:text-xs text-red-400 hover:text-red-300 transition-colors whitespace-nowrap"
           >
             Sign out
           </button>
         </div>
-      </div>
+      </div>  
 
-      <div className="max-w-4xl mx-auto px-4 py-6">
+      <div className="max-w-4xl mx-auto px-3 sm:px-4 py-4 sm:py-6">
 
         {/* Role notice for manager */}
         {userRole === 'manager' && (
@@ -929,12 +929,12 @@ export default function DashboardPage() {
         )}
 
         {/* Tabs — only show tabs the role has access to */}
-        <div className="flex gap-1 bg-gray-900 rounded-xl p-1 border border-gray-800 mb-6 w-fit">
+        <div className="flex gap-1 bg-gray-900 rounded-xl p-1 border border-gray-800 mb-6 w-full sm:w-fit overflow-x-auto">
           {availableTabs.map(t => (
             <button
               key={t}
               onClick={() => setTab(t)}
-              className={`px-5 py-2 rounded-lg text-sm font-medium capitalize transition-colors
+              className={`px-3 sm:px-5 py-2 rounded-lg text-xs sm:text-sm font-medium capitalize transition-colors whitespace-nowrap flex-shrink-0
                 ${tab === t ? 'bg-orange-500 text-white' : 'text-gray-400 hover:text-white'}`}
             >
               {t}
@@ -1013,8 +1013,7 @@ export default function DashboardPage() {
                         </div>
 
                         {/* Action buttons & Arrow */}
-                        <div className="flex items-center gap-2 self-end md:self-auto" onClick={e => e.stopPropagation()}>
-                          {hasPendingCash && CAN.verifyDonation(userRole) && (
+                        <div className="flex items-center gap-2 flex-wrap justify-end self-end md:self-auto" onClick= {e => e.stopPropagation()}>
                             <button
                               onClick={() => verifyCollectorBulk(c.id, 'cash')}
                               disabled={bulkVerifyingCollector === c.id}
@@ -1022,7 +1021,7 @@ export default function DashboardPage() {
                             >
                               {bulkVerifyingCollector === c.id && bulkVerifyingMode === 'cash' ? '...' : '✓ Verify Cash'}
                             </button>
-                          )}
+                          
 
                           {hasPendingUpi && CAN.verifyDonation(userRole) && (
                             <button
@@ -1120,12 +1119,12 @@ export default function DashboardPage() {
           <div className="flex flex-col gap-4">
 
             {/* Sub-tab toggle */}
-            <div className="flex gap-1 bg-gray-900 rounded-xl p-1 border border-gray-800 w-fit">
+            <div className="flex gap-1 bg-gray-900 rounded-xl p-1 border border-gray-800 w-full sm:w-fit">
               {(['collectors', 'donors'] as const).map(st => (
                 <button
                   key={st}
                   onClick={() => setRankingSubTab(st)}
-                  className={`px-5 py-2 rounded-lg text-sm font-medium capitalize transition-colors
+                  className={`flex-1 sm:flex-none px-3 sm:px-5 py-2 rounded-lg text-xs sm:text-sm font-medium capitalize transition-colors whitespace-nowrap
                     ${rankingSubTab === st ? 'bg-orange-500 text-white' : 'text-gray-400 hover:text-white'}`}
                 >
                   {st === 'collectors' ? '👥 Collectors' : '🎗️ Donors'}
@@ -1246,13 +1245,13 @@ export default function DashboardPage() {
               </div>
 
               {/* Filters (Collector & Type) */}
-              <div className="flex gap-2 flex-wrap md:flex-nowrap">
+              <div className="flex flex-col sm:flex-row gap-2 w-full md:w-auto">
                 
                 {/* Collector filter dropdown */}
                 <select
                   value={historyCollectorFilter}
                   onChange={e => setHistoryCollectorFilter(e.target.value)}
-                  className="bg-gray-950 border border-gray-800 rounded-lg px-3 py-2 text-xs text-gray-300 focus:outline-none focus:border-orange-500 transition-colors"
+                  className="flex-1 bg-gray-950 border border-gray-800 rounded-lg px-3 py-2 text-xs text-gray-300 focus:outline-none focus:border-orange-500 transition-colors"
                 >
                   <option value="all">All Collectors</option>
                   <option value="self">Self-Donations (Online)</option>
@@ -1265,7 +1264,7 @@ export default function DashboardPage() {
                 <select
                   value={historyTypeFilter}
                   onChange={e => setHistoryTypeFilter(e.target.value)}
-                  className="bg-gray-950 border border-gray-800 rounded-lg px-3 py-2 text-xs text-gray-300 focus:outline-none focus:border-orange-500 transition-colors"
+                  className="flex-1 bg-gray-950 border border-gray-800 rounded-lg px-3 py-2 text-xs text-gray-300 focus:outline-none focus:border-orange-500 transition-colors"
                 >
                   <option value="all">All Modes</option>
                   <option value="cash">💵 Cash</option>
