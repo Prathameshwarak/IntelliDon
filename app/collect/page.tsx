@@ -56,6 +56,8 @@ export default function CollectPage() {
   const [duplicateWarning, setDuplicateWarning] = useState<DuplicateWarning | null>(null)
   const [successData, setSuccessData] = useState<SuccessData | null>(null)
   const [pendingPayload, setPendingPayload] = useState<any>(null)
+  const [checkingPhone, setCheckingPhone] = useState(false)
+  const [duplicateModalData, setDuplicateModalData] = useState<{ eventName: string; receiptId: string } | null>(null)
 
   useEffect(() => {
     async function init() {
@@ -120,7 +122,7 @@ export default function CollectPage() {
   async function handleFormSubmit() {
     setError('')
     if (!donorName.trim()) { setError('Enter donor name'); return }
-    if (!donorPhone.trim() || donorPhone.length < 10) { setError('Enter valid 10-digit phone number'); return }
+    if (donorPhone.trim() && donorPhone.trim().length < 10) { setError('Enter valid 10-digit phone number'); return }
     if (!amount || isNaN(Number(amount)) || Number(amount) <= 0) { setError('Enter valid amount'); return }
     if (!selectedEvent) { setError('Select an event'); return }
 
@@ -136,7 +138,32 @@ export default function CollectPage() {
     }
 
     setPendingPayload(payload)
-    if (paymentMode === 'cash') {
+
+    // Check duplicate phone
+    if (donorPhone.trim()) {
+      setCheckingPhone(true)
+      try {
+        const res = await fetch(`/api/donations/check-phone?event_id=${selectedEvent.id}&phone=${donorPhone}`)
+        const data = await res.json()
+        if (data.exists) {
+          setDuplicateModalData({
+            eventName: data.event_name,
+            receiptId: data.receipt_id
+          })
+          setCheckingPhone(false)
+          return
+        }
+      } catch (err) {
+        console.error('Failed to check duplicate phone', err)
+      }
+      setCheckingPhone(false)
+    }
+
+    proceedToPaymentStep(payload)
+  }
+
+  function proceedToPaymentStep(payload: any) {
+    if (payload.payment_mode === 'cash') {
       setStep('cash_confirm')
     } else {
       setStep('upi_qr')
@@ -243,11 +270,13 @@ export default function CollectPage() {
             </div>
 
             <div>
-              <label className="text-xs text-gray-400 mb-1 block">Phone Number *</label>
+              <label className="text-xs text-gray-450 mb-1 block">
+                Phone Number <span className="text-gray-500 font-normal">(optional)</span>
+              </label>
               <input
                 type="tel"
                 value={donorPhone}
-                onChange={e => setDonorPhone(e.target.value)}
+                onChange={e => setDonorPhone(e.target.value.replace(/[^0-9]/g, ''))}
                 placeholder="10-digit mobile number"
                 maxLength={10}
                 className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-3 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-orange-500"
@@ -268,11 +297,11 @@ export default function CollectPage() {
             <div>
               <label className="text-xs text-gray-400 mb-1 block">Amount (₹) *</label>
               <input
-                type="number"
+                type="text"
+                inputMode="numeric"
                 value={amount}
-                onChange={e => setAmount(e.target.value)}
+                onChange={e => setAmount(e.target.value.replace(/[^0-9]/g, ''))}
                 placeholder="0"
-                min="1"
                 className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-3 text-2xl font-semibold text-white placeholder-gray-600 focus:outline-none focus:border-orange-500"
               />
             </div>
@@ -309,10 +338,10 @@ export default function CollectPage() {
 
             <button
               onClick={handleFormSubmit}
-              disabled={submitting}
-              className="w-full bg-orange-500 hover:bg-orange-600 disabled:opacity-50 text-white font-semibold py-4 rounded-xl text-base transition-colors mt-2"
+              disabled={submitting || checkingPhone}
+              className="w-full bg-orange-500 hover:bg-orange-600 disabled:bg-orange-300 disabled:opacity-50 disabled:cursor-not-allowed text-white font-semibold py-4 rounded-xl text-base transition-colors mt-2 cursor-pointer"
             >
-              Continue →
+              {checkingPhone ? 'Checking details...' : 'Continue →'}
             </button>
           </div>
         )}
@@ -493,6 +522,43 @@ export default function CollectPage() {
           </div>
         )}
 
+        {duplicateModalData && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm animate-fade-in text-center">
+            <div className="bg-gray-900 border border-gray-800 rounded-2xl w-full max-w-sm p-6 shadow-2xl text-center">
+              <div className="w-12 h-12 bg-yellow-950/50 text-yellow-500 rounded-full flex items-center justify-center text-2xl mb-4 mx-auto border border-yellow-900/30">
+                ⚠️
+              </div>
+              <h3 className="text-lg font-bold text-white mb-2">Previous Donation Found</h3>
+              <p className="text-sm text-gray-400 leading-relaxed mb-4">
+                A donation for <strong className="text-white">{duplicateModalData.eventName}</strong> has been done previously with this phone number.
+              </p>
+              <div className="bg-gray-950 border border-gray-850 rounded-xl p-3 mb-6">
+                <span className="text-[10px] text-gray-500 block font-medium uppercase tracking-wider">Receipt ID</span>
+                <span className="text-sm font-mono font-bold text-gray-300">{duplicateModalData.receiptId}</span>
+              </div>
+
+              <div className="flex gap-3">
+                <button
+                  onClick={() => setDuplicateModalData(null)}
+                  className="flex-1 bg-gray-800 hover:bg-gray-700 text-gray-300 font-medium py-2.5 rounded-lg text-xs sm:text-sm transition-colors cursor-pointer"
+                >
+                  Go Back
+                </button>
+                <button
+                  onClick={() => {
+                    setDuplicateModalData(null)
+                    if (pendingPayload) {
+                      proceedToPaymentStep(pendingPayload)
+                    }
+                  }}
+                  className="flex-1 bg-orange-500 hover:bg-orange-600 text-white font-medium py-2.5 rounded-lg text-xs sm:text-sm transition-colors cursor-pointer"
+                >
+                  I know, continue
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   )
