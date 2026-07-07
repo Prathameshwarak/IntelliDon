@@ -23,7 +23,7 @@ export async function POST(request) {
     } = body
 
     // ── 1. Validate ───────────────────────────────────────────
-    if (!mandal_id || !event_id || !donor_name || !donor_phone || !amount || !payment_mode) {
+    if (!mandal_id || !event_id || !donor_name || !amount || !payment_mode) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
     }
 
@@ -67,14 +67,18 @@ export async function POST(request) {
     }
 
     // ── 4. Duplicate phone check ──────────────────────────────
-    const { data: existingDonation } = await supabaseAdmin
-      .from('donations')
-      .select('id, receipt_number, amount')
-      .eq('event_id', event_id)
-      .eq('donor_phone', donor_phone)
-      .maybeSingle()
-
-    const isDuplicate = !!existingDonation
+    let isDuplicate = false
+    let existingDonation = null
+    if (donor_phone && donor_phone.trim()) {
+      const { data } = await supabaseAdmin
+        .from('donations')
+        .select('id, receipt_number, amount')
+        .eq('event_id', event_id)
+        .eq('donor_phone', donor_phone.trim())
+        .maybeSingle()
+      existingDonation = data
+      isDuplicate = !!existingDonation
+    }
 
     // ── 5. Get collector name for receipt ─────────────────────
     let collectorName = null
@@ -94,7 +98,7 @@ export async function POST(request) {
         mandal_id,
         event_id,
         donor_name: donor_name.trim(),
-        donor_phone: donor_phone.trim(),
+        donor_phone: donor_phone?.trim() || null,
         donor_address: donor_address?.trim() || null,
         amount: Number(amount),
         payment_mode,

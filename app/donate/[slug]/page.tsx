@@ -40,6 +40,8 @@ export default function PublicDonatePage() {
   const [screenshot, setScreenshot] = useState<File | null>(null)
   const [screenshotPreview, setScreenshotPreview] = useState<string | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const [checkingPhone, setCheckingPhone] = useState(false)
+  const [duplicateModalData, setDuplicateModalData] = useState<{ eventName: string; receiptId: string } | null>(null)
 
   // UI state
   const [step, setStep] = useState<Step>('form')
@@ -90,11 +92,32 @@ export default function PublicDonatePage() {
   }
 
   // ── Validate form and move to payment step ────────────────────
-  function handleFormSubmit() {
+  async function handleFormSubmit() {
     setError('')
     if (!donorName.trim()) { setError('Enter your full name'); return }
-    if (!donorPhone.trim() || donorPhone.length < 10) { setError('Enter valid 10-digit phone number'); return }
+    if (donorPhone.trim() && donorPhone.trim().length < 10) { setError('Enter valid 10-digit phone number'); return }
     if (!amount || isNaN(Number(amount)) || Number(amount) <= 0) { setError('Enter a valid donation amount'); return }
+
+    // Check duplicate phone
+    if (donorPhone.trim()) {
+      setCheckingPhone(true)
+      try {
+        const res = await fetch(`/api/donations/check-phone?event_id=${event!.id}&phone=${donorPhone}`)
+        const data = await res.json()
+        if (data.exists) {
+          setDuplicateModalData({
+            eventName: data.event_name,
+            receiptId: data.receipt_id
+          })
+          setCheckingPhone(false)
+          return
+        }
+      } catch (err) {
+        console.error('Failed to check duplicate phone', err)
+      }
+      setCheckingPhone(false)
+    }
+
     setStep('payment')
   }
 
@@ -236,11 +259,13 @@ export default function PublicDonatePage() {
 
             {/* Phone */}
             <div>
-              <label className="text-xs font-medium text-gray-600 mb-1 block">Phone Number *</label>
+              <label className="text-xs font-medium text-gray-600 mb-1 block">
+                Phone Number <span className="text-gray-400 font-normal">(optional)</span>
+              </label>
               <input
                 type="tel"
                 value={donorPhone}
-                onChange={e => setDonorPhone(e.target.value)}
+                onChange={e => setDonorPhone(e.target.value.replace(/[^0-9]/g, ''))}
                 placeholder="10-digit mobile number"
                 maxLength={10}
                 className="w-full border border-gray-300 rounded-xl px-4 py-3 text-sm text-gray-900
@@ -267,11 +292,11 @@ export default function PublicDonatePage() {
             <div>
               <label className="text-xs font-medium text-gray-600 mb-1 block">Donation Amount (₹) *</label>
               <input
-                type="number"
+                type="text"
+                inputMode="numeric"
                 value={amount}
-                onChange={e => setAmount(e.target.value)}
+                onChange={e => setAmount(e.target.value.replace(/[^0-9]/g, ''))}
                 placeholder="0"
-                min="1"
                 className="w-full border border-gray-300 rounded-xl px-4 py-3 text-3xl font-bold
                   text-gray-900 placeholder-gray-300 focus:outline-none focus:border-orange-400
                   focus:ring-2 focus:ring-orange-100 bg-white"
@@ -286,10 +311,11 @@ export default function PublicDonatePage() {
 
             <button
               onClick={handleFormSubmit}
-              className="w-full bg-orange-500 hover:bg-orange-600 text-white font-semibold
-                py-4 rounded-xl text-base transition-colors mt-2"
+              disabled={checkingPhone}
+              className="w-full bg-orange-500 hover:bg-orange-600 disabled:bg-orange-300 text-white font-semibold
+                py-4 rounded-xl text-base transition-colors mt-2 cursor-pointer disabled:cursor-not-allowed"
             >
-              Continue to Payment →
+              {checkingPhone ? 'Checking details...' : 'Continue to Payment →'}
             </button>
           </div>
         )}
@@ -537,6 +563,41 @@ export default function PublicDonatePage() {
           </div>
         )}
 
+        {duplicateModalData && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-xs">
+            <div className="bg-white rounded-2xl w-full max-w-sm p-6 shadow-xl border border-gray-100 text-center">
+              <div className="w-12 h-12 bg-yellow-50 text-yellow-500 rounded-full flex items-center justify-center text-2xl mb-4 mx-auto">
+                ⚠️
+              </div>
+              <h3 className="text-lg font-bold text-gray-900 mb-2">Previous Donation Found</h3>
+              <p className="text-sm text-gray-650 leading-relaxed mb-4">
+                A donation for <strong className="text-gray-900">{duplicateModalData.eventName}</strong> has been done previously with this phone number.
+              </p>
+              <div className="bg-gray-50 border border-gray-150 rounded-xl p-3 mb-6">
+                <span className="text-[10px] text-gray-400 block font-medium uppercase tracking-wider">Receipt ID</span>
+                <span className="text-sm font-mono font-bold text-gray-700">{duplicateModalData.receiptId}</span>
+              </div>
+
+              <div className="flex gap-3">
+                <button
+                  onClick={() => setDuplicateModalData(null)}
+                  className="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-600 font-medium py-2.5 rounded-lg text-sm transition-colors cursor-pointer"
+                >
+                  Go Back
+                </button>
+                <button
+                  onClick={() => {
+                    setDuplicateModalData(null)
+                    setStep('payment')
+                  }}
+                  className="flex-1 bg-orange-500 hover:bg-orange-600 text-white font-medium py-2.5 rounded-lg text-sm transition-colors cursor-pointer"
+                >
+                  I know, continue
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   )

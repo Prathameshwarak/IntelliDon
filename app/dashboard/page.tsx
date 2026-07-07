@@ -3,6 +3,8 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
+import { useSubscription, isSubscriptionExpired } from '@/lib/subscription'
+import UpgradeBanner from '@/components/UpgradeBanner'
 
 // ── Types ──────────────────────────────────────────────────────
 type Tab = 'donations' | 'ranking' | 'history' | 'events' | 'team'
@@ -51,6 +53,16 @@ type Member = {
   is_active: boolean
 }
 
+interface CollectorGroup {
+  id: string
+  name: string
+  donations: Donation[]
+  totalCash: number
+  pendingCash: number
+  totalUpi: number
+  pendingUpi: number
+}
+
 // ── Role capability map — single source of truth ───────────────
 // Change permissions here and the entire UI updates automatically
 const CAN = {
@@ -95,6 +107,7 @@ export default function DashboardPage() {
   const [historyTypeFilter, setHistoryTypeFilter] = useState('all')
   //line added by pratham:
   const [rankingSubTab, setRankingSubTab] = useState<'collectors' | 'donors'>('collectors')
+  const [bulkVerifyModalCollector, setBulkVerifyModalCollector] = useState<CollectorGroup | null>(null)
 
   // Events state
   const [events, setEvents] = useState<Event[]>([])
@@ -130,6 +143,12 @@ export default function DashboardPage() {
   const [generatedPassword, setGeneratedPassword] = useState('')
   const [showPasswordUpdatedModal, setShowPasswordUpdatedModal] = useState(false)
   const [resetPasswordSubmitting, setResetPasswordSubmitting] = useState(false)
+
+  // ── Subscription state ────────────────────────────────────────
+  const sub = useSubscription(mandalId)
+  const [showUpgradeBanner, setShowUpgradeBanner] = useState(false)
+  const [pendingVerifyId, setPendingVerifyId] = useState<string | null>(null)
+  const [pendingBulkCollector, setPendingBulkCollector] = useState<{ id: string; mode: 'cash' | 'upi_collector' } | null>(null)
 
   // ── Auth guard ────────────────────────────────────────────────
   useEffect(() => {
@@ -189,6 +208,12 @@ export default function DashboardPage() {
 
   async function verifyDonation(donationId: string) {
     if (!CAN.verifyDonation(userRole)) return
+    // If subscription expired, show upgrade banner first
+    if (sub.isExpired) {
+      setPendingVerifyId(donationId)
+      setShowUpgradeBanner(true)
+      return
+    }
     setVerifyingId(donationId)
     const res = await fetch('/api/donations/verify', {
       method: 'PATCH',
@@ -247,8 +272,15 @@ export default function DashboardPage() {
 
   async function verifyCollectorBulk(collectorId: string, paymentMode: 'cash' | 'upi_collector') {
     if (!CAN.verifyDonation(userRole)) return
+    // If subscription expired, show upgrade banner first
+    if (sub.isExpired) {
+      setPendingBulkCollector({ id: collectorId, mode: paymentMode })
+      setShowUpgradeBanner(true)
+      return
+    }
     if (!confirm(`Are you sure you want to verify all pending ${paymentMode === 'cash' ? 'Cash' : 'UPI'} collections for this collector?`)) return
     
+    setBulkVerifyModalCollector(null)
     setBulkVerifyingCollector(collectorId)
     setBulkVerifyingMode(paymentMode)
 
@@ -668,16 +700,11 @@ export default function DashboardPage() {
     .reduce((sum, d) => sum + Number(d.amount), 0)
   const selfPendingCount = selfDonations.filter(d => d.status === 'pending').length
 
+  // Unified summary calculations
+  const totalVerifiedCount = donations.filter(d => d.status === 'verified').length
+  const totalAmount = donations.filter(d => d.status === 'verified').reduce((sum, d) => sum + Number(d.amount), 0)
+  const totalPendingAmount = donations.filter(d => d.status === 'pending').reduce((sum, d) => sum + Number(d.amount), 0)
 
-  interface CollectorGroup {
-    id: string
-    name: string
-    donations: Donation[]
-    totalCash: number
-    pendingCash: number
-    totalUpi: number
-    pendingUpi: number
-  }
 
   const collectorGroups: Record<string, CollectorGroup> = {}
 
@@ -715,14 +742,29 @@ export default function DashboardPage() {
   const collectorList = Object.values(collectorGroups).sort((a, b) => a.name.localeCompare(b.name))
 
 //new Line added by pratham
-// Ranking: collectors sorted by total amount collected (cash + UPI), descending
+// Ranking: collectors sorted by total verified amount collected (cash + UPI), descending
   const rankingList = [...Object.values(collectorGroups)]
-    .map(c => ({ ...c, totalAmount: c.totalCash + c.totalUpi }))
+    .map(c => {
+      const verifiedCash = c.donations
+        .filter(d => d.status === 'verified' && d.payment_mode === 'cash')
+        .reduce((sum, d) => sum + Number(d.amount), 0)
+      const verifiedUpi = c.donations
+        .filter(d => d.status === 'verified' && d.payment_mode !== 'cash')
+        .reduce((sum, d) => sum + Number(d.amount), 0)
+      const verifiedCount = c.donations.filter(d => d.status === 'verified').length
+      return {
+        ...c,
+        totalCash: verifiedCash,
+        totalUpi: verifiedUpi,
+        totalAmount: verifiedCash + verifiedUpi,
+        donationsCount: verifiedCount
+      }
+    })
     .sort((a, b) => b.totalAmount - a.totalAmount)
   const topRankingAmount = rankingList.length > 0 ? rankingList[0].totalAmount : 0
 
   //line added by pratham  start line
-  // Donor Ranking: group ALL donations (collector + self) by donor phone, sorted by total donated descending
+  // Donor Ranking: group verified donations by donor phone, sorted by total donated descending
   interface DonorGroup {
     phone: string
     name: string
@@ -732,7 +774,7 @@ export default function DashboardPage() {
 
   const donorGroupsMap: Record<string, DonorGroup> = {}
 
-  donations.forEach(d => {
+  donations.filter(d => d.status === 'verified').forEach(d => {
     const key = d.donor_phone || d.donor_name || 'unknown'
     if (!donorGroupsMap[key]) {
       donorGroupsMap[key] = {
@@ -798,10 +840,60 @@ export default function DashboardPage() {
   const availableTabs: Tab[] = [
     'donations',
     'ranking',
-    'history',
-    ...(CAN.seeEventsTab(userRole) ? ['events' as Tab] : []),
-    ...(CAN.seeTeamTab(userRole) ? ['team' as Tab] : []),
+    // history tab — blocked when subscription expired
+    ...(!sub.isExpired ? ['history' as Tab] : []),
+    // events tab — blocked when subscription expired
+    ...(CAN.seeEventsTab(userRole) && !sub.isExpired ? ['events' as Tab] : []),
+    // team tab — blocked when subscription expired
+    ...(CAN.seeTeamTab(userRole) && !sub.isExpired ? ['team' as Tab] : []),
   ]
+
+  // Handler called when admin dismisses the upgrade banner
+  function handleBannerContinue() {
+    setShowUpgradeBanner(false)
+    // Execute the pending action they tried before the banner appeared
+    if (pendingVerifyId) {
+      const id = pendingVerifyId
+      setPendingVerifyId(null)
+      // Now actually run verify, bypassing the subscription check
+      setVerifyingId(id)
+      fetch('/api/donations/verify', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ donation_id: id, verified_by: userId, status: 'verified' })
+      }).then(r => r.json()).then(data => {
+        if (data.success) {
+          showToast('Donation verified', 'success')
+          setDonations(prev => prev.map(d =>
+            d.id === id ? { ...d, status: 'verified', pdf_url: data.pdf_url || d.pdf_url, rejection_reason: null } : d
+          ))
+          fetchDonations()
+          setReviewingId(null)
+          setScreenshotChecked(false)
+        } else showToast(data.error || 'Could not verify', 'error')
+        setVerifyingId(null)
+      })
+    }
+    if (pendingBulkCollector) {
+      const { id, mode } = pendingBulkCollector
+      setPendingBulkCollector(null)
+      if (!confirm(`Verify all pending ${mode === 'cash' ? 'Cash' : 'UPI'} for this collector?`)) return
+      setBulkVerifyingCollector(id)
+      setBulkVerifyingMode(mode)
+      fetch('/api/donations/verify', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ collector_id: id, payment_mode: mode, verified_by: userId })
+      }).then(r => r.json()).then(data => {
+        if (data.success) {
+          showToast(`All pending ${mode === 'cash' ? 'Cash' : 'UPI'} verified`, 'success')
+          fetchDonations()
+        } else showToast(data.error || 'Could not verify', 'error')
+        setBulkVerifyingCollector(null)
+        setBulkVerifyingMode(null)
+      })
+    }
+  }
 
   if (loading) {
     return (
@@ -840,6 +932,11 @@ export default function DashboardPage() {
         </div>
       )}
 
+      {/* Upgrade banner interstitial */}
+      {showUpgradeBanner && (
+        <UpgradeBanner onContinue={handleBannerContinue} />
+      )}
+
       {/* Header */}
       <div className="bg-gray-900 border-b border-gray-800 px-3 sm:px-6 py-3 sm:py-4 flex flex-wrap items-center justify-between gap-2">
         <div className="min-w-0">
@@ -868,6 +965,40 @@ export default function DashboardPage() {
         </div>
       </div>  
 
+      {/* Subscription strip */}
+      {!sub.loading && (
+        <div
+          className={`px-4 py-2.5 flex items-center justify-between gap-3 text-xs
+            ${sub.isExpired
+              ? 'bg-red-950/60 border-b border-red-900/50'
+              : sub.daysRemaining <= 7
+                ? 'bg-yellow-950/60 border-b border-yellow-900/50'
+                : 'bg-gray-900/60 border-b border-gray-800'}`}
+        >
+          <div className="flex items-center gap-2">
+            <span className={`font-medium capitalize
+              ${sub.isExpired ? 'text-red-400' : sub.daysRemaining <= 7 ? 'text-yellow-400' : 'text-gray-400'}`}>
+              {sub.isExpired
+                ? '⚠ Subscription expired — history, events, and team management are locked'
+                : sub.subscription
+                  ? `${sub.subscription.plan.charAt(0).toUpperCase() + sub.subscription.plan.slice(1)} plan · ${sub.daysRemaining} days remaining`
+                  : 'No active subscription'}
+            </span>
+          </div>
+          <button
+            onClick={() => router.push('/dashboard/subscription')}
+            className={`flex-shrink-0 font-semibold px-3 py-1.5 rounded-lg transition-colors
+              ${sub.isExpired
+                ? 'bg-red-600 hover:bg-red-500 text-white'
+                : sub.daysRemaining <= 7
+                  ? 'bg-yellow-600 hover:bg-yellow-500 text-white'
+                  : 'text-gray-400 hover:text-white'}`}
+          >
+            {sub.isExpired ? 'Upgrade now' : sub.daysRemaining <= 7 ? 'Renew' : 'View plan'}
+          </button>
+        </div>
+      )}
+
       <div className="max-w-4xl mx-auto px-3 sm:px-4 py-4 sm:py-6">
 
         {/* Role notice for manager */}
@@ -880,47 +1011,25 @@ export default function DashboardPage() {
         {/* Summary cards */}
         {tab === 'donations' && summary && (
           <div className="flex flex-col gap-6 mb-6">
-            {/* Collector Collections Summary */}
+            {/* Unified Donations Summary */}
             <div>
               <div className="flex items-center gap-2 mb-2 px-1">
-                <span className="text-sm">👥</span>
+                <span className="text-sm">📊</span>
                 <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wider">
-                  Collector Collections
+                  Donations Summary
                 </h3>
               </div>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
                 {[
-                  { label: 'Total donations', value: collectorTotalCount },
-                  { label: 'Total collected', value: formatAmount(collectorTotalAmount) },
-                  { label: 'Verified', value: formatAmount(collectorVerifiedAmount) },
-                  { label: 'Pending verify', value: collectorPendingCount },
+                  { label: 'Total verified donations', value: totalVerifiedCount },
+                  { label: 'Self-donations (Verified)', value: formatAmount(selfVerifiedAmount) },
+                  { label: 'Collected by Collectors (Verified)', value: formatAmount(collectorVerifiedAmount) },
+                  { label: 'Total amount (Verified)', value: formatAmount(totalAmount) },
+                  { label: 'Pending amount', value: formatAmount(totalPendingAmount) },
                 ].map(card => (
-                  <div key={card.label} className="bg-gray-800 rounded-xl p-4">
-                    <p className="text-xs text-gray-400 mb-1">{card.label}</p>
-                    <p className="text-xl font-semibold text-white">{card.value}</p>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {/* Direct Self-Donations Summary */}
-            <div>
-              <div className="flex items-center gap-2 mb-2 px-1">
-                <span className="text-sm">🌐</span>
-                <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wider">
-                  Direct Self-Donations
-                </h3>
-              </div>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                {[
-                  { label: 'Total self donations', value: selfTotalCount },
-                  { label: 'Total collected', value: formatAmount(selfTotalAmount) },
-                  { label: 'Verified', value: formatAmount(selfVerifiedAmount) },
-                  { label: 'Pending verify', value: selfPendingCount },
-                ].map(card => (
-                  <div key={card.label} className="bg-gray-800 rounded-xl p-4">
-                    <p className="text-xs text-gray-400 mb-1">{card.label}</p>
-                    <p className="text-xl font-semibold text-white">{card.value}</p>
+                  <div key={card.label} className="bg-gray-800 rounded-xl p-4 flex flex-col h-full">
+                    <p className="text-xs text-gray-400 mb-2">{card.label}</p>
+                    <p className="text-xl font-semibold text-white mt-auto">{card.value}</p>
                   </div>
                 ))}
               </div>
@@ -1013,29 +1122,39 @@ export default function DashboardPage() {
                         </div>
 
                         {/* Action buttons & Arrow */}
-                        <div className="flex items-center gap-2 flex-wrap justify-end self-end md:self-auto" onClick= {e => e.stopPropagation()}>
+                        <div className="flex items-center gap-2 flex-wrap justify-end self-end md:self-auto" onClick={e => e.stopPropagation()}>
+                          {hasPendingCash && !hasPendingUpi && CAN.verifyDonation(userRole) && (
                             <button
                               onClick={() => verifyCollectorBulk(c.id, 'cash')}
                               disabled={bulkVerifyingCollector === c.id}
-                              className="bg-green-650 hover:bg-green-700 text-white font-medium text-xs px-3 py-2 rounded-lg transition-colors flex items-center gap-1 disabled:opacity-50"
+                              className="bg-green-650 hover:bg-green-700 text-white font-medium text-xs px-3 py-2 rounded-lg transition-colors flex items-center gap-1 disabled:opacity-50 cursor-pointer"
                             >
                               {bulkVerifyingCollector === c.id && bulkVerifyingMode === 'cash' ? '...' : '✓ Verify Cash'}
                             </button>
-                          
+                          )}
 
-                          {hasPendingUpi && CAN.verifyDonation(userRole) && (
+                          {!hasPendingCash && hasPendingUpi && CAN.verifyDonation(userRole) && (
                             <button
                               onClick={() => verifyCollectorBulk(c.id, 'upi_collector')}
                               disabled={bulkVerifyingCollector === c.id}
-                              className="bg-green-650 hover:bg-green-700 text-white font-medium text-xs px-3 py-2 rounded-lg transition-colors flex items-center gap-1 disabled:opacity-50"
+                              className="bg-green-650 hover:bg-green-700 text-white font-medium text-xs px-3 py-2 rounded-lg transition-colors flex items-center gap-1 disabled:opacity-50 cursor-pointer"
                             >
                               {bulkVerifyingCollector === c.id && bulkVerifyingMode === 'upi_collector' ? '...' : '✓ Verify UPI'}
                             </button>
                           )}
 
+                          {hasPendingCash && hasPendingUpi && CAN.verifyDonation(userRole) && (
+                            <button
+                              onClick={() => setBulkVerifyModalCollector(c)}
+                              className="bg-green-650 hover:bg-green-700 text-white font-medium text-xs px-3 py-2 rounded-lg transition-colors flex items-center gap-1 cursor-pointer"
+                            >
+                              ✓ Verify
+                            </button>
+                          )}
+
                           <button 
                             onClick={() => setExpandedCollectors(prev => ({ ...prev, [c.id]: !prev[c.id] }))}
-                            className="text-gray-400 hover:text-white p-1 ml-1"
+                            className="text-gray-400 hover:text-white p-1 ml-1 cursor-pointer"
                           >
                             <svg 
                               className={`w-4 h-4 transform transition-transform duration-200 ${isExpanded ? 'rotate-180' : ''}`} 
@@ -1166,7 +1285,7 @@ export default function DashboardPage() {
                           <div className="flex gap-3 mt-1.5 text-[11px] text-gray-500">
                             <span>💵 Cash: {formatAmount(c.totalCash)}</span>
                             <span>📱 UPI: {formatAmount(c.totalUpi)}</span>
-                            <span>{c.donations.length} donation{c.donations.length !== 1 ? 's' : ''}</span>
+                            <span>{c.donationsCount} donation{c.donationsCount !== 1 ? 's' : ''}</span>
                           </div>
                         </div>
                       </div>
@@ -2082,6 +2201,61 @@ export default function DashboardPage() {
                   className="px-4 py-2 bg-orange-500 hover:bg-orange-600 disabled:opacity-50 text-white rounded-lg text-xs font-semibold transition-colors cursor-pointer"
                 >
                   {editSubmitting ? 'Saving...' : 'Save Changes'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Bulk Verification Modal for Both Cash & UPI Pending */}
+        {bulkVerifyModalCollector && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm animate-fade-in">
+            <div className="bg-gray-900 border border-gray-800 rounded-2xl w-full max-w-sm p-5 shadow-2xl">
+              <h3 className="text-sm font-semibold text-white mb-1">Verify Collections</h3>
+              <p className="text-xs text-gray-400 mb-4">
+                Select which pending collections to verify for <strong>{bulkVerifyModalCollector.name}</strong>:
+              </p>
+
+              <div className="space-y-3 mb-5">
+                {/* Cash Info & Verify Button */}
+                {bulkVerifyModalCollector.pendingCash > 0 && (
+                  <div className="flex items-center justify-between p-3 bg-gray-950/60 rounded-xl border border-gray-800">
+                    <div>
+                      <p className="text-xs font-medium text-gray-400">Cash Pending</p>
+                      <p className="text-lg font-bold text-yellow-400">{formatAmount(bulkVerifyModalCollector.pendingCash)}</p>
+                    </div>
+                    <button
+                      onClick={() => verifyCollectorBulk(bulkVerifyModalCollector.id, 'cash')}
+                      className="bg-green-650 hover:bg-green-700 text-white font-semibold text-xs px-3.5 py-2 rounded-lg transition-colors cursor-pointer"
+                    >
+                      ✓ Verify Cash
+                    </button>
+                  </div>
+                )}
+
+                {/* UPI Info & Verify Button */}
+                {bulkVerifyModalCollector.pendingUpi > 0 && (
+                  <div className="flex items-center justify-between p-3 bg-gray-950/60 rounded-xl border border-gray-800">
+                    <div>
+                      <p className="text-xs font-medium text-gray-400">UPI Pending</p>
+                      <p className="text-lg font-bold text-yellow-400">{formatAmount(bulkVerifyModalCollector.pendingUpi)}</p>
+                    </div>
+                    <button
+                      onClick={() => verifyCollectorBulk(bulkVerifyModalCollector.id, 'upi_collector')}
+                      className="bg-green-650 hover:bg-green-700 text-white font-semibold text-xs px-3.5 py-2 rounded-lg transition-colors cursor-pointer"
+                    >
+                      ✓ Verify UPI
+                    </button>
+                  </div>
+                )}
+              </div>
+
+              <div className="flex justify-end">
+                <button
+                  onClick={() => setBulkVerifyModalCollector(null)}
+                  className="px-4 py-2 bg-gray-800 hover:bg-gray-700 text-gray-300 rounded-lg text-xs font-medium transition-colors w-full sm:w-auto cursor-pointer"
+                >
+                  Close
                 </button>
               </div>
             </div>
