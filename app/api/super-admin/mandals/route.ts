@@ -24,7 +24,7 @@ export async function GET(request: Request) {
         phone,
         status,
         created_at,
-        users (
+        users!users_mandal_id_fkey (
           id,
           full_name,
           phone,

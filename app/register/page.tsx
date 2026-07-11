@@ -26,6 +26,23 @@ export default function RegisterPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
+  // Step 3 — extra org fields
+  const [pincode, setPincode] = useState('')
+  const [state, setState] = useState('Maharashtra')
+  const [adminPhone, setAdminPhone] = useState('')
+  const [upiId, setUpiId] = useState('')
+
+  // Step 3 — document files
+  const [docs, setDocs] = useState<Record<string, File | null>>({
+    doc_admin_aadhaar: null,
+    doc_bank_proof: null,
+    doc_auth_letter: null,
+    doc_address_proof: null,
+    doc_reg_cert: null,
+    doc_admin_pan: null,
+    doc_org_pan: null,
+  })
+
   // Form State
   const [formData, setFormData] = useState({
     name: "",
@@ -138,6 +155,12 @@ export default function RegisterPage() {
     const isPasswordValid = validateField("adminPassword", formData.adminPassword);
     const isConfirmValid = validateField("confirmPassword", formData.confirmPassword);
     
+    if (!adminPhone.trim() || adminPhone.replace(/[^0-9]/g, '').length < 10) {
+      setErrors(prev => ({ ...prev, adminPhone: 'Valid 10-digit admin phone is required' }))
+      setErrorMsg('Please complete all required fields correctly.')
+      return false
+    }
+    
     if (!isAdminNameValid || !isAdminEmailValid || !isPasswordValid || !isConfirmValid) {
       setErrorMsg("Please complete all required fields correctly.");
       return false;
@@ -152,6 +175,13 @@ export default function RegisterPage() {
     }
   };
 
+  const handleNext2 = () => {
+    if (validateStep2()) {
+      setErrorMsg('')
+      setStep(3)
+    }
+  }
+
   const handleBack = () => {
     setErrorMsg("");
     setStep(1);
@@ -165,21 +195,45 @@ export default function RegisterPage() {
     setErrorMsg("");
 
     try {
-      const response = await fetch("/api/mandals/register", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          name: formData.name,
-          phone: formData.phone,
-          address: formData.address || "",
-          city: formData.city || "",
-          adminName: formData.adminName,
-          adminEmail: formData.adminEmail,
-          adminPassword: formData.adminPassword,
-        }),
-      });
+      // Validate required documents before submitting
+      const requiredDocs = ['doc_admin_aadhaar', 'doc_bank_proof', 'doc_auth_letter', 'doc_address_proof']
+      const missingDocs = requiredDocs.filter(k => !docs[k])
+      if (missingDocs.length > 0) {
+        setErrorMsg('Please upload all required documents before submitting.')
+        setLoading(false)
+        return
+      }
+
+      if (!pincode.trim() || pincode.length < 6) {
+        setErrorMsg('Please enter a valid 6-digit pincode.')
+        setLoading(false)
+        return
+      }
+
+      // Build FormData — required because we're uploading files
+      const fd = new FormData()
+      fd.append('name', formData.name)
+      fd.append('phone', formData.phone)
+      fd.append('address', formData.address || '')
+      fd.append('city', formData.city || '')
+      fd.append('state', state)
+      fd.append('pincode', pincode)
+      fd.append('upi_id', upiId)
+      fd.append('admin_name', formData.adminName)
+      fd.append('admin_email', formData.adminEmail)
+      fd.append('admin_phone', adminPhone)
+      fd.append('admin_password', formData.adminPassword)
+
+      // Append document files
+      Object.entries(docs).forEach(([key, file]) => {
+        if (file) fd.append(key, file)
+      })
+
+      const response = await fetch('/api/mandals/register', {
+        method: 'POST',
+        // No Content-Type header — browser sets it automatically with boundary for FormData
+        body: fd,
+      })
 
       const result = await response.json();
 
@@ -421,17 +475,36 @@ export default function RegisterPage() {
               <span className={`text-xs font-semibold ${step === 1 ? "text-amber-500" : "text-emerald-500"}`}>Mandal Info</span>
             </div>
             <div className="flex-1 h-0.5 bg-slate-200 dark:bg-slate-800 rounded-full overflow-hidden">
-              <div className={`h-full bg-gradient-to-r from-emerald-500 to-amber-500 transition-all duration-500`} style={{ width: step === 1 ? "50%" : "100%" }} />
+              <div className={`h-full bg-gradient-to-r from-emerald-500 to-amber-500 transition-all duration-500`} style={{ width: step === 1 ? "33%" : step === 2 ? "66%" : "100%" }} />
             </div>
             <div className="flex items-center space-x-2">
               <span className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-xs transition-all duration-300 ${
-                step === 2 
-                  ? "bg-amber-500 text-white shadow-lg shadow-amber-500/25" 
-                  : "bg-slate-200 dark:bg-slate-800 text-slate-500 dark:text-slate-400"
+                step > 2
+                  ? "bg-emerald-500 text-white"
+                  : step === 2 
+                    ? "bg-amber-500 text-white shadow-lg shadow-amber-500/25" 
+                    : "bg-slate-200 dark:bg-slate-800 text-slate-500 dark:text-slate-400"
               }`}>
-                2
+                {step > 2 ? (
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M5 13l4 4L19 7" />
+                  </svg>
+                ) : "2"}
               </span>
               <span className={`text-xs font-semibold ${step === 2 ? "text-amber-500" : "text-slate-400"}`}>Admin Credentials</span>
+            </div>
+            <div className="flex-1 h-0.5 bg-slate-200 dark:bg-slate-800 rounded-full overflow-hidden">
+              <div className={`h-full bg-gradient-to-r from-emerald-500 to-amber-500 transition-all duration-500`} style={{ width: step >= 3 ? "100%" : "0%" }} />
+            </div>
+            <div className="flex items-center space-x-2">
+              <span className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-xs transition-all duration-300 ${
+                step === 3
+                  ? "bg-amber-500 text-white shadow-lg shadow-amber-500/25"
+                  : "bg-slate-200 dark:bg-slate-800 text-slate-500 dark:text-slate-400"
+              }`}>
+                3
+              </span>
+              <span className={`text-xs font-semibold ${step === 3 ? "text-amber-500" : "text-slate-400"}`}>KYC Documents</span>
             </div>
           </div>
 
@@ -665,6 +738,24 @@ export default function RegisterPage() {
                   )}
                 </div>
 
+                {/* Admin Phone */}
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider">
+                    Admin Mobile Number *
+                  </label>
+                  <input
+                    type="tel"
+                    value={adminPhone}
+                    onChange={e => setAdminPhone(e.target.value)}
+                    placeholder="e.g. 9876543210"
+                    maxLength={10}
+                    className="w-full px-4 py-3 bg-slate-50 dark:bg-[#0b0f19] border border-slate-200 dark:border-slate-800 rounded-xl text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500"
+                  />
+                  {errors.adminPhone && (
+                    <p className="text-xs text-rose-500 mt-1">{errors.adminPhone}</p>
+                  )}
+                </div>
+
                 {/* Password */}
                 <div className="space-y-1.5">
                   <label htmlFor="adminPassword" className="text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider">
@@ -872,22 +963,143 @@ export default function RegisterPage() {
                     Go Back
                   </button>
                   <button
+                    type="button"
+                    onClick={handleNext2}
+                    className="flex-1 py-3.5 px-4 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white font-semibold rounded-xl shadow-lg transition-all duration-300 transform hover:scale-[1.01] active:scale-[0.99] flex items-center justify-center space-x-2 cursor-pointer"
+                  >
+                    <span>Next: Documents</span>
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M14 5l7 7m0 0l-7 7m7-7H3" />
+                    </svg>
+                  </button>
+                </div>
+              </div>
+            )}
+            {/* STEP 3: KYC DOCUMENTS */}
+            {step === 3 && (
+              <div className="space-y-5 animate-fade-in-up">
+
+                {/* UPI ID */}
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider">
+                    UPI ID (optional but recommended)
+                  </label>
+                  <input
+                    type="text"
+                    value={upiId}
+                    onChange={e => setUpiId(e.target.value)}
+                    placeholder="e.g. mandal@okaxis"
+                    className="w-full px-4 py-3 bg-slate-50 dark:bg-[#0b0f19] border border-slate-200 dark:border-slate-800 rounded-xl text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500"
+                  />
+                </div>
+
+                {/* Pincode */}
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider">
+                    Pincode *
+                  </label>
+                  <input
+                    type="text"
+                    value={pincode}
+                    onChange={e => setPincode(e.target.value)}
+                    placeholder="e.g. 400028"
+                    maxLength={6}
+                    className="w-full px-4 py-3 bg-slate-50 dark:bg-[#0b0f19] border border-slate-200 dark:border-slate-800 rounded-xl text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500"
+                  />
+                </div>
+
+                {/* Document uploads */}
+                <div className="bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800 rounded-xl p-4 space-y-4">
+                  <p className="text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider">
+                    KYC Documents
+                  </p>
+                  <p className="text-xs text-slate-500">
+                    Upload clear photos or scanned copies. PDF, JPG, PNG accepted. Max 5MB each.
+                  </p>
+
+                  {[
+                    { key: 'doc_admin_aadhaar', label: 'Admin Aadhaar', required: true, hint: 'Front and back in one file' },
+                    { key: 'doc_bank_proof', label: 'Bank Proof', required: true, hint: 'Cancelled cheque or passbook first page' },
+                    { key: 'doc_auth_letter', label: 'Authorisation Letter / Committee Resolution', required: true, hint: 'Signed by committee members' },
+                    { key: 'doc_address_proof', label: 'Address Proof', required: true, hint: 'Utility bill, rent agreement, or property document' },
+                    { key: 'doc_reg_cert', label: 'Registration Certificate', required: false, hint: 'If your organisation is registered' },
+                    { key: 'doc_admin_pan', label: 'Admin PAN Card', required: false, hint: 'Recommended for faster verification' },
+                    { key: 'doc_org_pan', label: 'Organisation PAN Card', required: false, hint: 'If organisation has a PAN' },
+                  ].map(doc => (
+                    <div key={doc.key} className="space-y-1">
+                      <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
+                        {doc.label}
+                        {doc.required
+                          ? <span className="text-rose-500">*</span>
+                          : <span className="text-slate-400 font-normal">(optional)</span>}
+                      </label>
+                      <p className="text-xs text-slate-400">{doc.hint}</p>
+                      <div
+                        className={`relative border-2 border-dashed rounded-xl p-3 text-center cursor-pointer transition-colors
+                          ${docs[doc.key]
+                            ? 'border-emerald-500 bg-emerald-50 dark:bg-emerald-900/20'
+                            : 'border-slate-300 dark:border-slate-700 hover:border-amber-500'}`}
+                        onClick={() => document.getElementById(`file-${doc.key}`)?.click()}
+                      >
+                        {docs[doc.key] ? (
+                          <div className="flex items-center justify-between px-2">
+                            <span className="text-xs text-emerald-600 dark:text-emerald-400 font-medium truncate">
+                              ✓ {docs[doc.key]?.name}
+                            </span>
+                            <button
+                              type="button"
+                              onClick={e => { e.stopPropagation(); setDocs(prev => ({ ...prev, [doc.key]: null })) }}
+                              className="text-slate-400 hover:text-rose-500 ml-2 flex-shrink-0"
+                            >
+                              ✕
+                            </button>
+                          </div>
+                        ) : (
+                          <span className="text-xs text-slate-400">Tap to upload</span>
+                        )}
+                        <input
+                          id={`file-${doc.key}`}
+                          type="file"
+                          accept=".pdf,.jpg,.jpeg,.png"
+                          className="hidden"
+                          onChange={e => {
+                            const file = e.target.files?.[0] || null
+                            if (file && file.size > 5 * 1024 * 1024) {
+                              setErrorMsg(`${doc.label} exceeds 5MB limit`)
+                              return
+                            }
+                            setDocs(prev => ({ ...prev, [doc.key]: file }))
+                          }}
+                        />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Navigation */}
+                <div className="flex space-x-4 pt-2">
+                  <button
+                    type="button"
+                    onClick={() => { setErrorMsg(''); setStep(2) }}
+                    className="w-1/3 py-3.5 px-4 bg-slate-100 dark:bg-slate-850 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 font-semibold rounded-xl border border-slate-200 dark:border-slate-700 transition-all duration-300 active:scale-[0.98] cursor-pointer text-center text-sm"
+                  >
+                    Go Back
+                  </button>
+                  <button
                     type="submit"
                     disabled={loading}
-                    className="flex-1 py-3.5 px-4 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white font-semibold rounded-xl shadow-lg transition-all duration-300 transform hover:scale-[1.01] active:scale-[0.99] flex items-center justify-center space-x-2 cursor-pointer disabled:opacity-50"
+                    className="flex-1 py-3.5 px-4 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white font-semibold rounded-xl shadow-lg transition-all duration-300 hover:scale-[1.01] active:scale-[0.99] flex items-center justify-center space-x-2 cursor-pointer disabled:opacity-50"
                   >
                     {loading ? (
                       <>
-                        <svg className="animate-spin -ml-1 mr-2 h-5 w-5 text-white" fill="none" viewBox="0 0 24 24">
+                        <svg className="animate-spin h-5 w-5 text-white" fill="none" viewBox="0 0 24 24">
                           <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                           <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
                         </svg>
-                        <span>Registering...</span>
+                        <span>Submitting...</span>
                       </>
                     ) : (
-                      <>
-                        <span>Submit Registration</span>
-                      </>
+                      <span>Submit Registration</span>
                     )}
                   </button>
                 </div>

@@ -87,7 +87,7 @@ export default function LoginPage() {
           full_name,
           role,
           is_active,
-          mandals (
+          mandals!users_mandal_id_fkey (
             name
           )
         `)
@@ -101,7 +101,7 @@ export default function LoginPage() {
           .select(`
             full_name,
             role,
-            mandals (
+            mandals!users_mandal_id_fkey (
               name
             )
           `)

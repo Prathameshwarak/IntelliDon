@@ -187,6 +187,12 @@ export default function SuperAdminMandalsPage() {
           </Link>
           
           <div className="flex items-center space-x-4">
+            <Link
+              href="/super-admin/subscriptions"
+              className="text-xs font-semibold py-2 px-3 border border-amber-500/30 bg-amber-500/10 text-amber-400 hover:bg-amber-500/20 rounded-xl transition-all"
+            >
+              Subscriptions
+            </Link>
             <div className="hidden sm:flex flex-col text-right">
               <span className="text-xs font-semibold text-slate-800 dark:text-slate-200">{superAdminName}</span>
               <span className="text-[10px] text-amber-500 font-mono tracking-wider uppercase leading-none">Super Admin</span>

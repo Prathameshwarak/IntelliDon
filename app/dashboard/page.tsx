@@ -957,6 +957,17 @@ export default function DashboardPage() {
             🔗 <span className="hidden sm:inline">Share Link</span>
           </button>
           <button
+            onClick={() => router.push('/dashboard/subscription')}
+            className={`text-[10px] sm:text-xs px-2 sm:px-3 py-1.5 rounded-lg transition-colors font-medium whitespace-nowrap
+              ${sub.isExpired
+                ? 'bg-red-600 hover:bg-red-500 text-white'
+                : sub.daysRemaining <= 7
+                  ? 'bg-yellow-600 hover:bg-yellow-500 text-white'
+                  : 'bg-gray-700 hover:bg-gray-600 text-white'}`}
+          >
+            {sub.isExpired ? '⚠ Expired' : sub.daysRemaining <= 7 ? `⚠ ${sub.daysRemaining}d` : '📋 Plan'}
+          </button>
+          <button
             onClick={() => supabase.auth.signOut().then(() => router.push('/login'))}
             className="text-[10px] sm:text-xs text-red-400 hover:text-red-300 transition-colors whitespace-nowrap"
           >
