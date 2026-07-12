@@ -30,13 +30,39 @@ type Mandal = {
   admin_phone: string | null
   pincode: string | null
   upi_id: string | null
+  doc_reg_cert: string | null
+  doc_admin_aadhaar: string | null
+  doc_admin_pan: string | null
+  doc_org_pan: string | null
+  doc_bank_proof: string | null
+  doc_auth_letter: string | null
+  doc_address_proof: string | null
   kyc_status: 'pending' | 'in_review' | 'approved' | 'rejected' | null
+  kyc_notes: string | null
   users?: User[]
   subscriptions?: Subscription[]
 }
 
 type AllOrganizationsTabProps = {
   showToast: (message: string, type: 'success' | 'error') => void
+}
+
+function parseKycNotes(rawNotes: string | null): { notes: string; documentStatuses: Record<string, 'approved' | 'rejected' | 'pending'> } {
+  if (!rawNotes) {
+    return { notes: '', documentStatuses: {} }
+  }
+  try {
+    const parsed = JSON.parse(rawNotes)
+    if (parsed && typeof parsed === 'object') {
+      return {
+        notes: parsed.notes || '',
+        documentStatuses: parsed.documentStatuses || {}
+      }
+    }
+  } catch (e) {
+    // Treat as raw text note
+  }
+  return { notes: rawNotes, documentStatuses: {} }
 }
 
 export default function AllOrganizationsTab({ showToast }: AllOrganizationsTabProps) {
@@ -57,6 +83,35 @@ export default function AllOrganizationsTab({ showToast }: AllOrganizationsTabPr
   const [adminEmail, setAdminEmail] = useState('')
   const [adminPassword, setAdminPassword] = useState('Welcome@123')
   const [autoApprove, setAutoApprove] = useState(true)
+
+  // View organization details modal state
+  const [viewingOrg, setViewingOrg] = useState<Mandal | null>(null)
+
+  // Document preview sub-window modal state
+  const [previewDoc, setPreviewDoc] = useState<{
+    mandalId: string
+    key: string
+    label: string
+    url: string
+  } | null>(null)
+
+  async function handleViewDoc(mandalId: string, docKey: string, label: string, path: string | null) {
+    if (!path) {
+      setPreviewDoc({ mandalId, key: docKey, label, url: '' })
+      return
+    }
+    
+    try {
+      const { data, error } = await supabase.storage
+        .from('kyc-documents')
+        .createSignedUrl(path, 300)
+        
+      if (error || !data?.signedUrl) throw new Error(error?.message || 'Could not sign file URL')
+      setPreviewDoc({ mandalId, key: docKey, label, url: data.signedUrl })
+    } catch (err: any) {
+      showToast('Error opening file: ' + err.message, 'error')
+    }
+  }
 
   useEffect(() => {
     fetchAllOrganizations()
@@ -256,6 +311,7 @@ export default function AllOrganizationsTab({ showToast }: AllOrganizationsTabPr
                   <th className="py-3.5 px-5 text-center">KYC Status</th>
                   <th className="py-3.5 px-5">Subscription</th>
                   <th className="py-3.5 px-5">Created At</th>
+                  <th className="py-3.5 px-5 text-right">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-850 text-xs">
@@ -321,6 +377,16 @@ export default function AllOrganizationsTab({ showToast }: AllOrganizationsTabPr
                       {/* Created At */}
                       <td className="py-3.5 px-5 text-gray-400">
                         {formatDate(org.created_at)}
+                      </td>
+
+                      {/* Actions */}
+                      <td className="py-3.5 px-5 text-right">
+                        <button
+                          onClick={() => setViewingOrg(org)}
+                          className="px-3.5 py-1.5 bg-gray-800 hover:bg-gray-700 hover:text-white border border-gray-700 hover:border-gray-600 text-gray-305 font-bold rounded-xl text-[10px] transition-colors cursor-pointer"
+                        >
+                          View Details
+                        </button>
                       </td>
                     </tr>
                   )
@@ -509,6 +575,220 @@ export default function AllOrganizationsTab({ showToast }: AllOrganizationsTabPr
               </div>
 
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* View Details Modal */}
+      {viewingOrg && (
+        <div className="fixed inset-0 z-40 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-gray-900 border border-gray-800 rounded-2xl w-full max-w-3xl overflow-hidden shadow-2xl flex flex-col max-h-[90vh]">
+            {/* Header */}
+            <div className="p-6 border-b border-gray-800 flex justify-between items-center bg-gray-950/20">
+              <div>
+                <h3 className="text-base font-bold text-white">{viewingOrg.name}</h3>
+                <p className="text-xs text-gray-400 mt-0.5">Organization Details, Admins, Team Users, and KYC documents.</p>
+              </div>
+              <button 
+                onClick={() => setViewingOrg(null)}
+                className="text-gray-400 hover:text-white text-xs p-1"
+              >
+                ✕ Close
+              </button>
+            </div>
+
+            {/* Scrollable details content */}
+            <div className="flex-1 overflow-y-auto p-6 space-y-6">
+              
+              {/* Grid 1: Basic Registration Info */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-gray-950/30 p-4 border border-gray-850 rounded-xl text-xs">
+                <div className="md:col-span-2 pb-2 border-b border-gray-800 flex justify-between items-center">
+                  <h4 className="text-xs font-bold text-orange-400 uppercase tracking-wider">1. Profile & Registration Details</h4>
+                  <span className="text-[10px] text-gray-500 font-mono">Registered on {formatDate(viewingOrg.created_at)}</span>
+                </div>
+                <div><span className="text-gray-500">Mandal Name: </span><span className="text-white font-semibold">{viewingOrg.name}</span></div>
+                <div><span className="text-gray-500">Slug URL: </span><span className="text-gray-300 font-mono">/donate/{viewingOrg.slug}</span></div>
+                <div><span className="text-gray-500">Mandal Phone: </span><span className="text-gray-300 font-mono">{viewingOrg.phone || '—'}</span></div>
+                <div><span className="text-gray-500">UPI ID for Donations: </span><span className="text-gray-300 font-mono">{viewingOrg.upi_id || '—'}</span></div>
+                <div className="md:col-span-2"><span className="text-gray-500">Address: </span><span className="text-gray-300">{viewingOrg.address || '—'}, {viewingOrg.city || '—'} - {viewingOrg.pincode || '—'}</span></div>
+              </div>
+
+              {/* Grid 2: Account Administrator */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 bg-gray-950/30 p-4 border border-gray-850 rounded-xl text-xs">
+                <div className="md:col-span-3 pb-2 border-b border-gray-800">
+                  <h4 className="text-xs font-bold text-orange-400 uppercase tracking-wider">2. Account Administrator</h4>
+                </div>
+                <div><span className="text-gray-500">Admin Name: </span><span className="text-white font-semibold">{viewingOrg.admin_full_name || '—'}</span></div>
+                <div><span className="text-gray-500">Login Email: </span><span className="text-gray-300 font-mono">{viewingOrg.admin_email || '—'}</span></div>
+                <div><span className="text-gray-500">Admin Phone: </span><span className="text-gray-300 font-mono">{viewingOrg.admin_phone || '—'}</span></div>
+              </div>
+
+              {/* Section 3: Team Members */}
+              <div className="space-y-3 bg-gray-950/20 border border-gray-850 rounded-xl p-4">
+                <h4 className="text-xs font-bold text-orange-400 uppercase tracking-wider block">3. Team Members ({viewingOrg.users?.length || 0})</h4>
+                {(!viewingOrg.users || viewingOrg.users.length === 0) ? (
+                  <p className="text-xs text-gray-550 italic">No registered team members found for this organization.</p>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <table className="w-full border-collapse text-left text-xs">
+                      <thead>
+                        <tr className="border-b border-gray-800 text-[10px] text-gray-550 uppercase tracking-wider font-bold">
+                          <th className="py-2 px-3">Name</th>
+                          <th className="py-2 px-3">Phone</th>
+                          <th className="py-2 px-3">Role</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-850 text-gray-300">
+                        {viewingOrg.users.map(u => (
+                          <tr key={u.id} className="hover:bg-gray-950/20">
+                            <td className="py-2.5 px-3 font-semibold text-white">{u.full_name || '—'}</td>
+                            <td className="py-2.5 px-3 font-mono">{u.phone || '—'}</td>
+                            <td className="py-2.5 px-3">
+                              <span className={`px-2 py-0.5 rounded text-[9px] font-bold uppercase border
+                                ${u.role === 'admin' 
+                                  ? 'bg-amber-500/10 text-amber-450 border-amber-500/20'
+                                  : 'bg-indigo-500/10 text-indigo-400 border-indigo-500/20'}`}>
+                                {u.role}
+                              </span>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+
+              {/* Section 4: KYC Documents & View options */}
+              <div className="space-y-3 bg-gray-950/20 border border-gray-850 rounded-xl p-4">
+                <h4 className="text-xs font-bold text-orange-400 uppercase tracking-wider block">4. Submitted KYC Documents</h4>
+                <div className="space-y-2">
+                  {[
+                    { key: 'doc_admin_aadhaar', label: 'Admin Aadhaar *', required: true },
+                    { key: 'doc_bank_proof', label: 'Bank Proof (cancelled cheque/passbook) *', required: true },
+                    { key: 'doc_auth_letter', label: 'Committee Authorisation Letter *', required: true },
+                    { key: 'doc_address_proof', label: 'Address Proof *', required: true },
+                    { key: 'doc_reg_cert', label: 'Registration Certificate', required: false },
+                    { key: 'doc_admin_pan', label: 'Admin PAN', required: false },
+                    { key: 'doc_org_pan', label: 'Organisation PAN', required: false }
+                  ].map(doc => {
+                    const path = viewingOrg[doc.key as keyof Mandal] as string | null
+                    const parsed = parseKycNotes(viewingOrg.kyc_notes)
+                    const status = parsed.documentStatuses[doc.key] || 'pending'
+                    const isMissing = !path
+
+                    return (
+                      <div key={doc.key} className="flex justify-between items-center p-3 bg-gray-950/30 border border-gray-850 rounded-xl text-xs">
+                        <div>
+                          <span className="font-semibold text-gray-300">{doc.label}</span>
+                          <span className="text-[10px] text-gray-550 block">
+                            {isMissing ? 'Not Uploaded' : 'Uploaded'}
+                          </span>
+                        </div>
+
+                        <div className="flex items-center gap-3">
+                          {/* Individual Status */}
+                          {!isMissing && (
+                            <span className={`px-2 py-0.5 rounded text-[9px] font-bold uppercase border
+                              ${status === 'approved' 
+                                ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
+                                : status === 'rejected'
+                                ? 'bg-rose-500/10 text-rose-455 border-rose-500/20'
+                                : 'bg-amber-500/10 text-amber-400 border-amber-500/20'}`}>
+                              {status}
+                            </span>
+                          )}
+
+                          {isMissing ? (
+                            <span className="text-gray-550 text-[10px] italic pr-1 select-none">Not Attached</span>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={() => handleViewDoc(viewingOrg.id, doc.key, doc.label, path)}
+                              className="px-3 py-1 bg-gray-800 hover:bg-gray-700 text-orange-400 hover:text-orange-500 rounded-lg text-xs font-bold transition-colors cursor-pointer border border-gray-700"
+                            >
+                              View File
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+
+            </div>
+
+            {/* Footer buttons */}
+            <div className="p-6 border-t border-gray-850 flex justify-end bg-gray-955/20">
+              <button
+                type="button"
+                onClick={() => setViewingOrg(null)}
+                className="px-5 py-2.5 bg-gray-800 hover:bg-gray-700 text-gray-300 font-bold rounded-xl text-xs transition-colors cursor-pointer"
+              >
+                Close View
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Sub Window File Previewer Overlay */}
+      {previewDoc && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-gray-900 border border-gray-800 rounded-2xl w-full max-w-4xl h-[85vh] shadow-2xl flex flex-col overflow-hidden">
+            {/* Modal Header */}
+            <div className="p-4 border-b border-gray-800 flex justify-between items-center bg-gray-955/20">
+              <div>
+                <h3 className="text-sm font-bold text-white">KYC Document Preview</h3>
+                <p className="text-[10px] text-gray-500 font-mono tracking-wide mt-0.5">{previewDoc.label}</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setPreviewDoc(null)}
+                className="px-3 py-1.5 bg-gray-800 hover:bg-gray-700 text-gray-300 rounded-lg text-xs font-bold transition-colors cursor-pointer"
+              >
+                ✕ Close
+              </button>
+            </div>
+
+            {/* Modal Content - Iframe or Image */}
+            <div className="flex-1 bg-gray-950 flex items-center justify-center overflow-hidden p-2 relative">
+              {previewDoc.url ? (
+                previewDoc.url.includes('.pdf') || previewDoc.url.toLowerCase().indexOf('pdf') !== -1 ? (
+                  <iframe 
+                    src={previewDoc.url} 
+                    className="w-full h-full border-0 rounded-lg"
+                    title={previewDoc.label}
+                  />
+                ) : (
+                  <img 
+                    src={previewDoc.url} 
+                    alt={previewDoc.label}
+                    className="max-w-full max-h-full object-contain rounded-lg shadow-2xl"
+                  />
+                )
+              ) : (
+                /* Falling back to Mock document view overlay */
+                <div className="text-center p-8 space-y-4 max-w-md">
+                  <div className="w-16 h-16 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-amber-500 flex items-center justify-center text-3xl mx-auto animate-bounce">
+                    📄
+                  </div>
+                  <div className="space-y-1.5">
+                    <p className="text-sm font-bold text-white">Demo File (Mock Preview Mode)</p>
+                    <p className="text-xs text-gray-400 leading-relaxed">
+                      No document path was attached to this mock registration. Displaying dummy placeholder contents for Super Admin preview validation.
+                    </p>
+                  </div>
+                  <div className="p-4 bg-gray-900 border border-gray-850 rounded-xl text-left text-[11px] font-mono text-gray-400 space-y-1">
+                    <p className="text-[10px] font-bold text-gray-500 uppercase tracking-wide">System Metadata</p>
+                    <p>Mandal ID: {previewDoc.mandalId}</p>
+                    <p>Field Key: {previewDoc.key}</p>
+                    <p>Preview Timestamp: {new Date().toLocaleTimeString()}</p>
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
         </div>
       )}

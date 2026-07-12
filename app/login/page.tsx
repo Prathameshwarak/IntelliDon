@@ -81,26 +81,17 @@ export default function LoginPage() {
       }
 
       // 2. Fetch the corresponding user profile & mandal details for personalization
-      let { data: userProfile, error: profileError } = await supabase
-        .from("users")
-        .select(`
-          full_name,
-          role,
-          is_active,
-          mandals!users_mandal_id_fkey (
-            name
-          )
-        `)
-        .eq("id", data.user.id)
-        .single();
+      // We implement a retry block to handle potential Supabase Auth session initialization race condition
+      let userProfile: any = null;
+      let profileError: any = null;
 
-      // Fallback: If is_active column doesn't exist yet, retry without it
-      if (profileError && profileError.message.includes("is_active")) {
-        const { data: fallbackProfile, error: fallbackError } = await supabase
+      for (let attempt = 1; attempt <= 3; attempt++) {
+        const { data: profile, error } = await supabase
           .from("users")
           .select(`
             full_name,
             role,
+            is_active,
             mandals!users_mandal_id_fkey (
               name
             )
@@ -108,12 +99,41 @@ export default function LoginPage() {
           .eq("id", data.user.id)
           .single();
 
-        if (!fallbackError && fallbackProfile) {
-          userProfile = {
-            ...fallbackProfile,
-            is_active: true
-          };
+        if (profile) {
+          userProfile = profile;
           profileError = null;
+          break;
+        }
+
+        profileError = error;
+
+        // Fallback: If is_active column doesn't exist yet, retry without it
+        if (error && error.message.includes("is_active")) {
+          const { data: fallbackProfile, error: fallbackError } = await supabase
+            .from("users")
+            .select(`
+              full_name,
+              role,
+              mandals!users_mandal_id_fkey (
+                name
+              )
+            `)
+            .eq("id", data.user.id)
+            .single();
+
+          if (fallbackProfile) {
+            userProfile = {
+              ...fallbackProfile,
+              is_active: true
+            };
+            profileError = null;
+            break;
+          }
+          profileError = fallbackError;
+        }
+
+        if (attempt < 3) {
+          await new Promise((resolve) => setTimeout(resolve, 250));
         }
       }
 

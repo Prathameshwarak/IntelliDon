@@ -8,6 +8,11 @@ import { useSubscription } from '@/lib/useSubscription'
 import UpgradeBanner from '@/components/UpgradeBanner'
 import KycVerificationPanel from '@/components/dashboard/KycVerificationPanel'
 
+// ── TESTING / MIGRATION CONFIGURATION ──────────────────────────
+// Set to true to bypass KYC blocks and mandatory document upload popups (for testing / old accounts migration).
+// Toggle to false for production compliance enforcement.
+const BYPASS_KYC_VERIFICATION = true
+
 // ── Types ──────────────────────────────────────────────────────
 type Tab = 'donations' | 'ranking' | 'history' | 'events' | 'team'
 
@@ -153,6 +158,98 @@ export default function DashboardPage() {
   const [pendingVerifyId, setPendingVerifyId] = useState<string | null>(null)
   const [pendingBulkCollector, setPendingBulkCollector] = useState<{ id: string; mode: 'cash' | 'upi_collector' } | null>(null)
 
+  // ── Security & KYC gates ──────────────────────────────────────
+  const [requiresPasswordChange, setRequiresPasswordChange] = useState(false)
+  const [newPassword, setNewPassword] = useState('')
+  const [confirmPassword, setConfirmPassword] = useState('')
+  const [changingPassword, setChangingPassword] = useState(false)
+
+  const [kycFiles, setKycFiles] = useState<Record<string, File | null>>({
+    doc_admin_aadhaar: null,
+    doc_bank_proof: null,
+    doc_auth_letter: null,
+    doc_address_proof: null
+  })
+  const [uploadingKyc, setUploadingKyc] = useState(false)
+
+  async function handleMandatoryPasswordChange(e: React.FormEvent) {
+    e.preventDefault()
+    if (newPassword.length < 8) {
+      showToast('Password must be at least 8 characters long', 'error')
+      return
+    }
+    if (newPassword !== confirmPassword) {
+      showToast('Passwords do not match', 'error')
+      return
+    }
+    
+    setChangingPassword(true)
+    try {
+      const { error } = await supabase.auth.updateUser({
+        password: newPassword,
+        data: { requires_password_change: false }
+      })
+      if (error) throw error
+      
+      showToast('Password changed successfully!', 'success')
+      setRequiresPasswordChange(false)
+    } catch (err: any) {
+      showToast(err.message || 'Failed to update password', 'error')
+    } finally {
+      setChangingPassword(false)
+    }
+  }
+
+  async function handleKycPopupUpload(e: React.FormEvent) {
+    e.preventDefault()
+    
+    const missingDocs = []
+    if (mandalKyc) {
+      if (!mandalKyc.doc_admin_aadhaar && !kycFiles.doc_admin_aadhaar) missingDocs.push('Admin Aadhaar')
+      if (!mandalKyc.doc_bank_proof && !kycFiles.doc_bank_proof) missingDocs.push('Bank Proof')
+      if (!mandalKyc.doc_auth_letter && !kycFiles.doc_auth_letter) missingDocs.push('Committee Authorisation Letter')
+      if (!mandalKyc.doc_address_proof && !kycFiles.doc_address_proof) missingDocs.push('Address Proof')
+    }
+
+    if (missingDocs.length > 0) {
+      showToast(`Please select: ${missingDocs.join(', ')}`, 'error')
+      return
+    }
+    
+    setUploadingKyc(true)
+    try {
+      const updates: Record<string, string> = {}
+      
+      for (const [field, file] of Object.entries(kycFiles)) {
+        if (!file) continue
+        const ext = file.name.split('.').pop() || 'pdf'
+        const path = `${mandalId}/${field}.${ext}`
+        
+        const { error: uploadError } = await supabase.storage
+          .from('kyc-documents')
+          .upload(path, file, { upsert: true })
+          
+        if (uploadError) throw new Error(`Failed to upload ${file.name}: ${uploadError.message}`)
+        
+        updates[field] = path
+      }
+      
+      const { error: dbError } = await supabase
+        .from('mandals')
+        .update(updates)
+        .eq('id', mandalId)
+        
+      if (dbError) throw dbError
+      
+      showToast('KYC Documents uploaded successfully!', 'success')
+      setMandalKyc((prev: any) => prev ? { ...prev, ...updates } : prev)
+    } catch (err: any) {
+      showToast(err.message || 'Failed to upload documents', 'error')
+    } finally {
+      setUploadingKyc(false)
+    }
+  }
+
   async function initDashboard() {
     setLoading(true)
     const { data: { user } } = await supabase.auth.getUser()
@@ -183,6 +280,11 @@ export default function DashboardPage() {
     setMandalId(userRow.mandal_id)
     setMandalName(mandal?.name || '')
     setMandalKyc(mandal)
+
+    if (user.user_metadata?.requires_password_change) {
+      setRequiresPasswordChange(true)
+    }
+
     setLoading(false)
   }
 
@@ -902,7 +1004,7 @@ export default function DashboardPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-950 flex items-center justify-center">
+      <div className="min-h-screen bg-gray-955 flex items-center justify-center">
         <div className="flex flex-col items-center gap-3">
           <div className="w-8 h-8 rounded-full border-2 border-t-orange-500 border-r-transparent border-b-orange-500 border-l-transparent animate-spin" />
           <p className="text-gray-500 text-xs font-mono animate-pulse">Loading dashboard...</p>
@@ -911,17 +1013,116 @@ export default function DashboardPage() {
     )
   }
 
-  // Intercept if organization KYC has not been approved
-  if (mandalKyc && (mandalKyc.kyc_status !== 'approved' || mandalKyc.status !== 'active')) {
+  // Mandatory Password Change Gate
+  if (requiresPasswordChange) {
     return (
-      <KycVerificationPanel 
-        mandal={mandalKyc} 
-        userId={userId || ''}
-        showToast={showToast} 
-        onResubmitSuccess={initDashboard}
-      />
+      <div className="min-h-screen bg-gray-950 flex flex-col items-center justify-center p-4">
+        <div className="bg-gray-900 border border-gray-800 rounded-2xl w-full max-w-md p-8 text-center space-y-6 shadow-2xl relative overflow-hidden">
+          <div className="absolute top-0 left-0 right-0 h-1 bg-orange-500" />
+          
+          <div className="w-16 h-16 mx-auto rounded-full bg-orange-950/30 border border-orange-900/50 flex items-center justify-center text-orange-500 text-3xl">
+            🔒
+          </div>
+
+          <div className="space-y-2">
+            <h2 className="text-xl font-black text-white font-sans">Mandatory Password Change</h2>
+            <p className="text-xs text-gray-400 leading-relaxed">
+              Your account was created by the administrator. For security reasons, you must change your temporary password on first login.
+            </p>
+          </div>
+
+          <form onSubmit={handleMandatoryPasswordChange} className="space-y-4 text-left">
+            <div>
+              <label className="block text-xs font-semibold text-gray-400 mb-1">New Password</label>
+              <input 
+                type="password"
+                required
+                value={newPassword}
+                onChange={e => setNewPassword(e.target.value)}
+                placeholder="Enter new password (min 8 chars)"
+                className="w-full bg-gray-955 border border-gray-855 rounded-lg px-3.5 py-2 text-xs text-white placeholder-gray-650 focus:outline-none focus:border-orange-500 font-mono"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-gray-400 mb-1">Confirm New Password</label>
+              <input 
+                type="password"
+                required
+                value={confirmPassword}
+                onChange={e => setConfirmPassword(e.target.value)}
+                placeholder="Confirm new password"
+                className="w-full bg-gray-955 border border-gray-855 rounded-lg px-3.5 py-2 text-xs text-white placeholder-gray-650 focus:outline-none focus:border-orange-500 font-mono"
+              />
+            </div>
+
+            <button
+              type="submit"
+              disabled={changingPassword}
+              className="w-full py-3 bg-orange-500 hover:bg-orange-600 text-white font-bold rounded-xl text-xs transition-colors cursor-pointer disabled:opacity-50"
+            >
+              {changingPassword ? 'Updating Password...' : 'Update Password & Continue'}
+            </button>
+          </form>
+        </div>
+      </div>
     )
   }
+
+  // Intercept if organization account is suspended, or if KYC is not approved and verification is not bypassed
+  if (mandalKyc && (mandalKyc.status === 'suspended' || (!BYPASS_KYC_VERIFICATION && (mandalKyc.kyc_status !== 'approved' || mandalKyc.status !== 'active')))) {
+    if (mandalKyc.status === 'suspended') {
+      return (
+        <div className="min-h-screen bg-gray-955 flex flex-col items-center justify-center p-4">
+          <div className="bg-gray-900 border border-gray-800 rounded-2xl w-full max-w-md p-8 text-center space-y-6 shadow-2xl relative overflow-hidden">
+            {/* Red top border highlight */}
+            <div className="absolute top-0 left-0 right-0 h-1 bg-red-650" />
+
+            {/* Error Shield Icon */}
+            <div className="w-16 h-16 mx-auto rounded-full bg-red-955/30 border border-red-900/50 flex items-center justify-center text-red-500 text-3xl shadow-lg shadow-red-500/5">
+              ⚠️
+            </div>
+
+            <div className="space-y-2">
+              <h2 className="text-xl font-black text-white">Account Suspended</h2>
+              <p className="text-xs text-gray-400 leading-relaxed">
+                The organization account for <span className="font-semibold text-gray-250">{mandalKyc.name}</span> has been suspended by the administrator.
+              </p>
+            </div>
+
+            <div className="p-4 bg-gray-955/40 rounded-xl border border-gray-850 text-left text-xs text-gray-300 space-y-1">
+              <p className="font-bold text-[10px] text-red-400 uppercase tracking-wide">Next Steps</p>
+              <p>For questions regarding suspension or to appeal for reactivation, please contact support.</p>
+              <p className="text-gray-500 font-mono text-[9px] pt-1">Mandal ID: {mandalKyc.id}</p>
+            </div>
+
+            <button
+              onClick={async () => {
+                await supabase.auth.signOut()
+                window.location.href = '/login'
+              }}
+              className="w-full py-3 bg-red-600 hover:bg-red-700 text-white font-bold rounded-xl text-xs transition-colors cursor-pointer flex items-center justify-center shadow-lg shadow-red-500/10"
+            >
+              Sign Out
+            </button>
+          </div>
+        </div>
+      )
+    }
+
+    if (!BYPASS_KYC_VERIFICATION) {
+      return (
+        <KycVerificationPanel 
+          mandal={mandalKyc} 
+          userId={userId || ''}
+          showToast={showToast} 
+          onResubmitSuccess={initDashboard}
+        />
+      )
+    }
+  }
+
+  const isKycDocsMissing = !BYPASS_KYC_VERIFICATION && !!(mandalKyc && (!mandalKyc.doc_admin_aadhaar || !mandalKyc.doc_bank_proof || !mandalKyc.doc_auth_letter || !mandalKyc.doc_address_proof))
 
   return (
     <div className="min-h-screen bg-gray-950 text-white">
