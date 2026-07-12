@@ -5,6 +5,7 @@ import { supabase } from '@/lib/supabase'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import MandalsTab from '@/components/super-admin/MandalsTab'
+import AllOrganizationsTab from '@/components/super-admin/AllOrganizationsTab'
 import SubscriptionsTab from '@/components/super-admin/SubscriptionsTab'
 import PlansTab from '@/components/super-admin/PlansTab'
 
@@ -18,6 +19,7 @@ type PlanRow = {
 
 const TABS = [
   { id: 'mandals', label: 'Mandals & KYC', icon: '🏢' },
+  { id: 'organizations', label: 'All Organizations', icon: '📋' },
   { id: 'subscriptions', label: 'Subscriptions', icon: '💳' },
   { id: 'plans', label: 'Manage Plans', icon: '🛠️' }
 ] as const
@@ -183,6 +185,10 @@ function SuperAdminDashboardContent() {
           {/* Render Active Component Tab */}
           {activeTab === 'mandals' && (
             <MandalsTab showToast={showToast} />
+          )}
+
+          {activeTab === 'organizations' && (
+            <AllOrganizationsTab showToast={showToast} />
           )}
 
           {activeTab === 'subscriptions' && (

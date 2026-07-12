@@ -33,6 +33,22 @@ async function uploadDoc(file, mandalId, fieldName) {
   const path = `${mandalId}/${fieldName}.${ext}`
   const buffer = Buffer.from(await file.arrayBuffer())
 
+  // Automatically create the kyc-documents bucket if it is missing
+  try {
+    const { data: buckets } = await supabaseAdmin.storage.listBuckets()
+    const exists = buckets?.some(b => b.name === 'kyc-documents')
+    if (!exists) {
+      console.log('kyc-documents bucket is missing. Creating it...')
+      await supabaseAdmin.storage.createBucket('kyc-documents', {
+        public: false, // private bucket for security
+        allowedMimeTypes: ['image/png', 'image/jpeg', 'image/jpg', 'application/pdf'],
+        fileSizeLimit: 10 * 1024 * 1024 // 10MB limit
+      })
+    }
+  } catch (err) {
+    console.error('Error verifying/creating kyc-documents bucket:', err)
+  }
+
   const { error } = await supabaseAdmin.storage
     .from('kyc-documents')
     .upload(path, buffer, {
