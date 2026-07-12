@@ -74,7 +74,7 @@ export default function LandingPage() {
 
           if (userProfile) {
             if (userProfile.role === 'super_admin') {
-              setDashboardPath('/super-admin/mandals');
+              setDashboardPath('/super-admin');
             } else if (userProfile.role === 'collector') {
               setDashboardPath('/collect');
             } else {

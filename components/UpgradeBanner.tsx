@@ -4,15 +4,53 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { PLANS, SUPPORT_WHATSAPP_URL } from '@/lib/subscription'
 
+type PlanRow = {
+  id: string
+  name: string
+  price: number
+  price_label: string
+  features: string[]
+}
+
 export default function UpgradeBanner({ onContinue }: { onContinue: () => void }) {
   const router = useRouter()
   const [secondsLeft, setSecondsLeft] = useState(5)
+  const [plans, setPlans] = useState<PlanRow[]>([])
 
   useEffect(() => {
     if (secondsLeft <= 0) return
     const t = setTimeout(() => setSecondsLeft(s => s - 1), 1000)
     return () => clearTimeout(t)
   }, [secondsLeft])
+
+  useEffect(() => {
+    async function fetchPlans() {
+      try {
+        const res = await fetch('/api/plans')
+        const data = await res.json()
+        if (data.plans) {
+          setPlans(data.plans)
+        }
+      } catch (err) {
+        console.error('Failed to fetch plans for UpgradeBanner:', err)
+      }
+    }
+    fetchPlans()
+  }, [])
+
+  // Resolve display plans, falling back to static PLANS if dynamic fetch hasn't completed
+  const displayPlans = plans.filter(p => p.price > 0)
+  const activePlans = displayPlans.length > 0 
+    ? displayPlans 
+    : Object.entries(PLANS)
+        .filter(([_, p]) => p.price > 0)
+        .map(([id, p]) => ({
+          id,
+          name: p.name,
+          price: p.price,
+          price_label: p.priceLabel,
+          features: p.features,
+        }))
 
   return (
     <div className="fixed inset-0 z-[100] bg-black/85 backdrop-blur-sm flex items-center justify-center p-4">
@@ -38,27 +76,28 @@ export default function UpgradeBanner({ onContinue }: { onContinue: () => void }
 
         {/* Plan cards */}
         <div className="px-6 py-4 grid grid-cols-2 gap-3">
-          {(['basic', 'standard'] as const).map(key => {
-            const p = PLANS[key]
-            const isPopular = key === 'standard'
+          {activePlans.map(p => {
+            const isPopular = p.id === 'standard'
             return (
-              <div key={key}
-                className={`rounded-xl p-3 border ${isPopular
+              <div key={p.id}
+                className={`rounded-xl p-3 border flex flex-col justify-between ${isPopular
                   ? 'border-orange-500 bg-orange-500/10'
                   : 'border-gray-700 bg-gray-800'}`}>
-                {isPopular && (
-                  <p className="text-xs text-orange-400 font-semibold mb-1">Most popular</p>
-                )}
-                <p className="text-white font-semibold text-sm">{p.name}</p>
-                <p className={`text-sm font-bold mb-2 ${isPopular ? 'text-orange-400' : 'text-white'}`}>
-                  {p.priceLabel}
-                </p>
-                {p.features.map(f => (
-                  <div key={f} className="flex items-start gap-1.5 text-xs text-gray-400 mt-1">
-                    <span className="text-green-400 mt-0.5 flex-shrink-0">✓</span>
-                    <span>{f}</span>
-                  </div>
-                ))}
+                <div>
+                  {isPopular && (
+                    <p className="text-[10px] text-orange-400 font-semibold mb-1 uppercase tracking-wider">Most popular</p>
+                  )}
+                  <p className="text-white font-semibold text-sm capitalize">{p.name}</p>
+                  <p className={`text-sm font-bold mb-2 ${isPopular ? 'text-orange-400' : 'text-white'}`}>
+                    {p.price_label}
+                  </p>
+                  {p.features && p.features.slice(0, 3).map(f => (
+                    <div key={f} className="flex items-start gap-1.5 text-[10px] text-gray-400 mt-1">
+                      <span className="text-green-400 mt-0.5 flex-shrink-0">✓</span>
+                      <span className="line-clamp-2">{f}</span>
+                    </div>
+                  ))}
+                </div>
               </div>
             )
           })}
@@ -98,7 +137,7 @@ export default function UpgradeBanner({ onContinue }: { onContinue: () => void }
           >
             {secondsLeft > 0
               ? `Continue to verify (${secondsLeft}s)`
-              : 'Continue to verify'}
+              : 'Close Banner'}
           </button>
         </div>
       </div>

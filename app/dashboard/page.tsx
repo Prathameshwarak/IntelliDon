@@ -3,8 +3,10 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
-import { useSubscription, isSubscriptionExpired } from '@/lib/subscription'
+import { isSubscriptionExpired } from '@/lib/subscription'
+import { useSubscription } from '@/lib/useSubscription'
 import UpgradeBanner from '@/components/UpgradeBanner'
+import KycVerificationPanel from '@/components/dashboard/KycVerificationPanel'
 
 // ── Types ──────────────────────────────────────────────────────
 type Tab = 'donations' | 'ranking' | 'history' | 'events' | 'team'
@@ -81,6 +83,7 @@ export default function DashboardPage() {
   const [userRole, setUserRole] = useState<string>('')
   const [mandalId, setMandalId] = useState<string | null>(null)
   const [mandalName, setMandalName] = useState('')
+  const [mandalKyc, setMandalKyc] = useState<any>(null)
 
   // Default tab — manager only sees donations, admin sees all
   const [tab, setTab] = useState<Tab>('donations')
@@ -150,40 +153,42 @@ export default function DashboardPage() {
   const [pendingVerifyId, setPendingVerifyId] = useState<string | null>(null)
   const [pendingBulkCollector, setPendingBulkCollector] = useState<{ id: string; mode: 'cash' | 'upi_collector' } | null>(null)
 
+  async function initDashboard() {
+    setLoading(true)
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) { router.push('/login'); return }
+
+    const { data: userRow } = await supabase
+      .from('users')
+      .select('role, mandal_id')
+      .eq('id', user.id)
+      .single()
+
+    // Only admin and manager reach this page
+    if (!userRow || !['admin', 'manager'].includes(userRow.role)) {
+      if (userRow?.role === 'collector') router.push('/collect')
+      else if (userRow?.role === 'super_admin') router.push('/super-admin')
+      else router.push('/login')
+      return
+    }
+
+    const { data: mandal } = await supabase
+      .from('mandals')
+      .select('*')
+      .eq('id', userRow.mandal_id)
+      .single()
+
+    setUserId(user.id)
+    setUserRole(userRow.role)
+    setMandalId(userRow.mandal_id)
+    setMandalName(mandal?.name || '')
+    setMandalKyc(mandal)
+    setLoading(false)
+  }
+
   // ── Auth guard ────────────────────────────────────────────────
   useEffect(() => {
-    async function init() {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) { router.push('/login'); return }
-
-      const { data: userRow } = await supabase
-        .from('users')
-        .select('role, mandal_id')
-        .eq('id', user.id)
-        .single()
-
-      // Only admin and manager reach this page
-      // Collector → /collect, super_admin → /super-admin/mandals
-      if (!userRow || !['admin', 'manager'].includes(userRow.role)) {
-        if (userRow?.role === 'collector') router.push('/collect')
-        else if (userRow?.role === 'super_admin') router.push('/super-admin/mandals')
-        else router.push('/login')
-        return
-      }
-
-      const { data: mandal } = await supabase
-        .from('mandals')
-        .select('id, name')
-        .eq('id', userRow.mandal_id)
-        .single()
-
-      setUserId(user.id)
-      setUserRole(userRow.role)
-      setMandalId(userRow.mandal_id)
-      setMandalName(mandal?.name || '')
-      setLoading(false)
-    }
-    init()
+    initDashboard()
   }, [router])
 
   // ── Load data on tab change ───────────────────────────────────
@@ -898,8 +903,23 @@ export default function DashboardPage() {
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-950 flex items-center justify-center">
-        <p className="text-gray-400 text-sm">Loading...</p>
+        <div className="flex flex-col items-center gap-3">
+          <div className="w-8 h-8 rounded-full border-2 border-t-orange-500 border-r-transparent border-b-orange-500 border-l-transparent animate-spin" />
+          <p className="text-gray-500 text-xs font-mono animate-pulse">Loading dashboard...</p>
+        </div>
       </div>
+    )
+  }
+
+  // Intercept if organization KYC has not been approved
+  if (mandalKyc && (mandalKyc.kyc_status !== 'approved' || mandalKyc.status !== 'active')) {
+    return (
+      <KycVerificationPanel 
+        mandal={mandalKyc} 
+        userId={userId || ''}
+        showToast={showToast} 
+        onResubmitSuccess={initDashboard}
+      />
     )
   }
 
@@ -955,6 +975,17 @@ export default function DashboardPage() {
             className="text-[10px] sm:text-xs bg-gray-700 hover:bg-gray-600 text-white px-2 sm:px-3 py-1.5 rounded-lg transition-colors whitespace-nowrap"
           >
             🔗 <span className="hidden sm:inline">Share Link</span>
+          </button>
+          <button
+            onClick={() => router.push('/dashboard/subscription')}
+            className={`text-[10px] sm:text-xs px-2 sm:px-3 py-1.5 rounded-lg transition-colors font-medium whitespace-nowrap
+              ${sub.isExpired
+                ? 'bg-red-600 hover:bg-red-500 text-white'
+                : sub.daysRemaining <= 7
+                  ? 'bg-yellow-600 hover:bg-yellow-500 text-white'
+                  : 'bg-gray-700 hover:bg-gray-600 text-white'}`}
+          >
+            {sub.isExpired ? '⚠ Expired' : sub.daysRemaining <= 7 ? `⚠ ${sub.daysRemaining}d` : '📋 Plan'}
           </button>
           <button
             onClick={() => supabase.auth.signOut().then(() => router.push('/login'))}

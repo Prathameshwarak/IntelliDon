@@ -87,7 +87,7 @@ export default function LoginPage() {
           full_name,
           role,
           is_active,
-          mandals (
+          mandals!users_mandal_id_fkey (
             name
           )
         `)
@@ -101,7 +101,7 @@ export default function LoginPage() {
           .select(`
             full_name,
             role,
-            mandals (
+            mandals!users_mandal_id_fkey (
               name
             )
           `)
@@ -142,7 +142,7 @@ export default function LoginPage() {
       setSuccess(true);
       setTimeout(() => {
         if (userRole === "super_admin") {
-          router.push("/super-admin/mandals");
+          router.push("/super-admin");
         } else if (userRole === "admin" || userRole === "manager") {
           router.push("/dashboard");
         } else if (userRole === "collector") {

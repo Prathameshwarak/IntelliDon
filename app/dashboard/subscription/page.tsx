@@ -1,18 +1,37 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
-import { PLANS, PlanKey, useSubscription, SUPPORT_WHATSAPP_URL } from '@/lib/subscription'
+import { useRouter } from 'next/navigation'
+import Link from 'next/link'
+import { useSubscription } from '@/lib/useSubscription'
 
-export default function SubscriptionPage() {
+type PlanRow = {
+  id: string
+  name: string
+  price: number
+  price_label: string
+  features: string[]
+}
+
+function fmtDate(iso: string | null) {
+  if (!iso) return '—'
+  return new Date(iso).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })
+}
+
+export default function DashboardSubscriptionPage() {
   const router = useRouter()
+  const [authorized, setAuthorized] = useState(false)
   const [mandalId, setMandalId] = useState<string | null>(null)
   const [mandalName, setMandalName] = useState('')
-  const [loading, setLoading] = useState(true)
+  const [plans, setPlans] = useState<PlanRow[]>([])
 
+  // Subscription hook for normal admin
+  const sub = useSubscription(mandalId)
+
+  // ── Auth ────────────────────────────────────────────────────
   useEffect(() => {
-    async function init() {
+    async function checkAccess() {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) { router.push('/login'); return }
 
@@ -22,127 +41,227 @@ export default function SubscriptionPage() {
         .eq('id', user.id)
         .single()
 
-      if (!userRow || !['admin', 'manager'].includes(userRow.role)) {
-        router.push('/login')
+      if (!userRow || !['super_admin', 'admin', 'manager'].includes(userRow.role)) {
+        router.push('/')
         return
       }
 
-      const { data: mandal } = await supabase
-        .from('mandals')
-        .select('name')
-        .eq('id', userRow.mandal_id)
-        .single()
+      if (userRow.role === 'super_admin') {
+        router.push('/super-admin/subscriptions')
+        return
+      }
 
       setMandalId(userRow.mandal_id)
-      setMandalName(mandal?.name || '')
-      setLoading(false)
+
+      if (userRow.mandal_id) {
+        const { data: mandal } = await supabase
+          .from('mandals')
+          .select('name')
+          .eq('id', userRow.mandal_id)
+          .single()
+        setMandalName(mandal?.name || '')
+      }
+
+      setAuthorized(true)
     }
-    init()
+    checkAccess()
   }, [router])
 
-  const { subscription, loading: subLoading, isExpired, daysRemaining } = useSubscription(mandalId)
+  // ── Fetch plans ──────────────────────────────────────────────
+  useEffect(() => {
+    async function fetchPlans() {
+      try {
+        const res = await fetch('/api/plans')
+        const data = await res.json()
+        if (data.plans) {
+          setPlans(data.plans)
+        }
+      } catch (err) {
+        console.error('Failed to fetch plans:', err)
+      }
+    }
+    fetchPlans()
+  }, [])
 
-  if (loading || subLoading) {
+  if (!authorized) {
     return (
       <div className="min-h-screen bg-gray-950 flex items-center justify-center">
-        <p className="text-gray-400 text-sm">Loading...</p>
+        <p className="text-gray-400 text-sm">Checking access...</p>
       </div>
     )
   }
 
-  const currentPlanKey = (subscription?.plan || 'trial') as PlanKey
-  const currentPlan = PLANS[currentPlanKey]
+  if (sub.loading) {
+    return (
+      <div className="min-h-screen bg-gray-950 flex items-center justify-center">
+        <p className="text-gray-400 text-sm">Loading subscription details...</p>
+      </div>
+    )
+  }
+
+  const getWhatsAppUrl = () => {
+    const baseNumber = '919999999999'
+    const message = `Hello Intellidon Support, I would like to inquire about upgrading/renewing the subscription for Mandal: ${mandalName} (ID: ${mandalId}).`
+    return `https://wa.me/${baseNumber}?text=${encodeURIComponent(message)}`
+  }
+
+  // Only display paid plans for upgrade
+  const displayPlans = plans.filter(p => p.price > 0)
 
   return (
-    <div className="min-h-screen bg-gray-950 text-white">
-      <div className="bg-gray-900 border-b border-gray-800 px-6 py-4 flex items-center justify-between">
-        <div>
-          <p className="text-xs text-gray-400">Intellidon</p>
-          <p className="text-base font-semibold">{mandalName}</p>
-        </div>
-        <button onClick={() => router.push('/dashboard')} className="text-xs text-gray-400 hover:text-white transition-colors">
-          ← Back to dashboard
-        </button>
-      </div>
+    <div className="min-h-screen bg-gray-950 text-white p-4 sm:p-6 md:p-8">
+      <div className="max-w-4xl mx-auto">
+        {/* Back link */}
+        <Link href="/dashboard" className="inline-flex items-center gap-2 text-gray-400 hover:text-white text-sm transition-colors mb-6 group">
+          <span className="group-hover:-translate-x-1 transition-transform">←</span> Back to Dashboard
+        </Link>
 
-      <div className="max-w-2xl mx-auto px-4 py-8 flex flex-col gap-6">
-
-        {/* Current status */}
-        <div className={`rounded-2xl p-6 border ${isExpired ? 'bg-red-950/20 border-red-900/40' : 'bg-gray-900 border-gray-800'}`}>
-          <div className="flex items-center justify-between mb-3">
-            <p className="text-xs text-gray-400 uppercase tracking-wider font-semibold">Current Plan</p>
-            <span className={`text-xs font-semibold px-2.5 py-1 rounded-full
-              ${isExpired ? 'bg-red-900/50 text-red-400' : 'bg-green-900/50 text-green-400'}`}>
-              {isExpired ? 'Expired' : 'Active'}
-            </span>
+        {/* Header */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-gray-800 pb-6">
+          <div>
+            <div className="flex items-center gap-3">
+              <h1 className="text-3xl font-bold tracking-tight bg-gradient-to-r from-white via-gray-100 to-gray-400 bg-clip-text text-transparent">
+                Subscription Plan
+              </h1>
+              {mandalName && (
+                <span className="text-xs bg-orange-500/10 border border-orange-500/30 text-orange-400 px-3 py-1 rounded-full font-medium mt-1">
+                  {mandalName}
+                </span>
+              )}
+            </div>
+            <p className="text-gray-400 text-sm mt-1">View your mandal's active subscription and plans</p>
           </div>
-          <p className="text-2xl font-bold text-white">{currentPlan.name}</p>
-          <p className="text-gray-400 text-sm mt-1">{currentPlan.priceLabel}</p>
-
-          {subscription?.ends_at && (
-            <p className="text-xs text-gray-500 mt-3">
-              {isExpired
-                ? `Expired on ${new Date(subscription.ends_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}`
-                : `Renews / expires on ${new Date(subscription.ends_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })} — ${daysRemaining} day${daysRemaining !== 1 ? 's' : ''} left`}
-            </p>
-          )}
-
-          {subscription?.notes && (
-            <div className="mt-4 bg-gray-950/60 border border-gray-800 rounded-lg p-3">
-              <p className="text-[10px] text-gray-500 uppercase font-semibold mb-1">Note from Intellidon team</p>
-              <p className="text-xs text-gray-300">{subscription.notes}</p>
-            </div>
-          )}
-
-          {isExpired && (
-            <div className="mt-4 bg-red-950/30 border border-red-900/30 rounded-lg p-3 text-xs text-red-300">
-              Your subscription has expired. You can still receive and record donations, but collection history,
-              event management, and team management are locked until you renew.
-            </div>
-          )}
         </div>
 
-        {/* Plans comparison */}
-        <div>
-          <p className="text-sm font-semibold text-white mb-3">Available Plans</p>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-            {(Object.keys(PLANS) as PlanKey[]).map(key => {
-              const p = PLANS[key]
-              const isCurrent = key === currentPlanKey
-              return (
-                <div key={key} className={`rounded-xl p-4 border flex flex-col
-                  ${isCurrent ? 'border-orange-500 bg-orange-950/10' : 'border-gray-800 bg-gray-900'}`}>
-                  <p className="text-white font-semibold text-sm">{p.name}</p>
-                  <p className="text-orange-400 font-bold text-lg mt-1">{p.priceLabel}</p>
-                  <ul className="text-gray-400 text-xs mt-3 space-y-1.5 flex-1">
-                    {p.features.map(f => <li key={f}>• {f}</li>)}
-                  </ul>
-                  {isCurrent && (
-                    <span className="mt-3 text-[10px] text-orange-400 font-semibold uppercase tracking-wider">
-                      Current Plan
-                    </span>
-                  )}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-8">
+          {/* Column 1: Current Status */}
+          <div className="md:col-span-1 flex flex-col gap-6">
+            <div className="bg-gray-900 border border-gray-800 rounded-2xl p-6 relative overflow-hidden shadow-xl">
+              {/* Subtle gradient background glow */}
+              <div className="absolute top-0 right-0 w-32 h-32 bg-orange-500/10 rounded-full blur-3xl pointer-events-none" />
+
+              <h2 className="text-xs text-gray-500 font-semibold uppercase tracking-wider mb-4">
+                Current Status
+              </h2>
+
+              <div className="flex flex-col gap-4">
+                <div>
+                  <p className="text-xs text-gray-400">Plan</p>
+                  <p className="text-xl font-bold text-white mt-1 capitalize font-sans">
+                    {sub.subscription?.plan || 'No Active Plan'}
+                  </p>
                 </div>
-              )
-            })}
-          </div>
-        </div>
 
-        {/* Manual renewal instructions */}
-        <div className="bg-gray-900 border border-gray-800 rounded-xl p-5">
-          <p className="text-sm font-semibold text-white mb-2">How to renew or upgrade</p>
-          <p className="text-xs text-gray-400 leading-relaxed">
-            Payments are currently handled manually. Contact the Intellidon team on WhatsApp to upgrade your plan
-            or renew your subscription. Once payment is confirmed, your plan will be activated within a few hours.
-          </p>
-          <a
-            href={SUPPORT_WHATSAPP_URL}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-block mt-4 bg-green-600 hover:bg-green-700 text-white text-sm font-medium px-4 py-2.5 rounded-lg transition-colors"
-          >
-            💬 Contact on WhatsApp
-          </a>
+                <div>
+                  <p className="text-xs text-gray-400">Status</p>
+                  <div className="flex items-center gap-2 mt-1.5">
+                    <span className={`h-2.5 w-2.5 rounded-full ${sub.isExpired ? 'bg-red-500' : 'bg-green-500 animate-pulse'}`} />
+                    <span className={`text-sm font-semibold capitalize ${sub.isExpired ? 'text-red-400' : 'text-green-400'}`}>
+                      {sub.isExpired ? 'Expired' : 'Active'}
+                    </span>
+                  </div>
+                </div>
+
+                <div>
+                  <p className="text-xs text-gray-400">Validity</p>
+                  <p className="text-sm font-semibold text-white mt-1">
+                    {sub.subscription?.ends_at 
+                      ? `${fmtDate(sub.subscription.ends_at)} (${sub.daysRemaining} days remaining)`
+                      : 'N/A'}
+                  </p>
+                </div>
+
+                {sub.subscription?.notes && (
+                  <div className="border-t border-gray-800 pt-3">
+                    <p className="text-xs text-gray-400 mb-1">Notes</p>
+                    <p className="text-xs text-gray-300 italic whitespace-pre-line bg-gray-950/40 p-2.5 rounded-lg border border-gray-800/50">
+                      {sub.subscription.notes}
+                    </p>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* Column 2: Available Plans */}
+          <div className="md:col-span-2 flex flex-col gap-6">
+            <div className="bg-gray-900 border border-gray-800 rounded-2xl p-6 shadow-xl">
+              <h2 className="text-lg font-bold text-white mb-2">Available Subscription Plans</h2>
+              <p className="text-xs text-gray-400 mb-6">Select a plan to upgrade or renew. Contact support to finalize payment.</p>
+
+              {displayPlans.length === 0 ? (
+                <p className="text-sm text-gray-500 italic py-6">No upgrade plans currently configured.</p>
+              ) : (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  {displayPlans.map(p => {
+                    const isPopular = p.id === 'standard'
+                    const isCurrent = sub.subscription?.plan === p.id
+
+                    return (
+                      <div 
+                        key={p.id} 
+                        className={`rounded-2xl p-5 border relative flex flex-col justify-between transition-all duration-300 hover:scale-[1.01]
+                          ${isCurrent 
+                            ? 'border-green-500/50 bg-green-950/10 shadow-green-950/20' 
+                            : isPopular 
+                              ? 'border-orange-500 bg-orange-500/5 shadow-orange-950/20 shadow-lg' 
+                              : 'border-gray-800 bg-gray-950 hover:border-gray-700'}`}
+                      >
+                        {isCurrent && (
+                          <span className="absolute top-3 right-3 text-[10px] bg-green-500/20 text-green-400 px-2 py-0.5 rounded-full font-bold uppercase tracking-wider border border-green-500/30">
+                            Current Plan
+                          </span>
+                        )}
+                        {!isCurrent && isPopular && (
+                          <span className="absolute top-3 right-3 text-[10px] bg-orange-500/20 text-orange-400 px-2 py-0.5 rounded-full font-bold uppercase tracking-wider border border-orange-500/30">
+                            Popular
+                          </span>
+                        )}
+
+                        <div>
+                          <p className="text-white font-bold text-sm capitalize">{p.name}</p>
+                          <p className={`text-base font-extrabold mt-1.5 ${isCurrent ? 'text-green-400' : isPopular ? 'text-orange-400' : 'text-white'}`}>
+                            {p.price_label}
+                          </p>
+
+                          {p.features && p.features.length > 0 && (
+                            <ul className="mt-5 space-y-2.5">
+                              {p.features.map(f => (
+                                <li key={f} className="flex items-start gap-2 text-xs text-gray-300">
+                                  <span className="text-green-400 font-bold flex-shrink-0 mt-0.5">✓</span>
+                                  <span>{f}</span>
+                                </li>
+                              ))}
+                            </ul>
+                          )}
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
+            </div>
+
+            {/* WhatsApp CTA */}
+            <div className="bg-gradient-to-r from-orange-600 to-orange-500 rounded-2xl p-6 shadow-xl flex flex-col sm:flex-row sm:items-center justify-between gap-4 border border-orange-400/20">
+              <div className="flex-1">
+                <h3 className="text-lg font-bold text-white">Upgrade or Renew via WhatsApp</h3>
+                <p className="text-xs text-orange-100 mt-1 max-w-md">
+                  Click the button to text our support team on WhatsApp. Please keep the generated message intact so we can quickly verify your mandal.
+                </p>
+              </div>
+
+              <a 
+                href={getWhatsAppUrl()}
+                target="_blank" 
+                rel="noopener noreferrer"
+                className="flex-shrink-0 bg-white hover:bg-orange-50 text-orange-600 font-bold px-5 py-3 rounded-xl shadow-lg transition-all duration-300 flex items-center justify-center gap-2 text-sm"
+              >
+                <span>💬</span>
+                <span>Upgrade Now</span>
+              </a>
+            </div>
+          </div>
         </div>
       </div>
     </div>
