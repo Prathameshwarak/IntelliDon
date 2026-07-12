@@ -3,10 +3,10 @@
 import { useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 
-export default function DeprecatedMandalsPage() {
+export default function DeprecatedSubscriptionsPage() {
   const router = useRouter()
   useEffect(() => {
-    router.replace('/super-admin?tab=mandals')
+    router.replace('/super-admin?tab=subscriptions')
   }, [router])
 
   return (

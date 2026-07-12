@@ -24,6 +24,20 @@ export async function GET(request: Request) {
         phone,
         status,
         created_at,
+        admin_full_name,
+        admin_email,
+        admin_phone,
+        pincode,
+        upi_id,
+        doc_reg_cert,
+        doc_admin_aadhaar,
+        doc_admin_pan,
+        doc_org_pan,
+        doc_bank_proof,
+        doc_auth_letter,
+        doc_address_proof,
+        kyc_status,
+        kyc_notes,
         users!users_mandal_id_fkey (
           id,
           full_name,
@@ -56,7 +70,22 @@ export async function GET(request: Request) {
 export async function PATCH(request: Request) {
   try {
     const body = await request.json()
-    const { mandalId, action, plan = 'trial' } = body
+    const { mandalId, action, plan = 'trial', kycStatus, kycNotes } = body
+
+    // KYC update — separate from approve/reject action
+    if (kycStatus) {
+      const { error } = await supabaseAdmin
+        .from('mandals')
+        .update({
+          kyc_status: kycStatus,
+          kyc_notes: kycNotes || null,
+          kyc_reviewed_at: new Date().toISOString()
+        })
+        .eq('id', mandalId)
+
+      if (error) return NextResponse.json({ error: 'Could not update KYC status' }, { status: 500 })
+      return NextResponse.json({ success: true, message: `KYC ${kycStatus}` })
+    }
 
     if (!mandalId || !action) {
       return NextResponse.json({ error: 'mandalId and action are required' }, { status: 400 })

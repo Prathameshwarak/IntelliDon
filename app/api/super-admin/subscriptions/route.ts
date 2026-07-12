@@ -65,8 +65,16 @@ export async function PATCH(request: Request) {
     if (!mandal_id) {
       return NextResponse.json({ error: 'mandal_id is required' }, { status: 400 })
     }
-    if (plan && !['trial', 'basic', 'standard'].includes(plan)) {
-      return NextResponse.json({ error: 'Invalid plan' }, { status: 400 })
+    if (plan) {
+      const { data: dbPlan } = await supabaseAdmin
+        .from('subscription_plans')
+        .select('id')
+        .eq('id', plan)
+        .maybeSingle()
+
+      if (!dbPlan && !['trial', 'basic', 'standard'].includes(plan)) {
+        return NextResponse.json({ error: 'Invalid plan' }, { status: 400 })
+      }
     }
     if (status && !['active', 'suspended'].includes(status)) {
       return NextResponse.json({ error: 'Invalid status' }, { status: 400 })

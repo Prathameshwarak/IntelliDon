@@ -3,7 +3,8 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
-import { useSubscription, isSubscriptionExpired } from '@/lib/subscription'
+import { isSubscriptionExpired } from '@/lib/subscription'
+import { useSubscription } from '@/lib/useSubscription'
 import UpgradeBanner from '@/components/UpgradeBanner'
 
 // ── Types ──────────────────────────────────────────────────────
@@ -166,7 +167,7 @@ export default function DashboardPage() {
       // Collector → /collect, super_admin → /super-admin/mandals
       if (!userRow || !['admin', 'manager'].includes(userRow.role)) {
         if (userRow?.role === 'collector') router.push('/collect')
-        else if (userRow?.role === 'super_admin') router.push('/super-admin/mandals')
+        else if (userRow?.role === 'super_admin') router.push('/super-admin')
         else router.push('/login')
         return
       }
