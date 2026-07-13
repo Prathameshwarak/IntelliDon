@@ -98,7 +98,7 @@ export async function POST(request) {
         mandal_id,
         event_id,
         donor_name: donor_name.trim(),
-        donor_phone: donor_phone?.trim() || null,
+        donor_phone: donor_phone?.trim() || '',
         donor_address: donor_address?.trim() || null,
         amount: Number(amount),
         payment_mode,
@@ -199,6 +199,7 @@ export async function GET(request) {
     const mandal_id = searchParams.get('mandal_id')
     const event_id = searchParams.get('event_id')
     const status = searchParams.get('status')
+    const collected_by = searchParams.get('collected_by')
 
     if (!mandal_id) {
       return NextResponse.json({ error: 'mandal_id is required' }, { status: 400 })
@@ -229,6 +230,7 @@ export async function GET(request) {
 
     if (event_id) query = query.eq('event_id', event_id)
     if (status) query = query.eq('status', status)
+    if (collected_by) query = query.eq('collected_by', collected_by)
 
     let { data: donations, error } = await query
 
@@ -258,6 +260,7 @@ export async function GET(request) {
 
       if (event_id) fallbackQuery = fallbackQuery.eq('event_id', event_id)
       if (status) fallbackQuery = fallbackQuery.eq('status', status)
+      if (collected_by) fallbackQuery = fallbackQuery.eq('collected_by', collected_by)
 
       const fallbackResult = await fallbackQuery
       donations = fallbackResult.data

@@ -18,13 +18,13 @@ async function verifySuperAdmin(request: Request) {
   }
   const { data: profile, error: profileError } = await supabaseAdmin
     .from('users')
-    .select('role')
+    .select('role, full_name')
     .eq('id', user.id)
     .single()
   if (profileError || !profile || profile.role !== 'super_admin') {
     return { error: 'Forbidden: Super admin access only', status: 403 }
   }
-  return { callerId: user.id }
+  return { callerId: user.id, callerName: profile.full_name || 'Super Admin' }
 }
 
 // GET — every mandal with its subscription row, for the super-admin panel
@@ -38,7 +38,7 @@ export async function GET(request: Request) {
     .from('mandals')
     .select(`
       id, name, slug, city, status,
-      subscriptions ( id, plan, status, ends_at, notes, last_payment_at, last_payment_amount, updated_at )
+      subscriptions ( id, plan, status, ends_at, notes, payment_notes, last_payment_at, last_payment_amount, updated_at )
     `)
     .order('name')
 
@@ -85,7 +85,17 @@ export async function PATCH(request: Request) {
       updated_at: new Date().toISOString(),
     }
     if (plan) updates.plan = plan
-    if (ends_at) updates.ends_at = ends_at
+    if (ends_at) {
+      const minDate = new Date()
+      minDate.setDate(minDate.getDate() + 30)
+      minDate.setHours(0, 0, 0, 0)
+
+      const selectedDate = new Date(ends_at)
+      if (selectedDate < minDate) {
+        return NextResponse.json({ error: 'Allotment duration must be at least 30 days (1 month)' }, { status: 400 })
+      }
+      updates.ends_at = ends_at
+    }
     if (status) updates.status = status
     if (typeof notes === 'string') updates.notes = notes
     if (mark_paid) {
@@ -96,9 +106,36 @@ export async function PATCH(request: Request) {
 
     const { data: existing } = await supabaseAdmin
       .from('subscriptions')
-      .select('id')
+      .select('id, plan, ends_at, status, payment_notes')
       .eq('mandal_id', mandal_id)
       .maybeSingle()
+
+    // Build the audit log history list
+    let logs: any[] = []
+    if (existing && existing.payment_notes) {
+      try {
+        const parsed = JSON.parse(existing.payment_notes)
+        if (Array.isArray(parsed)) {
+          logs = parsed
+        }
+      } catch (e) {
+        console.error('Error parsing payment_notes log history:', e)
+      }
+    }
+
+    const newLog = {
+      id: Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15),
+      plan: plan || (existing ? existing.plan : 'trial'),
+      ends_at: ends_at || (existing ? existing.ends_at : null),
+      status: status || (existing ? existing.status : 'active'),
+      amount_paid: mark_paid ? (mark_paid.amount ?? null) : null,
+      notes: notes || null,
+      created_at: new Date().toISOString(),
+      created_by: authCheck.callerName || 'Super Admin'
+    }
+
+    logs.push(newLog)
+    updates.payment_notes = JSON.stringify(logs)
 
     const result = existing
       ? await supabaseAdmin.from('subscriptions').update(updates).eq('mandal_id', mandal_id).select().single()

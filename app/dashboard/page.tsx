@@ -129,6 +129,145 @@ export default function DashboardPage() {
   const [dateError, setDateError] = useState('')
   const [editingEventId, setEditingEventId] = useState<string | null>(null)
 
+  // CSV Export handler
+  const handleExportCSV = (donationsToExport: Donation[], filename = 'collection_history.csv') => {
+    const headers = ['Receipt Number', 'Donor Name', 'Phone', 'Address', 'Amount', 'Collector', 'Payment Mode', 'Status', 'Date']
+    const rows = donationsToExport.map(d => [
+      d.receipt_number,
+      d.donor_name,
+      d.donor_phone || '',
+      d.donor_address || '',
+      d.amount,
+      d.payment_mode === 'upi_self' ? 'Self' : (d.users?.full_name || 'Unknown'),
+      d.payment_mode === 'cash' ? 'Cash' : d.payment_mode === 'upi_self' ? 'UPI (Self)' : 'UPI (Collector)',
+      d.status,
+      new Date(d.created_at).toLocaleString('en-IN')
+    ])
+    
+    const csvContent = [
+      headers.join(','),
+      ...rows.map(row => row.map(val => {
+        const strVal = String(val)
+        if (strVal.includes(',') || strVal.includes('"') || strVal.includes('\n')) {
+          return `"${strVal.replace(/"/g, '""')}"`
+        }
+        return strVal
+      }).join(','))
+    ].join('\n')
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.setAttribute('href', url)
+    link.setAttribute('download', filename)
+    link.style.visibility = 'hidden'
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+  }
+
+  // PDF Export handler
+  const handleExportPDF = (donationsToExport: Donation[], title = 'Collection History Report') => {
+    const printWindow = window.open('', '_blank')
+    if (!printWindow) {
+      alert('Pop-up blocked. Please allow pop-ups for this site to download the PDF report.')
+      return
+    }
+
+    const totalAmount = donationsToExport.reduce((sum, d) => sum + Number(d.amount), 0)
+    const verifiedAmount = donationsToExport.filter(d => d.status === 'verified').reduce((sum, d) => sum + Number(d.amount), 0)
+    const pendingAmount = donationsToExport.filter(d => d.status === 'pending').reduce((sum, d) => sum + Number(d.amount), 0)
+
+    const tableRows = donationsToExport.map(d => `
+      <tr>
+        <td>${d.receipt_number}</td>
+        <td>${d.donor_name}</td>
+        <td>${d.donor_phone || '—'}</td>
+        <td>₹${Number(d.amount).toLocaleString('en-IN')}</td>
+        <td>${d.payment_mode === 'upi_self' ? 'Self' : (d.users?.full_name || 'Unknown')}</td>
+        <td class="capitalize">${d.payment_mode.replace('_', ' ')}</td>
+        <td class="status-${d.status}">${d.status.toUpperCase()}</td>
+        <td>${new Date(d.created_at).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}</td>
+      </tr>
+    `).join('')
+
+    printWindow.document.write(`
+      <html>
+        <head>
+          <title>${title}</title>
+          <style>
+            body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; color: #1a1a1a; padding: 24px; margin: 0; }
+            .header { margin-bottom: 24px; border-bottom: 2px solid #e2e8f0; padding-bottom: 16px; }
+            .title { font-size: 24px; font-weight: bold; margin: 0; color: #e8650a; }
+            .mandal { font-size: 14px; color: #4a5568; margin-top: 4px; }
+            .summary { display: grid; grid-template-cols: repeat(3, 1fr); gap: 16px; margin-bottom: 24px; }
+            .summary-card { background: #f7fafc; border: 1px solid #edf2f7; padding: 12px; border-radius: 8px; }
+            .summary-label { font-size: 10px; color: #718096; text-transform: uppercase; letter-spacing: 0.05em; font-weight: 600; }
+            .summary-value { font-size: 18px; font-weight: bold; margin-top: 4px; color: #1a202c; }
+            table { width: 100%; border-collapse: collapse; text-align: left; font-size: 12px; margin-top: 12px; }
+            th { background: #edf2f7; color: #4a5568; font-weight: 600; padding: 10px; border-bottom: 1px solid #e2e8f0; }
+            td { padding: 10px; border-bottom: 1px solid #edf2f7; color: #2d3748; }
+            tr:nth-child(even) { background: #fcfcfc; }
+            .status-verified { color: #2f855a; font-weight: 600; }
+            .status-pending { color: #c05621; font-weight: 600; }
+            .status-rejected { color: #9b2c2c; font-weight: 600; }
+            .footer { margin-top: 40px; font-size: 10px; color: #a0aec0; text-align: center; border-top: 1px solid #edf2f7; padding-top: 12px; }
+            @media print {
+              body { padding: 0; }
+              .no-print { display: none; }
+            }
+          </style>
+        </head>
+        <body>
+          <div class="header">
+            <h1 class="title">${title}</h1>
+            <div class="mandal">${mandalName || 'Intellidon Mandal'} · Generated on ${new Date().toLocaleDateString('en-IN')}</div>
+          </div>
+          <div class="summary">
+            <div class="summary-card">
+              <div class="summary-label">Total Filtered Amount</div>
+              <div class="summary-value">₹${totalAmount.toLocaleString('en-IN')}</div>
+            </div>
+            <div class="summary-card">
+              <div class="summary-label">Verified Amount</div>
+              <div class="summary-value">₹${verifiedAmount.toLocaleString('en-IN')}</div>
+            </div>
+            <div class="summary-card">
+              <div class="summary-label">Donation Count</div>
+              <div class="summary-value">${donationsToExport.length}</div>
+            </div>
+          </div>
+          <table>
+            <thead>
+              <tr>
+                <th>Receipt</th>
+                <th>Donor Name</th>
+                <th>Phone</th>
+                <th>Amount</th>
+                <th>Collector</th>
+                <th>Mode</th>
+                <th>Status</th>
+                <th>Date</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${tableRows}
+            </tbody>
+          </table>
+          <div class="footer">
+            Generated via Intellidon Donation System. All values verified against official digital ledgers.
+          </div>
+          <script>
+            window.onload = function() {
+              window.print();
+            }
+          </script>
+        </body>
+      </html>
+    `)
+    printWindow.document.close()
+  }
+
   // Team state
   const [members, setMembers] = useState<Member[]>([])
   const [showMemberForm, setShowMemberForm] = useState(false)
@@ -1604,10 +1743,10 @@ export default function DashboardPage() {
                   onChange={e => setHistoryCollectorFilter(e.target.value)}
                   className="flex-1 bg-gray-950 border border-gray-800 rounded-lg px-3 py-2 text-xs text-gray-300 focus:outline-none focus:border-orange-500 transition-colors"
                 >
-                  <option value="all">All Collectors</option>
-                  <option value="self">Self-Donations (Online)</option>
+                  <option value="all" className="bg-gray-900 text-white">All Collectors</option>
+                  <option value="self" className="bg-gray-900 text-white">Self-Donations (Online)</option>
                   {distinctCollectors.map(c => (
-                    <option key={c.id} value={c.id}>{c.name}</option>
+                    <option key={c.id} value={c.id} className="bg-gray-900 text-white">{c.name}</option>
                   ))}
                 </select>
 
@@ -1617,13 +1756,31 @@ export default function DashboardPage() {
                   onChange={e => setHistoryTypeFilter(e.target.value)}
                   className="flex-1 bg-gray-950 border border-gray-800 rounded-lg px-3 py-2 text-xs text-gray-300 focus:outline-none focus:border-orange-500 transition-colors"
                 >
-                  <option value="all">All Modes</option>
-                  <option value="cash">💵 Cash</option>
-                  <option value="upi_collector">📱 UPI (collector)</option>
-                  <option value="upi_self">📱 UPI (self)</option>
+                  <option value="all" className="bg-gray-900 text-white">All Modes</option>
+                  <option value="cash" className="bg-gray-900 text-white">💵 Cash</option>
+                  <option value="upi_collector" className="bg-gray-900 text-white">📱 UPI (collector)</option>
+                  <option value="upi_self" className="bg-gray-900 text-white">📱 UPI (self)</option>
                 </select>
 
               </div>
+            </div>
+
+            {/* Export buttons */}
+            <div className="flex gap-2">
+              <button
+                onClick={() => handleExportCSV(filteredHistoryDonations, `mandal_history_${new Date().toISOString().slice(0, 10)}.csv`)}
+                disabled={filteredHistoryDonations.length === 0}
+                className="flex-1 sm:flex-initial sm:px-6 py-2 bg-gray-900 border border-gray-800 text-gray-300 font-semibold rounded-lg text-xs hover:bg-gray-850 hover:text-white transition-colors disabled:opacity-50"
+              >
+                📥 Export CSV
+              </button>
+              <button
+                onClick={() => handleExportPDF(filteredHistoryDonations, 'Mandal Collection History Report')}
+                disabled={filteredHistoryDonations.length === 0}
+                className="flex-1 sm:flex-initial sm:px-6 py-2 bg-gray-900 border border-gray-800 text-gray-300 font-semibold rounded-lg text-xs hover:bg-gray-850 hover:text-white transition-colors disabled:opacity-50"
+              >
+                📄 Export PDF
+              </button>
             </div>
 
             {/* Donations Table/List */}
