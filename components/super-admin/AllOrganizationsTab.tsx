@@ -69,6 +69,21 @@ export default function AllOrganizationsTab({ showToast }: AllOrganizationsTabPr
   const [organizations, setOrganizations] = useState<Mandal[]>([])
   const [loading, setLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState('')
+  const [visibleCount, setVisibleCount] = useState(10)
+
+  const [selectedDocKey, setSelectedDocKey] = useState('')
+  const [selectedDocUrl, setSelectedDocUrl] = useState('')
+  const [selectedDocLabel, setSelectedDocLabel] = useState('')
+  const [uploadingDocKey, setUploadingDocKey] = useState<string | null>(null)
+  const [uploadingFile, setUploadingFile] = useState(false)
+
+  const [detailedUser, setDetailedUser] = useState<any | null>(null)
+  const [loadingDetailedUser, setLoadingDetailedUser] = useState(false)
+  const [showDetailedUserModal, setShowDetailedUserModal] = useState(false)
+
+  const [resetPasswordUserId, setResetPasswordUserId] = useState<string | null>(null)
+  const [newPasswordValue, setNewPasswordValue] = useState('')
+  const [resettingPassword, setResettingPassword] = useState(false)
 
   // Create organization modal states
   const [showCreateModal, setShowCreateModal] = useState(false)
@@ -95,6 +110,12 @@ export default function AllOrganizationsTab({ showToast }: AllOrganizationsTabPr
     url: string
   } | null>(null)
 
+  useEffect(() => {
+    setSelectedDocKey('')
+    setSelectedDocUrl('')
+    setSelectedDocLabel('')
+  }, [viewingOrg])
+
   async function handleViewDoc(mandalId: string, docKey: string, label: string, path: string | null) {
     if (!path) {
       setPreviewDoc({ mandalId, key: docKey, label, url: '' })
@@ -113,9 +134,133 @@ export default function AllOrganizationsTab({ showToast }: AllOrganizationsTabPr
     }
   }
 
+  async function selectDocument(docKey: string, label: string, path: string) {
+    setSelectedDocKey(docKey)
+    setSelectedDocLabel(label)
+    setSelectedDocUrl('') // Reset while loading
+    
+    try {
+      const { data, error } = await supabase.storage
+        .from('kyc-documents')
+        .createSignedUrl(path, 300)
+        
+      if (error || !data?.signedUrl) throw new Error(error?.message || 'Could not sign file URL')
+      setSelectedDocUrl(data.signedUrl)
+    } catch (err: any) {
+      showToast('Error loading file: ' + err.message, 'error')
+    }
+  }
+
+  const triggerUpload = (docKey: string) => {
+    setUploadingDocKey(docKey)
+    const input = document.getElementById('super-admin-doc-uploader') as HTMLInputElement
+    if (input) {
+      input.value = ''
+      input.click()
+    }
+  }
+
+  async function handleFileUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    if (!file || !uploadingDocKey || !viewingOrg) return
+
+    setUploadingFile(true)
+    try {
+      const ext = file.name.split('.').pop() || 'pdf'
+      const path = `${viewingOrg.id}/${uploadingDocKey}.${ext}`
+
+      // 1. Upload to Supabase Storage
+      const { error: uploadError } = await supabase.storage
+        .from('kyc-documents')
+        .upload(path, file, { upsert: true })
+
+      if (uploadError) throw new Error(`Upload error: ${uploadError.message}`)
+
+      // 2. Update DB via PATCH api
+      const res = await fetch('/api/super-admin/mandals', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          mandalId: viewingOrg.id,
+          documentKey: uploadingDocKey,
+          documentPath: path
+        })
+      })
+      const data = await res.json()
+      if (data.error) throw new Error(data.error)
+
+      showToast('Document uploaded successfully!', 'success')
+
+      // 3. Update state locally
+      const updatedOrg = {
+        ...viewingOrg,
+        [uploadingDocKey]: path
+      }
+      setOrganizations(prev => prev.map(org => org.id === viewingOrg.id ? updatedOrg : org))
+      setViewingOrg(updatedOrg)
+
+      // Auto-preview the uploaded file
+      selectDocument(uploadingDocKey, uploadingDocKey, path)
+    } catch (err: any) {
+      showToast(err.message || 'Failed to upload document', 'error')
+    } finally {
+      setUploadingFile(false)
+      setUploadingDocKey(null)
+    }
+  }
+
+  async function fetchUserDetailedInfo(userId: string) {
+    setLoadingDetailedUser(true)
+    setShowDetailedUserModal(true)
+    setDetailedUser(null)
+    try {
+      const res = await fetch(`/api/super-admin/users/${userId}`)
+      const data = await res.json()
+      if (data.error) throw new Error(data.error)
+      setDetailedUser(data.user)
+    } catch (err: any) {
+      showToast(err.message || 'Failed to load user details', 'error')
+      setShowDetailedUserModal(false)
+    } finally {
+      setLoadingDetailedUser(false)
+    }
+  }
+
+  async function handlePasswordReset(e: React.FormEvent) {
+    e.preventDefault()
+    if (!resetPasswordUserId || newPasswordValue.length < 8) return
+
+    setResettingPassword(true)
+    try {
+      const res = await fetch(`/api/super-admin/users/${resetPasswordUserId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ password: newPasswordValue })
+      })
+      const data = await res.json()
+      if (data.error) throw new Error(data.error)
+
+      showToast('Password updated successfully!', 'success')
+      setResetPasswordUserId(null)
+      setNewPasswordValue('')
+
+      if (detailedUser && detailedUser.id === resetPasswordUserId) {
+        setDetailedUser((prev: any) => prev ? { ...prev, password_change: new Date().toISOString() } : prev)
+      }
+    } catch (err: any) {
+      showToast(err.message || 'Failed to update password', 'error')
+    } finally {
+      setResettingPassword(false)
+    }
+  }
+
   useEffect(() => {
     fetchAllOrganizations()
   }, [])
+
+  useEffect(() => {
+    setVisibleCount(10)
+  }, [searchQuery])
 
   async function handleCreateOrganization(e: React.FormEvent) {
     e.preventDefault()
@@ -187,10 +332,21 @@ export default function AllOrganizationsTab({ showToast }: AllOrganizationsTabPr
       const data = await res.json()
       if (data.error) throw new Error(data.error)
       setOrganizations(data.mandals || [])
+      setVisibleCount(10)
     } catch (err: any) {
       showToast(err.message || 'Failed to load organizations', 'error')
     } finally {
       setLoading(false)
+    }
+  }
+
+  const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
+    const target = e.currentTarget
+    const threshold = 50 // px from bottom
+    if (target.scrollHeight - target.scrollTop - target.clientHeight <= threshold) {
+      if (visibleCount < filteredOrgs.length) {
+        setVisibleCount(prev => Math.min(prev + 10, filteredOrgs.length))
+      }
     }
   }
 
@@ -300,22 +456,25 @@ export default function AllOrganizationsTab({ showToast }: AllOrganizationsTabPr
         </div>
       ) : (
         <div className="bg-gray-900 border border-gray-800 rounded-2xl overflow-hidden">
-          <div className="overflow-x-auto">
+          <div 
+            className="overflow-x-auto max-h-[600px] overflow-y-auto scrollbar-thin scrollbar-thumb-gray-800 scrollbar-track-transparent"
+            onScroll={handleScroll}
+          >
             <table className="w-full border-collapse text-left">
-              <thead>
-                <tr className="border-b border-gray-800 text-[10px] text-gray-500 uppercase tracking-wider font-bold bg-gray-950/20">
-                  <th className="py-3.5 px-5">Organization Name</th>
-                  <th className="py-3.5 px-5">Location</th>
-                  <th className="py-3.5 px-5">Contacts</th>
-                  <th className="py-3.5 px-5 text-center">Status</th>
-                  <th className="py-3.5 px-5 text-center">KYC Status</th>
-                  <th className="py-3.5 px-5">Subscription</th>
-                  <th className="py-3.5 px-5">Created At</th>
-                  <th className="py-3.5 px-5 text-right">Actions</th>
+              <thead className="sticky top-0 bg-gray-900 z-10 border-b border-gray-800">
+                <tr className="border-b border-gray-800 text-[10px] text-gray-550 uppercase tracking-wider font-bold bg-gray-950/20">
+                  <th className="py-3.5 px-5 bg-gray-900">Organization Name</th>
+                  <th className="py-3.5 px-5 bg-gray-900">Location</th>
+                  <th className="py-3.5 px-5 bg-gray-900">Contacts</th>
+                  <th className="py-3.5 px-5 bg-gray-900 text-center">Status</th>
+                  <th className="py-3.5 px-5 bg-gray-900 text-center">KYC Status</th>
+                  <th className="py-3.5 px-5 bg-gray-900">Subscription</th>
+                  <th className="py-3.5 px-5 bg-gray-900">Created At</th>
+                  <th className="py-3.5 px-5 bg-gray-900 text-right">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-850 text-xs">
-                {filteredOrgs.map(org => {
+                {filteredOrgs.slice(0, visibleCount).map(org => {
                   const sub = org.subscriptions?.[0]
                   return (
                     <tr key={org.id} className="hover:bg-gray-850/20 transition-colors">
@@ -614,18 +773,123 @@ export default function AllOrganizationsTab({ showToast }: AllOrganizationsTabPr
               </div>
 
               {/* Grid 2: Account Administrator */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 bg-gray-950/30 p-4 border border-gray-850 rounded-xl text-xs">
-                <div className="md:col-span-3 pb-2 border-b border-gray-800">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 bg-gray-955/30 p-4 border border-gray-850 rounded-xl text-xs">
+                <div className="md:col-span-3 pb-2 border-b border-gray-800 flex justify-between items-center">
                   <h4 className="text-xs font-bold text-orange-400 uppercase tracking-wider">2. Account Administrator</h4>
+                  {viewingOrg.users?.find(u => u.role === 'admin') && (
+                    <button
+                      type="button"
+                      onClick={() => setResetPasswordUserId(viewingOrg.users?.find(u => u.role === 'admin')?.id || null)}
+                      className="px-2.5 py-1 bg-gray-850 hover:bg-gray-800 hover:text-white border border-gray-750 hover:border-gray-700 text-orange-400 font-bold rounded-lg text-[10px] transition-colors cursor-pointer"
+                    >
+                      Change Password
+                    </button>
+                  )}
                 </div>
                 <div><span className="text-gray-500">Admin Name: </span><span className="text-white font-semibold">{viewingOrg.admin_full_name || '—'}</span></div>
                 <div><span className="text-gray-500">Login Email: </span><span className="text-gray-300 font-mono">{viewingOrg.admin_email || '—'}</span></div>
                 <div><span className="text-gray-500">Admin Phone: </span><span className="text-gray-300 font-mono">{viewingOrg.admin_phone || '—'}</span></div>
               </div>
 
-              {/* Section 3: Team Members */}
+              {/* Section 3: Documents (New layout with inline viewer and row buttons) */}
               <div className="space-y-3 bg-gray-950/20 border border-gray-850 rounded-xl p-4">
-                <h4 className="text-xs font-bold text-orange-400 uppercase tracking-wider block">3. Team Members ({viewingOrg.users?.length || 0})</h4>
+                <h4 className="text-xs font-bold text-orange-400 uppercase tracking-wider block">3. Documents</h4>
+                
+                <div className="flex flex-wrap gap-2.5 items-center">
+                  {[
+                    { key: 'doc_admin_aadhaar', label: 'Aadhaar' },
+                    { key: 'doc_bank_proof', label: 'Bank Proof' },
+                    { key: 'doc_auth_letter', label: 'Auth Letter' },
+                    { key: 'doc_address_proof', label: 'Address Proof' },
+                    { key: 'doc_reg_cert', label: 'Reg Certificate' },
+                    { key: 'doc_admin_pan', label: 'Admin PAN' },
+                    { key: 'doc_org_pan', label: 'Org PAN' }
+                  ].map(doc => {
+                    const path = viewingOrg[doc.key as keyof Mandal] as string | null
+                    const isMissing = !path
+
+                    if (isMissing) {
+                      return (
+                        <div key={doc.key} className="flex items-center gap-1.5 bg-gray-955/40 px-2.5 py-1.5 border border-dashed border-gray-800 rounded-xl text-[11px]">
+                          <span className="text-gray-500 font-semibold">{doc.label} (No attachment)</span>
+                          <button
+                            type="button"
+                            onClick={() => triggerUpload(doc.key)}
+                            disabled={uploadingFile && uploadingDocKey === doc.key}
+                            className="px-2 py-0.5 bg-orange-500/10 hover:bg-orange-500/20 text-orange-400 font-bold rounded text-[9px] border border-orange-500/20 transition-colors cursor-pointer disabled:opacity-50"
+                          >
+                            {uploadingFile && uploadingDocKey === doc.key ? 'Uploading...' : 'Upload Now'}
+                          </button>
+                        </div>
+                      )
+                    }
+
+                    return (
+                      <button
+                        key={doc.key}
+                        type="button"
+                        onClick={() => selectDocument(doc.key, doc.label, path)}
+                        className={`px-3 py-1.5 font-bold rounded-xl text-xs border transition-colors cursor-pointer
+                          ${selectedDocKey === doc.key
+                            ? 'bg-orange-500 border-orange-400 text-white shadow-lg shadow-orange-500/10'
+                            : 'bg-gray-800 border-gray-750 hover:bg-gray-750 hover:border-gray-700 text-gray-300 hover:text-white'}`}
+                      >
+                        📄 {doc.label}
+                      </button>
+                    )
+                  })}
+                </div>
+
+                {/* Inline document preview box */}
+                {selectedDocUrl ? (
+                  <div className="mt-4 border border-gray-800 rounded-xl overflow-hidden bg-gray-955 h-[350px] relative">
+                    <div className="absolute top-2 right-2 z-10 flex gap-2">
+                      <button
+                        type="button"
+                        onClick={() => window.open(selectedDocUrl, '_blank')}
+                        className="px-2.5 py-1 bg-gray-900/80 hover:bg-gray-800/90 text-gray-300 rounded text-[9px] font-bold border border-gray-750 transition-colors cursor-pointer"
+                      >
+                        External ↗
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setSelectedDocUrl('')
+                          setSelectedDocKey('')
+                        }}
+                        className="px-2.5 py-1 bg-gray-900/80 hover:bg-gray-800/90 text-gray-300 rounded text-[9px] font-bold border border-gray-750 transition-colors cursor-pointer"
+                      >
+                        Close Preview ✕
+                      </button>
+                    </div>
+                    
+                    {selectedDocUrl.includes('.pdf') || selectedDocUrl.toLowerCase().indexOf('pdf') !== -1 ? (
+                      <iframe
+                        src={selectedDocUrl}
+                        className="w-full h-full border-0"
+                        title={selectedDocLabel}
+                      />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center p-4">
+                        <img
+                          src={selectedDocUrl}
+                          alt={selectedDocLabel}
+                          className="max-w-full max-h-full object-contain rounded-lg shadow-2xl"
+                        />
+                      </div>
+                    )}
+                  </div>
+                ) : selectedDocKey ? (
+                  <div className="mt-4 border border-gray-850 rounded-xl bg-gray-950 h-[100px] flex items-center justify-center text-xs text-gray-550 font-mono">
+                    <div className="w-5 h-5 rounded-full border border-t-orange-500 border-r-transparent border-b-orange-500 border-l-transparent animate-spin mr-2" />
+                    Generating preview link...
+                  </div>
+                ) : null}
+              </div>
+
+              {/* Section 4: Team Members (moved after document section) */}
+              <div className="space-y-3 bg-gray-950/20 border border-gray-850 rounded-xl p-4">
+                <h4 className="text-xs font-bold text-orange-400 uppercase tracking-wider block">4. Team Members ({viewingOrg.users?.length || 0})</h4>
                 {(!viewingOrg.users || viewingOrg.users.length === 0) ? (
                   <p className="text-xs text-gray-550 italic">No registered team members found for this organization.</p>
                 ) : (
@@ -636,11 +900,12 @@ export default function AllOrganizationsTab({ showToast }: AllOrganizationsTabPr
                           <th className="py-2 px-3">Name</th>
                           <th className="py-2 px-3">Phone</th>
                           <th className="py-2 px-3">Role</th>
+                          <th className="py-2 px-3 text-right">Actions</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-gray-850 text-gray-300">
                         {viewingOrg.users.map(u => (
-                          <tr key={u.id} className="hover:bg-gray-950/20">
+                          <tr key={u.id} className="hover:bg-gray-955/20">
                             <td className="py-2.5 px-3 font-semibold text-white">{u.full_name || '—'}</td>
                             <td className="py-2.5 px-3 font-mono">{u.phone || '—'}</td>
                             <td className="py-2.5 px-3">
@@ -651,6 +916,15 @@ export default function AllOrganizationsTab({ showToast }: AllOrganizationsTabPr
                                 {u.role}
                               </span>
                             </td>
+                            <td className="py-2.5 px-3 text-right">
+                              <button
+                                type="button"
+                                onClick={() => fetchUserDetailedInfo(u.id)}
+                                className="px-2.5 py-1 bg-gray-800 hover:bg-gray-700 hover:text-white border border-gray-700 hover:border-gray-600 text-orange-400 hover:text-orange-500 font-bold rounded-xl text-[10px] transition-colors cursor-pointer"
+                              >
+                                View Details
+                              </button>
+                            </td>
                           </tr>
                         ))}
                       </tbody>
@@ -658,65 +932,6 @@ export default function AllOrganizationsTab({ showToast }: AllOrganizationsTabPr
                   </div>
                 )}
               </div>
-
-              {/* Section 4: KYC Documents & View options */}
-              <div className="space-y-3 bg-gray-950/20 border border-gray-850 rounded-xl p-4">
-                <h4 className="text-xs font-bold text-orange-400 uppercase tracking-wider block">4. Submitted KYC Documents</h4>
-                <div className="space-y-2">
-                  {[
-                    { key: 'doc_admin_aadhaar', label: 'Admin Aadhaar *', required: true },
-                    { key: 'doc_bank_proof', label: 'Bank Proof (cancelled cheque/passbook) *', required: true },
-                    { key: 'doc_auth_letter', label: 'Committee Authorisation Letter *', required: true },
-                    { key: 'doc_address_proof', label: 'Address Proof *', required: true },
-                    { key: 'doc_reg_cert', label: 'Registration Certificate', required: false },
-                    { key: 'doc_admin_pan', label: 'Admin PAN', required: false },
-                    { key: 'doc_org_pan', label: 'Organisation PAN', required: false }
-                  ].map(doc => {
-                    const path = viewingOrg[doc.key as keyof Mandal] as string | null
-                    const parsed = parseKycNotes(viewingOrg.kyc_notes)
-                    const status = parsed.documentStatuses[doc.key] || 'pending'
-                    const isMissing = !path
-
-                    return (
-                      <div key={doc.key} className="flex justify-between items-center p-3 bg-gray-950/30 border border-gray-850 rounded-xl text-xs">
-                        <div>
-                          <span className="font-semibold text-gray-300">{doc.label}</span>
-                          <span className="text-[10px] text-gray-550 block">
-                            {isMissing ? 'Not Uploaded' : 'Uploaded'}
-                          </span>
-                        </div>
-
-                        <div className="flex items-center gap-3">
-                          {/* Individual Status */}
-                          {!isMissing && (
-                            <span className={`px-2 py-0.5 rounded text-[9px] font-bold uppercase border
-                              ${status === 'approved' 
-                                ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
-                                : status === 'rejected'
-                                ? 'bg-rose-500/10 text-rose-455 border-rose-500/20'
-                                : 'bg-amber-500/10 text-amber-400 border-amber-500/20'}`}>
-                              {status}
-                            </span>
-                          )}
-
-                          {isMissing ? (
-                            <span className="text-gray-550 text-[10px] italic pr-1 select-none">Not Attached</span>
-                          ) : (
-                            <button
-                              type="button"
-                              onClick={() => handleViewDoc(viewingOrg.id, doc.key, doc.label, path)}
-                              className="px-3 py-1 bg-gray-800 hover:bg-gray-700 text-orange-400 hover:text-orange-500 rounded-lg text-xs font-bold transition-colors cursor-pointer border border-gray-700"
-                            >
-                              View File
-                            </button>
-                          )}
-                        </div>
-                      </div>
-                    )
-                  })}
-                </div>
-              </div>
-
             </div>
 
             {/* Footer buttons */}
@@ -792,6 +1007,206 @@ export default function AllOrganizationsTab({ showToast }: AllOrganizationsTabPr
           </div>
         </div>
       )}
+
+      {/* Detailed Team Member Modal */}
+      {showDetailedUserModal && (
+        <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-gray-900 border border-gray-800 rounded-2xl w-full max-w-md overflow-hidden shadow-2xl flex flex-col max-h-[85vh]">
+            {/* Header */}
+            <div className="p-5 border-b border-gray-800 flex justify-between items-center bg-gray-955/20">
+              <div>
+                <h3 className="text-sm font-bold text-white">Team Member Profile</h3>
+                <p className="text-[10px] text-gray-550 font-mono tracking-wide mt-0.5">Super Admin Audit View</p>
+              </div>
+              <button 
+                onClick={() => setShowDetailedUserModal(false)}
+                className="text-gray-400 hover:text-white text-xs p-1 cursor-pointer"
+              >
+                ✕ Close
+              </button>
+            </div>
+
+            {/* Content */}
+            <div className="p-5 space-y-4 overflow-y-auto text-xs">
+              {loadingDetailedUser ? (
+                <div className="flex flex-col items-center justify-center py-12 space-y-2">
+                  <div className="w-6 h-6 rounded-full border border-t-orange-500 border-r-transparent border-b-orange-500 border-l-transparent animate-spin" />
+                  <p className="text-[10px] text-gray-500 font-mono">Fetching profile details...</p>
+                </div>
+              ) : detailedUser ? (
+                <div className="space-y-4">
+                  {/* Basic Card */}
+                  <div className="bg-gray-955/50 border border-gray-850 p-4 rounded-xl space-y-2.5">
+                    <div className="flex justify-between items-center pb-2 border-b border-gray-800">
+                      <div>
+                        <p className="text-sm font-bold text-white">{detailedUser.full_name}</p>
+                        <p className="text-[9px] text-orange-400 font-mono tracking-wider uppercase leading-none mt-0.5">
+                          {detailedUser.designation}
+                        </p>
+                      </div>
+                      <span className={`px-2 py-0.5 rounded text-[9px] font-bold uppercase border
+                        ${detailedUser.is_active 
+                          ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' 
+                          : 'bg-rose-500/10 text-rose-455 border-rose-500/20'}`}>
+                        {detailedUser.is_active ? 'Active' : 'Suspended'}
+                      </span>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-3 text-[11px] text-gray-300">
+                      <div>
+                        <span className="text-gray-550 block text-[9px] font-semibold uppercase tracking-wider">Email Address</span>
+                        <span className="font-mono text-white truncate block">{detailedUser.email}</span>
+                      </div>
+                      <div>
+                        <span className="text-gray-550 block text-[9px] font-semibold uppercase tracking-wider">Phone Number</span>
+                        <span className="font-mono text-white block">{detailedUser.phone || '—'}</span>
+                      </div>
+                      <div>
+                        <span className="text-gray-550 block text-[9px] font-semibold uppercase tracking-wider">System Role</span>
+                        <span className="capitalize block">{detailedUser.role}</span>
+                      </div>
+                      <div>
+                        <span className="text-gray-550 block text-[9px] font-semibold uppercase tracking-wider">Joined Date</span>
+                        <span>{detailedUser.created_at ? formatDate(detailedUser.created_at) : '—'}</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Security / Logs Card */}
+                  <div className="bg-gray-955/50 border border-gray-850 p-4 rounded-xl space-y-2 text-[11px]">
+                    <h4 className="text-[9px] font-bold text-gray-400 uppercase tracking-wider border-b border-gray-800 pb-1.5 mb-2.5">
+                      Security & Login Info
+                    </h4>
+                    <div className="space-y-2">
+                      <div className="flex justify-between items-center">
+                        <span className="text-gray-555">Last Login:</span>
+                        <span className="font-mono text-white text-right">
+                          {detailedUser.last_login ? new Date(detailedUser.last_login).toLocaleString('en-IN') : 'Never logged in'}
+                        </span>
+                      </div>
+                      <div className="flex justify-between items-center">
+                        <span className="text-gray-555">Profile / Password Update:</span>
+                        <span className="font-mono text-white text-right">
+                          {detailedUser.password_change ? new Date(detailedUser.password_change).toLocaleString('en-IN') : 'No password updates'}
+                        </span>
+                      </div>
+                      <div className="pt-2 border-t border-gray-800/40 flex justify-end">
+                        <button
+                          type="button"
+                          onClick={() => setResetPasswordUserId(detailedUser.id)}
+                          className="px-2.5 py-1.5 bg-gray-850 hover:bg-gray-800 hover:text-white border border-gray-750 text-orange-400 font-bold rounded-lg text-[9px] transition-colors cursor-pointer"
+                        >
+                          Change Password
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Collection Activity Card */}
+                  <div className="bg-gray-955/50 border border-gray-850 p-4 rounded-xl space-y-2 text-[11px]">
+                    <h4 className="text-[9px] font-bold text-gray-400 uppercase tracking-wider border-b border-gray-800 pb-1.5 mb-2.5">
+                      Collection Activity
+                    </h4>
+                    <div className="grid grid-cols-2 gap-3 text-center">
+                      <div className="bg-gray-950/40 p-2.5 border border-gray-850 rounded-lg">
+                        <p className="text-[9px] text-gray-550 font-bold uppercase tracking-wider">Total Collected</p>
+                        <p className="text-xs font-black text-white mt-1">{detailedUser.activity.totalCount} donations</p>
+                        <p className="text-[10px] font-mono text-gray-405 mt-0.5">₹{detailedUser.activity.totalAmount}</p>
+                      </div>
+                      <div className="bg-gray-950/40 p-2.5 border border-gray-850 rounded-lg">
+                        <p className="text-[9px] text-emerald-500 font-bold uppercase tracking-wider">Verified Cash</p>
+                        <p className="text-xs font-black text-emerald-450 mt-1">{detailedUser.activity.verifiedCount} items</p>
+                        <p className="text-[10px] font-mono text-emerald-400 mt-0.5">₹{detailedUser.activity.verifiedAmount}</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <p className="text-gray-555 text-center py-6">Could not load profile info.</p>
+              )}
+            </div>
+
+            {/* Footer */}
+            <div className="p-4 border-t border-gray-850 bg-gray-955/20 flex justify-end">
+              <button
+                type="button"
+                onClick={() => setShowDetailedUserModal(false)}
+                className="px-4 py-2 bg-gray-800 hover:bg-gray-700 text-gray-300 font-bold rounded-xl text-xs transition-colors cursor-pointer"
+              >
+                Close Profile
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Change Password Modal */}
+      {resetPasswordUserId && (
+        <div className="fixed inset-0 z-55 bg-black/75 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-gray-900 border border-gray-800 rounded-2xl w-full max-w-sm overflow-hidden shadow-2xl flex flex-col">
+            {/* Header */}
+            <div className="p-5 border-b border-gray-800 flex justify-between items-center bg-gray-955/20">
+              <div>
+                <h3 className="text-sm font-bold text-white">Change User Password</h3>
+                <p className="text-[10px] text-gray-555 font-mono mt-0.5">Admin Security Credential Update</p>
+              </div>
+              <button 
+                onClick={() => {
+                  setResetPasswordUserId(null)
+                  setNewPasswordValue('')
+                }}
+                className="text-gray-400 hover:text-white text-xs p-1 cursor-pointer"
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Form */}
+            <form onSubmit={handlePasswordReset} className="p-5 space-y-4">
+              <div>
+                <label className="block text-xs font-semibold text-gray-400 mb-1.5">New Password *</label>
+                <input
+                  type="text"
+                  required
+                  placeholder="Min 8 characters"
+                  value={newPasswordValue}
+                  onChange={e => setNewPasswordValue(e.target.value)}
+                  className="w-full bg-gray-955 border border-gray-800 rounded-lg px-3 py-2 text-xs text-white placeholder-gray-600 focus:outline-none focus:border-orange-500 font-mono"
+                />
+              </div>
+
+              <div className="flex gap-3 justify-end pt-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setResetPasswordUserId(null)
+                    setNewPasswordValue('')
+                  }}
+                  className="px-4 py-2 bg-gray-800 hover:bg-gray-700 text-gray-300 font-semibold rounded-xl text-xs transition-colors cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={resettingPassword || newPasswordValue.length < 8}
+                  className="px-4 py-2 bg-orange-500 hover:bg-orange-600 text-white font-bold rounded-xl text-xs transition-colors cursor-pointer disabled:opacity-50"
+                >
+                  {resettingPassword ? 'Updating...' : 'Update Password'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Hidden File Uploader */}
+      <input
+        type="file"
+        id="super-admin-doc-uploader"
+        className="hidden"
+        accept="image/*,application/pdf"
+        onChange={handleFileUpload}
+      />
 
     </div>
   )

@@ -80,11 +80,37 @@ export async function GET(request: Request) {
 }
 
 // PATCH - approve, reject, or suspend a mandal
-// Body: { mandalId: string, action: 'approve' | 'reject' | 'suspend', plan?: string }
+// Body: { mandalId: string, action?: 'approve' | 'reject' | 'suspend', plan?: string, documentKey?: string, documentPath?: string }
 export async function PATCH(request: Request) {
   try {
     const body = await request.json()
-    const { mandalId, action, plan = 'trial', kycStatus, kycNotes } = body
+    const { mandalId, action, plan = 'trial', kycStatus, kycNotes, documentKey, documentPath } = body
+
+    // Update document path if provided
+    if (documentKey && documentPath) {
+      const allowedKeys = [
+        'doc_admin_aadhaar',
+        'doc_bank_proof',
+        'doc_auth_letter',
+        'doc_address_proof',
+        'doc_reg_cert',
+        'doc_admin_pan',
+        'doc_org_pan'
+      ]
+      if (!allowedKeys.includes(documentKey)) {
+        return NextResponse.json({ error: 'Invalid document key' }, { status: 400 })
+      }
+      const { error } = await supabaseAdmin
+        .from('mandals')
+        .update({ [documentKey]: documentPath })
+        .eq('id', mandalId)
+
+      if (error) {
+        console.error('Update document DB error:', error)
+        return NextResponse.json({ error: 'Could not update document record' }, { status: 500 })
+      }
+      return NextResponse.json({ success: true, message: 'Document updated successfully' })
+    }
 
     // KYC update — separate from approve/reject action
     if (kycStatus) {

@@ -130,7 +130,7 @@ function SuperAdminDashboardContent() {
       )}
 
       {/* Unified Side Navigation Panel */}
-      <aside className="w-full md:w-64 bg-gray-900 border-b md:border-b-0 md:border-r border-gray-800 flex flex-col justify-between shrink-0">
+      <aside className="w-full md:w-64 bg-gray-900 border-b md:border-b-0 md:border-r border-gray-800 flex flex-col justify-between shrink-0 md:sticky md:top-0 md:h-screen">
         <div>
           {/* Logo Brand Header */}
           <div className="p-6 border-b border-gray-800 flex items-center space-x-3">
