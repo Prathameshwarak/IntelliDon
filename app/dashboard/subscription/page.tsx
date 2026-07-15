@@ -5,6 +5,7 @@ import { supabase } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { useSubscription } from '@/lib/useSubscription'
+import UpiQR from '@/components/UpiQR'
 
 type PlanRow = {
   id: string
@@ -29,6 +30,7 @@ export default function DashboardSubscriptionPage() {
   const [adminPhone, setAdminPhone] = useState('')
   const [adminEmail, setAdminEmail] = useState('')
   const [selectedPlan, setSelectedPlan] = useState<PlanRow | null>(null)
+  const [showMobileQr, setShowMobileQr] = useState(false)
 
   // Subscription hook for normal admin
   const sub = useSubscription(mandalId)
@@ -281,26 +283,100 @@ export default function DashboardSubscriptionPage() {
                   <p className="text-xs text-gray-500">Please click and select one of the available subscription plans above to proceed with the payment.</p>
                 </div>
               ) : (
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 animate-fade-in">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 animate-fade-in">
                   <div className="bg-gray-950 border border-gray-850 rounded-xl p-4 space-y-3 flex flex-col justify-between">
                     <div>
                       <span className="text-[10px] bg-orange-500/10 text-orange-400 font-bold uppercase tracking-wider px-2 py-0.5 rounded-full">
                         Step 1: UPI Payment
                       </span>
-                      <p className="text-xs text-gray-300 mt-2">
-                        Click the button below to open your UPI app and pay for the <strong>{selectedPlan.name}</strong> plan.
-                      </p>
-                    </div>
+                      
+                      {/* Mobile View: Proceed Button */}
+                      <div className="block md:hidden mt-3 space-y-3">
+                        <p className="text-xs text-gray-300">
+                          Click the button below to open your UPI app and pay for the <strong>{selectedPlan.name}</strong> plan.
+                        </p>
+                        <a 
+                          href={`upi://pay?pa=${encodeURIComponent(subUpiId)}&pn=${encodeURIComponent('Intellidon Subscription')}&am=${selectedPlan.price.toFixed(2)}&cu=INR&tn=${encodeURIComponent(
+                            `Plan: ${selectedPlan.name}, Price: Rs. ${selectedPlan.price}`
+                          )}`}
+                          className="w-full bg-orange-500 hover:bg-orange-600 text-white font-bold py-2.5 rounded-xl shadow transition-all duration-300 flex items-center justify-center gap-2 text-xs cursor-pointer text-center"
+                        >
+                          <span>⚡</span>
+                          <span>Proceed for Payment (Pay ₹{selectedPlan.price})</span>
+                        </a>
 
-                    <a 
-                      href={`upi://pay?pa=${encodeURIComponent(subUpiId)}&pn=${encodeURIComponent('Intellidon Subscription')}&am=${selectedPlan.price.toFixed(2)}&cu=INR&tn=${encodeURIComponent(
-                        `Plan: ${selectedPlan.name}, Price: Rs. ${selectedPlan.price}, Admin: ${adminName}, Phone: ${adminPhone}, Email: ${adminEmail}`
-                      )}`}
-                      className="w-full bg-orange-500 hover:bg-orange-600 text-white font-bold py-2.5 rounded-xl shadow transition-all duration-300 flex items-center justify-center gap-2 text-xs cursor-pointer text-center"
-                    >
-                      <span>⚡</span>
-                      <span>Proceed for Payment (Pay ₹{selectedPlan.price})</span>
-                    </a>
+                        <div className="text-center pt-1">
+                          <button
+                            type="button"
+                            onClick={() => setShowMobileQr(!showMobileQr)}
+                            className="text-xs text-orange-400 hover:text-orange-350 underline font-medium cursor-pointer"
+                          >
+                            {showMobileQr ? 'Hide QR Code' : "Don't have a UPI app? Show QR Code"}
+                          </button>
+                        </div>
+
+                        {showMobileQr && (
+                          <div className="flex flex-col items-center gap-4 mt-3 bg-gray-900 border border-gray-805 p-4 rounded-xl animate-fade-in">
+                            <div className="p-1.5 bg-white rounded-lg">
+                              <UpiQR 
+                                upiId={subUpiId}
+                                name="Intellidon Subscription"
+                                amount={selectedPlan.price}
+                                note={`Plan: ${selectedPlan.name}, Price: Rs. ${selectedPlan.price}`}
+                                size={150}
+                              />
+                            </div>
+                            
+                            <div className="flex items-center gap-2 bg-gray-950 p-2 rounded-lg border border-gray-850 w-full">
+                              <span className="text-[11px] text-orange-400 font-mono select-all font-bold flex-1 text-center truncate">
+                                {subUpiId}
+                              </span>
+                              <button
+                                onClick={() => {
+                                  navigator.clipboard.writeText(subUpiId)
+                                  alert('UPI ID copied to clipboard!')
+                                }}
+                                className="text-[10px] bg-gray-800 hover:bg-gray-750 text-gray-350 px-2 py-1 rounded transition-colors cursor-pointer"
+                              >
+                                Copy
+                              </button>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Desktop View: QR Code & UPI ID only */}
+                      <div className="hidden md:flex flex-col items-center gap-4 mt-3">
+                        <p className="text-xs text-gray-300 text-center">
+                          Scan the QR code below or use the UPI ID to pay for the <strong>{selectedPlan.name}</strong> plan.
+                        </p>
+                        
+                        <div className="p-1.5 bg-white rounded-lg">
+                          <UpiQR 
+                            upiId={subUpiId}
+                            name="Intellidon Subscription"
+                            amount={selectedPlan.price}
+                            note={`Plan: ${selectedPlan.name}, Price: Rs. ${selectedPlan.price}`}
+                            size={160}
+                          />
+                        </div>
+
+                        <div className="flex items-center gap-2 bg-gray-900 p-2 rounded-lg border border-gray-805 w-full">
+                          <span className="text-[11px] text-orange-400 font-mono select-all font-bold flex-1 text-center truncate">
+                            {subUpiId}
+                          </span>
+                          <button
+                            onClick={() => {
+                              navigator.clipboard.writeText(subUpiId)
+                              alert('UPI ID copied to clipboard!')
+                            }}
+                            className="text-[10px] bg-gray-800 hover:bg-gray-750 text-gray-350 px-2 py-1 rounded transition-colors cursor-pointer"
+                          >
+                            Copy
+                          </button>
+                        </div>
+                      </div>
+                    </div>
                   </div>
 
                   <div className="bg-gray-950 border border-gray-850 rounded-xl p-4 space-y-3 flex flex-col justify-between">
