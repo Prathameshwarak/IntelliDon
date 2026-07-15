@@ -30,6 +30,7 @@ export default function DashboardSubscriptionPage() {
   const [adminPhone, setAdminPhone] = useState('')
   const [adminEmail, setAdminEmail] = useState('')
   const [selectedPlan, setSelectedPlan] = useState<PlanRow | null>(null)
+  const [showMobileQr, setShowMobileQr] = useState(false)
 
   // Subscription hook for normal admin
   const sub = useSubscription(mandalId)
@@ -303,6 +304,45 @@ export default function DashboardSubscriptionPage() {
                           <span>⚡</span>
                           <span>Proceed for Payment (Pay ₹{selectedPlan.price})</span>
                         </a>
+
+                        <div className="text-center pt-1">
+                          <button
+                            type="button"
+                            onClick={() => setShowMobileQr(!showMobileQr)}
+                            className="text-xs text-orange-400 hover:text-orange-350 underline font-medium cursor-pointer"
+                          >
+                            {showMobileQr ? 'Hide QR Code' : "Don't have a UPI app? Show QR Code"}
+                          </button>
+                        </div>
+
+                        {showMobileQr && (
+                          <div className="flex flex-col items-center gap-4 mt-3 bg-gray-900 border border-gray-805 p-4 rounded-xl animate-fade-in">
+                            <div className="p-1.5 bg-white rounded-lg">
+                              <UpiQR 
+                                upiId={subUpiId}
+                                name="Intellidon Subscription"
+                                amount={selectedPlan.price}
+                                note={`Plan: ${selectedPlan.name}, Price: Rs. ${selectedPlan.price}`}
+                                size={150}
+                              />
+                            </div>
+                            
+                            <div className="flex items-center gap-2 bg-gray-950 p-2 rounded-lg border border-gray-850 w-full">
+                              <span className="text-[11px] text-orange-400 font-mono select-all font-bold flex-1 text-center truncate">
+                                {subUpiId}
+                              </span>
+                              <button
+                                onClick={() => {
+                                  navigator.clipboard.writeText(subUpiId)
+                                  alert('UPI ID copied to clipboard!')
+                                }}
+                                className="text-[10px] bg-gray-800 hover:bg-gray-750 text-gray-350 px-2 py-1 rounded transition-colors cursor-pointer"
+                              >
+                                Copy
+                              </button>
+                            </div>
+                          </div>
+                        )}
                       </div>
 
                       {/* Desktop View: QR Code & UPI ID only */}
