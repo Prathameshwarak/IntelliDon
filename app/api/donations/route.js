@@ -53,13 +53,17 @@ export async function POST(request) {
     // ── 3. Check event ────────────────────────────────────────
     const { data: event, error: eventError } = await supabaseAdmin
       .from('events')
-      .select('id, name, year, is_active')
+      .select('id, name, year, is_active, is_suspended')
       .eq('id', event_id)
       .eq('mandal_id', mandal_id)
       .single()
 
     if (eventError || !event) {
       return NextResponse.json({ error: 'Event not found' }, { status: 404 })
+    }
+
+    if (event.is_suspended) {
+      return NextResponse.json({ error: 'This event is suspended and cannot accept donations' }, { status: 403 })
     }
 
     if (!event.is_active) {

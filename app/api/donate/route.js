@@ -46,6 +46,7 @@ export async function GET(request) {
       .select('id, name, year, upi_id, upi_qr_url')
       .eq('mandal_id', mandal.id)
       .eq('is_active', true)
+      .neq('is_suspended', true)
       .order('year', { ascending: false })
       .limit(1)
 

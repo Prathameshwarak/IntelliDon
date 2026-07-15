@@ -50,6 +50,7 @@ type Event = {
   is_active: boolean
   is_expired: boolean  // ← ADD (returned by API)
   days_remaining: number // ← ADD (returned by API)
+  is_suspended?: boolean
 }
 
 type Member = {
@@ -1268,7 +1269,7 @@ export default function DashboardPage() {
 
       {/* Toast */}
       {toast && (
-        <div className={`fixed top-4 right-4 z-50 px-4 py-3 rounded-lg text-sm font-medium shadow-xl
+        <div className={`fixed top-4 right-4 z-[100] px-4 py-3 rounded-lg text-sm font-medium shadow-xl
           ${toast.type === 'success' ? 'bg-green-600' : 'bg-red-600'} text-white`}>
           {toast.msg}
         </div>
@@ -1992,44 +1993,47 @@ export default function DashboardPage() {
             ) : (
               events.map(ev => {
                 const isExpired = ev.is_expired || ev.end_date < new Date().toISOString().split('T')[0]
+                const isSuspended = ev.is_suspended
                 return (
                   <div key={ev.id} className={`bg-gray-800 border rounded-xl p-4
-                    ${isExpired ? 'border-gray-700 opacity-60' : 'border-gray-700'}`}>
+                    ${isExpired || isSuspended ? 'border-gray-700 opacity-60' : 'border-gray-700'}`}>
                     <div className="flex items-start justify-between gap-3">
                       <div className="flex-1">
                         <p className="font-medium text-white text-sm">{ev.name} {ev.year}</p>
                         <p className="text-xs text-gray-400 mt-1">
                           {ev.upi_id ? `UPI: ${ev.upi_id}` : 'No UPI ID'}
                         </p>
-                        <p className="text-xs text-gray-500 mt-1">
+                        <p className="text-xs text-gray-550 mt-1">
                           {new Date(ev.start_date).toLocaleDateString('en-IN', { day:'numeric', month:'short' })}
                           {' — '}
                           {new Date(ev.end_date).toLocaleDateString('en-IN', { day:'numeric', month:'short', year:'numeric' })}
-                          {ev.days_remaining > 0 && !isExpired && (
+                          {ev.days_remaining > 0 && !isExpired && !isSuspended && (
                             <span className="text-orange-400 ml-2">{ev.days_remaining} days left</span>
                           )}
                         </p>
                       </div>
                       <div className="flex items-center gap-2 flex-shrink-0">
                         <span className={`text-xs font-medium px-2.5 py-1 rounded-full
-                          ${isExpired
-                            ? 'bg-gray-700 text-gray-500'
-                            : ev.is_active
-                              ? 'bg-green-900/50 text-green-400'
-                              : 'bg-gray-700 text-gray-400'}`}>
-                          {isExpired ? 'Expired' : ev.is_active ? 'Active' : 'Inactive'}
+                          ${isSuspended
+                            ? 'bg-red-900/50 text-red-400'
+                            : isExpired
+                              ? 'bg-gray-700 text-gray-500'
+                              : ev.is_active
+                                ? 'bg-green-900/50 text-green-400'
+                                : 'bg-gray-700 text-gray-400'}`}>
+                          {isSuspended ? 'Suspended by Intellidon Admin' : isExpired ? 'Expired' : ev.is_active ? 'Active' : 'Inactive'}
                         </span>
-                        {/* Toggle only available if not expired */}
-                        {!isExpired && CAN.toggleEvent(userRole) && (
+                        {/* Toggle only available if not expired and not suspended */}
+                        {!isExpired && !isSuspended && CAN.toggleEvent(userRole) && (
                           <button
                             onClick={() => toggleEvent(ev.id, ev.is_active)}
-                            className="text-xs text-gray-400 hover:text-white transition-colors"
+                            className="text-xs text-gray-455 hover:text-white transition-colors"
                           >
                             {ev.is_active ? 'Deactivate' : 'Activate'}
                           </button>
                         )}
-                        {/* Edit only available if not expired */}
-                        {!isExpired && CAN.createEvent(userRole) && (
+                        {/* Edit only available if not expired and not suspended */}
+                        {!isExpired && !isSuspended && CAN.createEvent(userRole) && (
                           <button
                             onClick={() => startEditingEvent(ev)}
                             className="text-xs text-orange-400 hover:text-orange-300 transition-colors ml-2"

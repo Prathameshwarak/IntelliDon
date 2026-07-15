@@ -163,7 +163,7 @@ export async function PATCH(request) {
     // Fetch event to check dates before allowing toggle
     const { data: event } = await supabaseAdmin
       .from('events')
-      .select('end_date, start_date, is_active, mandal_id')
+      .select('end_date, start_date, is_active, mandal_id, is_suspended')
       .eq('id', event_id)
       .single()
 
@@ -172,6 +172,14 @@ export async function PATCH(request) {
     }
 
     const today = new Date().toISOString().split('T')[0]
+
+    // Cannot activate a suspended event
+    if (is_active === true && event.is_suspended) {
+      return NextResponse.json(
+        { error: 'This event is suspended and cannot be activated' },
+        { status: 403 }
+      )
+    }
 
     // Cannot reactivate an expired event
     if (is_active === true && event.end_date < today) {
@@ -230,6 +238,11 @@ export async function PUT(request) {
 
     if (!event) {
       return NextResponse.json({ error: 'Event not found' }, { status: 404 })
+    }
+
+    // Cannot edit a suspended event
+    if (event.is_suspended) {
+      return NextResponse.json({ error: 'This event is suspended and cannot be edited' }, { status: 403 })
     }
 
     const today = new Date().toISOString().split('T')[0]

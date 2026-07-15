@@ -38,7 +38,7 @@ export async function GET(request: Request) {
     .from('mandals')
     .select(`
       id, name, slug, city, status,
-      subscriptions ( id, plan, status, ends_at, notes, payment_notes, last_payment_at, last_payment_amount, updated_at )
+      subscriptions ( id, plan, status, ends_at, notes, payment_notes, last_payment_at, last_payment_amount, payment_status, updated_at )
     `)
     .order('name')
 
@@ -101,7 +101,12 @@ export async function PATCH(request: Request) {
     if (mark_paid) {
       updates.last_payment_at = new Date().toISOString()
       updates.last_payment_amount = mark_paid.amount ?? null
+      updates.payment_status = 'paid'
       updates.status = 'active'
+    } else {
+      if (ends_at || plan) {
+        updates.payment_status = 'unpaid'
+      }
     }
 
     const { data: existing } = await supabaseAdmin
