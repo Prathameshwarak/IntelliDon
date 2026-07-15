@@ -31,7 +31,7 @@ export function useSubscription(mandalId: string | null) {
   return {
     loading,
     subscription,
-    isExpired: isSubscriptionExpired(subscription),
+    isExpired: loading ? false : isSubscriptionExpired(subscription),
     daysRemaining: daysRemaining(subscription),
     refetch: fetchSubscription,
   }

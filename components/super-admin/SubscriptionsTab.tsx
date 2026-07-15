@@ -12,6 +12,7 @@ type SubscriptionRow = {
   payment_notes: string | null
   last_payment_at: string | null
   last_payment_amount: number | null
+  payment_status: string | null
   updated_at: string | null
 }
 
@@ -97,9 +98,68 @@ export default function SubscriptionsTab({ plans, showToast }: SubscriptionsTabP
   const [search, setSearch] = useState('')
   const [activeSubTab, setActiveSubTab] = useState<'current' | 'history'>('current')
 
+  // Quick Pay Modal State
+  const [payingMandal, setPayingMandal] = useState<EnrichedMandal | null>(null)
+  const [payAmount, setPayAmount] = useState('')
+  const [payNotes, setPayNotes] = useState('')
+  const [paySubmitting, setPaySubmitting] = useState(false)
+
+  // Subscription Payment UPI Config State
+  const [subUpiId, setSubUpiId] = useState('intellidon@upi')
+  const [savingUpi, setSavingUpi] = useState(false)
+
   useEffect(() => {
     fetchMandals()
+    fetchSettings()
   }, [])
+
+  // ── Fetch Settings ───────────────────────────────────────────
+  async function fetchSettings() {
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      const token = session?.access_token
+      const res = await fetch('/api/super-admin/settings', {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      })
+      const data = await res.json()
+      if (data.settings) {
+        const upi = data.settings.find((s: any) => s.key === 'subscription_upi_id')?.value
+        if (upi) setSubUpiId(upi)
+      }
+    } catch (err) {
+      console.error('Could not fetch settings', err)
+    }
+  }
+
+  // ── Save Subscription UPI ID ─────────────────────────────────
+  async function saveSubUpiId() {
+    if (!subUpiId || !subUpiId.trim()) {
+      showToast('UPI ID is required', 'error')
+      return
+    }
+    setSavingUpi(true)
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      const token = session?.access_token
+      const res = await fetch('/api/super-admin/settings', {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {})
+        },
+        body: JSON.stringify({ key: 'subscription_upi_id', value: subUpiId.trim() })
+      })
+      const data = await res.json()
+      if (data.success) {
+        showToast('Subscription UPI ID saved successfully', 'success')
+      } else {
+        showToast(data.error || 'Could not save setting', 'error')
+      }
+    } catch (err) {
+      showToast('Could not save setting', 'error')
+    }
+    setSavingUpi(false)
+  }
 
   // ── Fetch ───────────────────────────────────────────────────
   async function fetchMandals() {
@@ -120,6 +180,41 @@ export default function SubscriptionsTab({ plans, showToast }: SubscriptionsTabP
       showToast('Could not fetch subscriptions', 'error')
     }
     setLoading(false)
+  }
+
+  // ── Confirm Payment Received ─────────────────────────────────
+  async function handleConfirmPayment() {
+    if (!payingMandal || !payingMandal.activeSub) return
+    setPaySubmitting(true)
+
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      const token = session?.access_token
+
+      const res = await fetch('/api/super-admin/subscriptions', {
+        method: 'PATCH',
+        headers: { 
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {})
+        },
+        body: JSON.stringify({
+          mandal_id: payingMandal.id,
+          mark_paid: { amount: parseFloat(payAmount) },
+          notes: payNotes || `Payment recorded on ${new Date().toLocaleDateString('en-IN')}`
+        })
+      })
+      const data = await res.json()
+      if (data.success) {
+        showToast('Payment recorded successfully', 'success')
+        setPayingMandal(null)
+        await fetchMandals()
+      } else {
+        showToast(data.error || 'Could not record payment', 'error')
+      }
+    } catch (err) {
+      showToast('Could not record payment', 'error')
+    }
+    setPaySubmitting(false)
   }
 
   // ── Open edit modal ─────────────────────────────────────────
@@ -438,6 +533,32 @@ export default function SubscriptionsTab({ plans, showToast }: SubscriptionsTabP
         </button>
       </div>
 
+      {/* Subscription UPI ID Configuration Card */}
+      <div className="bg-gray-900 border border-gray-850 rounded-2xl p-4 flex flex-col sm:flex-row items-center justify-between gap-4">
+        <div className="space-y-1">
+          <h4 className="text-xs font-bold text-orange-500 uppercase tracking-wider block">Subscription Payment UPI ID</h4>
+          <p className="text-[11px] text-gray-400">
+            Configure the UPI ID shown to mandal admins on their subscription page for payments.
+          </p>
+        </div>
+        <div className="flex gap-2 w-full sm:w-auto">
+          <input
+            type="text"
+            value={subUpiId}
+            onChange={e => setSubUpiId(e.target.value)}
+            placeholder="e.g. intellidon@upi"
+            className="flex-1 sm:w-64 bg-gray-850 border border-gray-700 rounded-xl px-3 py-2 text-xs text-white placeholder-gray-500 focus:outline-none focus:border-orange-500"
+          />
+          <button
+            onClick={saveSubUpiId}
+            disabled={savingUpi}
+            className="bg-orange-500 hover:bg-orange-600 disabled:opacity-50 text-white text-xs font-semibold px-4 py-2 rounded-xl transition-colors cursor-pointer"
+          >
+            {savingUpi ? 'Saving...' : 'Save UPI'}
+          </button>
+        </div>
+      </div>
+
       {/* Search + filter bar */}
       <div className="flex gap-3 flex-wrap items-center">
         <input
@@ -504,17 +625,40 @@ export default function SubscriptionsTab({ plans, showToast }: SubscriptionsTabP
                   </div>
                   <p className="text-xs text-gray-400 mt-1">{m.city}</p>
                   {m.activeSub ? (
-                    <p className="text-[11px] text-gray-500 mt-1">
-                      {m.isExpired
-                        ? `Expired ${fmtDate(m.activeSub.ends_at)}`
-                        : `Valid until ${fmtDate(m.activeSub.ends_at)}`}
-                      {m.activeSub.last_payment_amount && (
-                        <span className="ml-2 text-green-400">
-                          · Last paid ₹{m.activeSub.last_payment_amount}
-                          {m.activeSub.last_payment_at && ` on ${fmtDate(m.activeSub.last_payment_at)}`}
-                        </span>
+                    <div className="flex items-center gap-2 mt-1.5 flex-wrap">
+                      <p className="text-[11px] text-gray-500">
+                        {m.isExpired
+                          ? `Expired ${fmtDate(m.activeSub.ends_at)}`
+                          : `Valid until ${fmtDate(m.activeSub.ends_at)}`}
+                      </p>
+                      {m.activeSub.payment_status === 'unpaid' ? (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const activePlan = plans.find(p => p.id === m.activeSub?.plan)
+                            const planPrice = activePlan?.price || 0
+                            setPayingMandal(m)
+                            setPayAmount(planPrice ? planPrice.toString() : '')
+                            setPayNotes('')
+                          }}
+                          className="px-2 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider bg-rose-500/10 hover:bg-rose-500/25 text-rose-400 border border-rose-500/20 cursor-pointer transition-colors"
+                        >
+                          Unpaid
+                        </button>
+                      ) : (
+                        <div className="flex items-center gap-1.5">
+                          <span className="px-2 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 select-none">
+                            Paid
+                          </span>
+                          {m.activeSub.last_payment_amount && (
+                            <span className="text-[10px] text-emerald-450 font-medium">
+                              (Last paid ₹{m.activeSub.last_payment_amount}
+                              {m.activeSub.last_payment_at && ` on ${fmtDate(m.activeSub.last_payment_at)}`})
+                            </span>
+                          )}
+                        </div>
                       )}
-                    </p>
+                    </div>
                   ) : (
                     <p className="text-[11px] text-gray-600 mt-1">No subscription</p>
                   )}
@@ -618,6 +762,58 @@ export default function SubscriptionsTab({ plans, showToast }: SubscriptionsTabP
             </div>
           </div>
         )
+      )}
+
+      {/* Quick Pay Modal */}
+      {payingMandal && payingMandal.activeSub && (
+        <div className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4">
+          <div className="bg-gray-900 border border-gray-800 rounded-2xl max-w-sm w-full p-6 space-y-4">
+            <div>
+              <h3 className="text-base font-bold text-white">Record Subscription Payment</h3>
+              <p className="text-xs text-gray-400 mt-1 font-mono">
+                {payingMandal.name} · {payingMandal.activeSub.plan} plan
+              </p>
+            </div>
+
+            <div className="space-y-1">
+              <label className="text-xs text-gray-455 block font-medium">Amount Received (₹)</label>
+              <input
+                type="number"
+                value={payAmount}
+                onChange={e => setPayAmount(e.target.value)}
+                placeholder="e.g. 599"
+                className="w-full bg-gray-850 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-orange-500"
+              />
+            </div>
+
+            <div className="space-y-1">
+              <label className="text-xs text-gray-455 block font-medium">Notes / Method</label>
+              <input
+                type="text"
+                value={payNotes}
+                onChange={e => setPayNotes(e.target.value)}
+                placeholder="e.g. GPay transaction, cash, etc."
+                className="w-full bg-gray-850 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-orange-500"
+              />
+            </div>
+
+            <div className="flex gap-2 pt-2">
+              <button
+                onClick={handleConfirmPayment}
+                disabled={paySubmitting || !payAmount}
+                className="flex-1 bg-green-600 hover:bg-green-700 disabled:opacity-50 text-white font-semibold py-2.5 rounded-xl text-xs transition-colors cursor-pointer"
+              >
+                {paySubmitting ? 'Processing...' : 'Mark as Paid'}
+              </button>
+              <button
+                onClick={() => setPayingMandal(null)}
+                className="px-4 bg-gray-750 hover:bg-gray-700 text-gray-300 rounded-xl text-xs transition-colors cursor-pointer border border-gray-700"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   )
