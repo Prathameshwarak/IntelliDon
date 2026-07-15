@@ -110,11 +110,64 @@ export default function AllOrganizationsTab({ showToast }: AllOrganizationsTabPr
     url: string
   } | null>(null)
 
+  const [orgEvents, setOrgEvents] = useState<any[]>([])
+  const [loadingEvents, setLoadingEvents] = useState(false)
+  const [togglingEventId, setTogglingEventId] = useState<string | null>(null)
+
   useEffect(() => {
     setSelectedDocKey('')
     setSelectedDocUrl('')
     setSelectedDocLabel('')
+
+    if (viewingOrg) {
+      fetchOrgEvents(viewingOrg.id)
+    } else {
+      setOrgEvents([])
+    }
   }, [viewingOrg])
+
+  async function fetchOrgEvents(mandalId: string) {
+    setLoadingEvents(true)
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      const token = session?.access_token
+      const res = await fetch(`/api/super-admin/events?mandal_id=${mandalId}`, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      })
+      const data = await res.json()
+      if (data.error) throw new Error(data.error)
+      setOrgEvents(data.events || [])
+    } catch (err: any) {
+      showToast(err.message || 'Failed to load organization events', 'error')
+    } finally {
+      setLoadingEvents(false)
+    }
+  }
+
+  async function handleToggleSuspendEvent(eventId: string, currentSuspended: boolean) {
+    setTogglingEventId(eventId)
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      const token = session?.access_token
+      const res = await fetch(`/api/super-admin/events`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {})
+        },
+        body: JSON.stringify({ eventId, isSuspended: !currentSuspended })
+      })
+      const data = await res.json()
+      if (data.error) throw new Error(data.error)
+      showToast(data.message || 'Event status updated', 'success')
+      // Update local state
+      setOrgEvents(prev => prev.map(e => e.id === eventId ? { ...e, is_suspended: !currentSuspended, is_active: !currentSuspended ? false : e.is_active } : e))
+    } catch (err: any) {
+      showToast(err.message || 'Failed to update event status', 'error')
+    } finally {
+      setTogglingEventId(null)
+    }
+  }
 
   async function handleViewDoc(mandalId: string, docKey: string, label: string, path: string | null) {
     if (!path) {
@@ -927,6 +980,77 @@ export default function AllOrganizationsTab({ showToast }: AllOrganizationsTabPr
                             </td>
                           </tr>
                         ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+
+              {/* Section 5: Events */}
+              <div className="space-y-3 bg-gray-950/20 border border-gray-850 rounded-xl p-4">
+                <h4 className="text-xs font-bold text-orange-400 uppercase tracking-wider block">5. Organization Events ({orgEvents.length})</h4>
+                {loadingEvents ? (
+                  <div className="flex flex-col items-center justify-center py-6 space-y-2">
+                    <div className="w-5 h-5 rounded-full border border-t-orange-500 border-r-transparent border-b-orange-500 border-l-transparent animate-spin" />
+                    <p className="text-[10px] text-gray-550 font-mono">Fetching events...</p>
+                  </div>
+                ) : orgEvents.length === 0 ? (
+                  <p className="text-xs text-gray-550 italic">No events found for this organization.</p>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <table className="w-full border-collapse text-left text-xs">
+                      <thead>
+                        <tr className="border-b border-gray-800 text-[10px] text-gray-550 uppercase tracking-wider font-bold">
+                          <th className="py-2 px-3">Event Name</th>
+                          <th className="py-2 px-3">UPI ID</th>
+                          <th className="py-2 px-3">Dates</th>
+                          <th className="py-2 px-3 text-center">Status</th>
+                          <th className="py-2 px-3 text-right">Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-850 text-gray-300">
+                        {orgEvents.map(ev => {
+                          const today = new Date().toISOString().split('T')[0]
+                          const isExpired = ev.end_date < today
+                          const isSuspended = ev.is_suspended
+
+                          return (
+                            <tr key={ev.id} className="hover:bg-gray-955/20">
+                              <td className="py-2.5 px-3 font-semibold text-white">
+                                {ev.name} {ev.year}
+                              </td>
+                              <td className="py-2.5 px-3 font-mono">{ev.upi_id || '—'}</td>
+                              <td className="py-2.5 px-3 text-gray-400">
+                                {ev.start_date} to {ev.end_date}
+                              </td>
+                              <td className="py-2.5 px-3 text-center">
+                                <span className={`px-2 py-0.5 rounded text-[9px] font-bold uppercase border
+                                  ${isSuspended
+                                    ? 'bg-rose-500/10 text-rose-455 border-rose-500/20'
+                                    : isExpired
+                                      ? 'bg-gray-550/10 text-gray-555 border-gray-550/20'
+                                      : ev.is_active
+                                        ? 'bg-emerald-500/10 text-emerald-450 border-emerald-500/20'
+                                        : 'bg-amber-500/10 text-amber-400 border-amber-500/20'}`}>
+                                  {isSuspended ? 'Suspended' : isExpired ? 'Expired' : ev.is_active ? 'Active' : 'Inactive'}
+                                </span>
+                              </td>
+                              <td className="py-2.5 px-3 text-right">
+                                <button
+                                  type="button"
+                                  onClick={() => handleToggleSuspendEvent(ev.id, !!ev.is_suspended)}
+                                  disabled={togglingEventId === ev.id || isExpired}
+                                  className={`px-3 py-1 font-bold rounded-lg text-[10px] transition-colors cursor-pointer border disabled:opacity-30 disabled:cursor-not-allowed
+                                    ${isSuspended
+                                      ? 'bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border-emerald-500/20'
+                                      : 'bg-rose-500/10 hover:bg-rose-500/20 text-rose-455 border-rose-500/20'}`}
+                                >
+                                  {togglingEventId === ev.id ? 'Updating...' : isSuspended ? 'Unsuspend' : 'Suspend'}
+                                </button>
+                              </td>
+                            </tr>
+                          )
+                        })}
                       </tbody>
                     </table>
                   </div>

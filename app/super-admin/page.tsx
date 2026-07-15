@@ -6,6 +6,7 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import MandalsTab from '@/components/super-admin/MandalsTab'
 import AllOrganizationsTab from '@/components/super-admin/AllOrganizationsTab'
+import EventsTab from '@/components/super-admin/EventsTab'
 import SubscriptionsTab from '@/components/super-admin/SubscriptionsTab'
 import PlansTab from '@/components/super-admin/PlansTab'
 
@@ -20,6 +21,7 @@ type PlanRow = {
 const TABS = [
   { id: 'mandals', label: 'Mandals & KYC', icon: '🏢' },
   { id: 'organizations', label: 'All Organizations', icon: '📋' },
+  { id: 'events', label: 'Manage Events', icon: '📅' },
   { id: 'subscriptions', label: 'Subscriptions', icon: '💳' },
   { id: 'plans', label: 'Manage Plans', icon: '🛠️' }
 ] as const
@@ -123,7 +125,7 @@ function SuperAdminDashboardContent() {
       
       {/* Toast Banner */}
       {toast && (
-        <div className={`fixed top-4 right-4 z-50 px-4 py-3 rounded-xl text-sm font-medium shadow-2xl transition-all duration-300
+        <div className={`fixed top-4 right-4 z-[100] px-4 py-3 rounded-xl text-sm font-medium shadow-2xl transition-all duration-300
           ${toast.type === 'success' ? 'bg-green-600' : 'bg-red-600'} text-white`}>
           {toast.msg}
         </div>
@@ -189,6 +191,10 @@ function SuperAdminDashboardContent() {
 
           {activeTab === 'organizations' && (
             <AllOrganizationsTab showToast={showToast} />
+          )}
+
+          {activeTab === 'events' && (
+            <EventsTab showToast={showToast} />
           )}
 
           {activeTab === 'subscriptions' && (
