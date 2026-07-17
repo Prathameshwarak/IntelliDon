@@ -55,7 +55,7 @@ export async function GET(request) {
 
   let { data: members, error } = await supabaseAdmin
     .from('users')
-    .select('id, full_name, phone, role, is_active, created_at')
+    .select('id, full_name, phone, email, role, is_active, created_at')
     .eq('mandal_id', mandal_id)
     .order('role')
 
@@ -63,7 +63,7 @@ export async function GET(request) {
     // Fallback: If is_active column doesn't exist yet, retry query without it
     const { data: fallbackMembers, error: fallbackError } = await supabaseAdmin
       .from('users')
-      .select('id, full_name, phone, role, created_at')
+      .select('id, full_name, phone, email, role, created_at')
       .eq('mandal_id', mandal_id)
       .order('role')
 
@@ -77,6 +77,20 @@ export async function GET(request) {
     return NextResponse.json({ error: 'Could not fetch team' }, { status: 500 })
   }
 
+  // Attach each member's event access (empty array = access to ALL events)
+  const { data: accessRows } = await supabaseAdmin
+    .from('user_event_access')
+    .select('user_id, event_id')
+    .eq('mandal_id', mandal_id)
+
+  const accessByUser = {}
+  for (const row of accessRows || []) {
+    if (!accessByUser[row.user_id]) accessByUser[row.user_id] = []
+    accessByUser[row.user_id].push(row.event_id)
+  }
+
+  members = members.map(m => ({ ...m, event_ids: accessByUser[m.id] || [] }))
+
   return NextResponse.json({ members })
 }
 
@@ -84,7 +98,7 @@ export async function GET(request) {
 export async function POST(request) {
   try {
     const body = await request.json()
-    const { mandal_id, full_name, phone, email, password, role } = body
+    const { mandal_id, full_name, phone, email, password, role, event_ids } = body
 
     if (!mandal_id || !full_name || !phone || !email || !password || !role) {
       return NextResponse.json({ error: 'All fields are required' }, { status: 400 })
@@ -98,21 +112,63 @@ export async function POST(request) {
       return NextResponse.json({ error: 'Password must be at least 8 characters' }, { status: 400 })
     }
 
+    const normalizedEmail = String(email).trim().toLowerCase()
+    const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+    if (!emailPattern.test(normalizedEmail)) {
+      return NextResponse.json({ error: 'Enter a valid email address' }, { status: 400 })
+    }
+
+    // event_ids is optional. If provided it must be an array of strings.
+    const requestedEventIds = Array.isArray(event_ids) ? [...new Set(event_ids.filter(Boolean))] : []
+
     // Secure POST: Confirm caller is admin of the same mandal
     const authCheck = await verifyAdminCaller(request, mandal_id)
     if (authCheck.error) {
       return NextResponse.json({ error: authCheck.error }, { status: authCheck.status })
     }
 
+    // Duplicate-email guard: same mandal cannot have two members
+    // sharing an email (case-insensitive).
+    const { data: existingWithEmail } = await supabaseAdmin
+      .from('users')
+      .select('id')
+      .eq('mandal_id', mandal_id)
+      .ilike('email', normalizedEmail)
+      .maybeSingle()
+
+    if (existingWithEmail) {
+      return NextResponse.json(
+        { error: 'A team member with this email already exists in your organization' },
+        { status: 409 }
+      )
+    }
+
+    // Validate that any requested events actually belong to this mandal
+    if (requestedEventIds.length > 0) {
+      const { data: ownedEvents, error: eventsError } = await supabaseAdmin
+        .from('events')
+        .select('id')
+        .eq('mandal_id', mandal_id)
+        .in('id', requestedEventIds)
+
+      if (eventsError || (ownedEvents || []).length !== requestedEventIds.length) {
+        return NextResponse.json({ error: 'One or more selected events are invalid' }, { status: 400 })
+      }
+    }
+
     // Create auth account
     const { data: authUser, error: authError } = await supabaseAdmin.auth.admin.createUser({
-      email,
+      email: normalizedEmail,
       password,
       email_confirm: true
     })
 
     if (authError) {
-      return NextResponse.json({ error: authError.message }, { status: 500 })
+      const isDuplicate = /already.*registered|already.*exists/i.test(authError.message || '')
+      return NextResponse.json(
+        { error: isDuplicate ? 'This email is already registered to another account' : authError.message },
+        { status: isDuplicate ? 409 : 500 }
+      )
     }
 
     // Create users row with is_active default to true
@@ -123,10 +179,11 @@ export async function POST(request) {
         mandal_id,
         full_name,
         phone,
+        email: normalizedEmail,
         role,
         is_active: true
       })
-      .select('id, full_name, phone, role, is_active, created_at')
+      .select('id, full_name, phone, email, role, is_active, created_at')
       .single()
 
     if (userError) {
@@ -135,7 +192,28 @@ export async function POST(request) {
       return NextResponse.json({ error: 'Could not create team member' }, { status: 500 })
     }
 
-    return NextResponse.json({ success: true, member })
+    // Assign event access (skip entirely = access to all events)
+    if (requestedEventIds.length > 0) {
+      const { error: accessError } = await supabaseAdmin
+        .from('user_event_access')
+        .insert(requestedEventIds.map(event_id => ({
+          user_id: member.id,
+          event_id,
+          mandal_id
+        })))
+
+      if (accessError) {
+        // Member was created but access rows failed — surface this
+        // clearly rather than silently leaving them with all-event access.
+        return NextResponse.json({
+          success: true,
+          member: { ...member, event_ids: [] },
+          warning: 'Member created, but event access could not be saved. Edit the member to set it.'
+        })
+      }
+    }
+
+    return NextResponse.json({ success: true, member: { ...member, event_ids: requestedEventIds } })
   } catch (err) {
     return NextResponse.json({ error: 'Something went wrong' }, { status: 500 })
   }
@@ -145,7 +223,7 @@ export async function POST(request) {
 export async function PATCH(request) {
   try {
     const body = await request.json()
-    const { action, user_id, full_name, phone, role, is_active } = body
+    const { action, user_id, full_name, phone, role, is_active, event_ids } = body
 
     if (!user_id || !action) {
       return NextResponse.json({ error: 'user_id and action are required' }, { status: 400 })
@@ -190,14 +268,50 @@ export async function PATCH(request) {
         .from('users')
         .update({ full_name, phone, role })
         .eq('id', user_id)
-        .select('id, full_name, phone, role, is_active, created_at')
+        .select('id, full_name, phone, email, role, is_active, created_at')
         .single()
 
       if (updateError) {
         return NextResponse.json({ error: 'Could not update team member' }, { status: 500 })
       }
 
-      return NextResponse.json({ success: true, member: updatedMember })
+      // event_ids is optional in edit payload. Only touch access rows
+      // if the caller explicitly sent an array (undefined = leave as-is).
+      let finalEventIds = null
+      if (Array.isArray(event_ids)) {
+        const cleanIds = [...new Set(event_ids.filter(Boolean))]
+
+        if (cleanIds.length > 0) {
+          const { data: ownedEvents, error: eventsError } = await supabaseAdmin
+            .from('events')
+            .select('id')
+            .eq('mandal_id', targetProfile.mandal_id)
+            .in('id', cleanIds)
+
+          if (eventsError || (ownedEvents || []).length !== cleanIds.length) {
+            return NextResponse.json({ error: 'One or more selected events are invalid' }, { status: 400 })
+          }
+        }
+
+        await supabaseAdmin.from('user_event_access').delete().eq('user_id', user_id)
+
+        if (cleanIds.length > 0) {
+          const { error: accessError } = await supabaseAdmin
+            .from('user_event_access')
+            .insert(cleanIds.map(event_id => ({
+              user_id,
+              event_id,
+              mandal_id: targetProfile.mandal_id
+            })))
+          if (accessError) {
+            return NextResponse.json({ error: 'Could not update event access' }, { status: 500 })
+          }
+        }
+
+        finalEventIds = cleanIds
+      }
+
+      return NextResponse.json({ success: true, member: { ...updatedMember, event_ids: finalEventIds } })
 
     } else if (action === 'toggle_status') {
       if (typeof is_active !== 'boolean') {
