@@ -94,6 +94,28 @@ export async function POST(request) {
       return NextResponse.json({ error: 'This event is no longer active' }, { status: 403 })
     }
 
+    // ── 3b. Event-access guard for collectors/managers ────────
+    // Blocks a restricted team member from submitting to an event
+    // outside their assigned list, even via a direct API call.
+    if (collected_by) {
+      const { data: collectorRow } = await supabaseAdmin
+        .from('users')
+        .select('role')
+        .eq('id', collected_by)
+        .single()
+
+      if (collectorRow && collectorRow.role !== 'admin') {
+        const { data: accessRows } = await supabaseAdmin
+          .from('user_event_access')
+          .select('event_id')
+          .eq('user_id', collected_by)
+
+        if (accessRows && accessRows.length > 0 && !accessRows.some(r => r.event_id === event_id)) {
+          return NextResponse.json({ error: 'You do not have access to collect for this event' }, { status: 403 })
+        }
+      }
+    }
+
     // ── 4. Duplicate phone check ──────────────────────────────
     let isDuplicate = false
     let existingDonation = null

@@ -7,6 +7,8 @@ import { isSubscriptionExpired } from '@/lib/subscription'
 import { useSubscription } from '@/lib/useSubscription'
 import UpgradeBanner from '@/components/UpgradeBanner'
 import KycVerificationPanel from '@/components/dashboard/KycVerificationPanel'
+import ExpenseManager from '@/components/dashboard/ExpenseManager'
+import SponsorshipSection from '@/components/dashboard/SponsorshipSection'
 
 // ── TESTING / MIGRATION CONFIGURATION ──────────────────────────
 // Set to true to bypass KYC blocks and mandatory document upload popups (for testing / old accounts migration).
@@ -57,8 +59,10 @@ type Member = {
   id: string
   full_name: string
   phone: string
+  email?: string
   role: string
   is_active: boolean
+  event_ids?: string[]   // empty/undefined = access to ALL events
 }
 
 interface CollectorGroup {
@@ -81,6 +85,7 @@ const CAN = {
   removeMember:    (role: string) => role === 'admin',
   seeTeamTab:      (role: string) => role === 'admin',   // manager cannot manage team
   seeEventsTab:    (role: string) => ['admin', 'manager'].includes(role),
+  manageExpenses:  (role: string) => ['admin', 'manager'].includes(role),  // Adhyaksha + Khajindar (#11)
 }
 
 export default function DashboardPage() {
@@ -116,6 +121,7 @@ export default function DashboardPage() {
   const [historyTypeFilter, setHistoryTypeFilter] = useState('all')
   //line added by pratham:
   const [rankingSubTab, setRankingSubTab] = useState<'collectors' | 'donors'>('collectors')
+  const [donationSubTab, setDonationSubTab] = useState<'support_fund' | 'sponsorship'>('support_fund')
   const [bulkVerifyModalCollector, setBulkVerifyModalCollector] = useState<CollectorGroup | null>(null)
 
   // Events state
@@ -129,6 +135,7 @@ export default function DashboardPage() {
   const [eventEndDate, setEventEndDate] = useState('')
   const [dateError, setDateError] = useState('')
   const [editingEventId, setEditingEventId] = useState<string | null>(null)
+  const [expenseManagerEvent, setExpenseManagerEvent] = useState<Event | null>(null)
 
   // CSV Export handler
   const handleExportCSV = (donationsToExport: Donation[], filename = 'collection_history.csv') => {
@@ -278,12 +285,16 @@ export default function DashboardPage() {
   const [memberPassword, setMemberPassword] = useState('')
   const [memberRole, setMemberRole] = useState<'collector' | 'manager'>('collector')
   const [memberSubmitting, setMemberSubmitting] = useState(false)
+  const [memberEventScope, setMemberEventScope] = useState<'all' | 'specific'>('all')
+  const [memberEventIds, setMemberEventIds] = useState<string[]>([])
 
   // Edit / Reset Password states
   const [editUser, setEditUser] = useState<Member | null>(null)
   const [editName, setEditName] = useState('')
   const [editPhone, setEditPhone] = useState('')
   const [editRole, setEditRole] = useState<'collector' | 'manager'>('collector')
+  const [editEventScope, setEditEventScope] = useState<'all' | 'specific'>('all')
+  const [editEventIds, setEditEventIds] = useState<string[]>([])
   const [editSubmitting, setEditSubmitting] = useState(false)
 
   const [resetPasswordUser, setResetPasswordUser] = useState<Member | null>(null)
@@ -436,9 +447,9 @@ export default function DashboardPage() {
   // ── Load data on tab change ───────────────────────────────────
   useEffect(() => {
     if (!mandalId) return
-    if (tab === 'donations') fetchDonations()
+    if (tab === 'donations') { fetchDonations(); fetchEvents() }
     if (tab === 'events') fetchEvents()
-    if (tab === 'team') fetchTeam()
+    if (tab === 'team') { fetchTeam(); fetchEvents() }
   }, [tab, mandalId])
 
   // ── Donations ─────────────────────────────────────────────────
@@ -745,18 +756,30 @@ export default function DashboardPage() {
       showToast('All fields required', 'error'); return
     }
     if (memberPassword.length < 8) { showToast('Password must be at least 8 characters', 'error'); return }
+    if (memberEventScope === 'specific' && memberEventIds.length === 0) {
+      showToast('Select at least one event, or switch to "All events"', 'error'); return
+    }
     setMemberSubmitting(true)
     const headers = await getAuthHeaders()
     const res = await fetch('/api/team', {
       method: 'POST',
       headers,
-      body: JSON.stringify({ mandal_id: mandalId, full_name: memberName, phone: memberPhone, email: memberEmail, password: memberPassword, role: memberRole })
+      body: JSON.stringify({
+        mandal_id: mandalId,
+        full_name: memberName,
+        phone: memberPhone,
+        email: memberEmail,
+        password: memberPassword,
+        role: memberRole,
+        event_ids: memberEventScope === 'specific' ? memberEventIds : []
+      })
     })
     const data = await res.json()
     if (data.success) {
-      showToast('Member added', 'success')
+      showToast(data.warning || 'Member added', data.warning ? 'error' : 'success')
       setMembers(prev => [...prev, data.member])
       setMemberName(''); setMemberPhone(''); setMemberEmail(''); setMemberPassword('')
+      setMemberEventScope('all'); setMemberEventIds([])
       setShowMemberForm(false)
     } else showToast(data.error || 'Could not add member', 'error')
     setMemberSubmitting(false)
@@ -812,12 +835,18 @@ export default function DashboardPage() {
     setEditName(member.full_name)
     setEditPhone(member.phone)
     setEditRole(member.role as 'collector' | 'manager')
+    const ids = member.event_ids || []
+    setEditEventScope(ids.length > 0 ? 'specific' : 'all')
+    setEditEventIds(ids)
   }
 
   async function updateMember() {
     if (!editUser) return
     if (!editName || !editPhone || !editRole) {
       showToast('All fields required', 'error'); return
+    }
+    if (editEventScope === 'specific' && editEventIds.length === 0) {
+      showToast('Select at least one event, or switch to "All events"', 'error'); return
     }
     setEditSubmitting(true)
     try {
@@ -830,7 +859,8 @@ export default function DashboardPage() {
           user_id: editUser.id,
           full_name: editName,
           phone: editPhone,
-          role: editRole
+          role: editRole,
+          event_ids: editEventScope === 'specific' ? editEventIds : []
         })
       })
       const data = await res.json()
@@ -1435,7 +1465,23 @@ export default function DashboardPage() {
         {/* ── TAB: Donations ── */}
         {tab === 'donations' && (
           <div className="flex flex-col gap-4">
-            
+
+            {/* Sub-tab toggle: Support Fund / Sponsorship — mirrors the Ranking tab pattern */}
+            <div className="flex gap-1 bg-gray-900 rounded-xl p-1 border border-gray-800 w-full sm:w-fit">
+              {(['support_fund', 'sponsorship'] as const).map(st => (
+                <button
+                  key={st}
+                  onClick={() => setDonationSubTab(st)}
+                  className={`flex-1 sm:flex-none px-3 sm:px-5 py-2 rounded-lg text-xs sm:text-sm font-medium transition-colors whitespace-nowrap
+                    ${donationSubTab === st ? 'bg-orange-500 text-white' : 'text-gray-400 hover:text-white'}`}
+                >
+                  {st === 'support_fund' ? '💵 Support Fund' : '🤝 Sponsorship'}
+                </button>
+              ))}
+            </div>
+
+            {donationSubTab === 'support_fund' && (
+            <>
             {/* Direct Self-Donation Drawer Toggle Button */}
             <div className="flex justify-between items-center bg-gray-900 border border-gray-800 rounded-xl p-4">
               <div>
@@ -1609,6 +1655,12 @@ export default function DashboardPage() {
                   )
                 })}
               </div>
+            )}
+            </>
+            )}
+
+            {donationSubTab === 'sponsorship' && (
+              <SponsorshipSection mandalId={mandalId!} events={events} showToast={showToast} />
             )}
           </div>
         )}
@@ -2055,6 +2107,16 @@ export default function DashboardPage() {
                         )}
                       </div>
                     </div>
+                    {CAN.manageExpenses(userRole) && (
+                      <div className="mt-3 pt-3 border-t border-gray-700">
+                        <button
+                          onClick={() => setExpenseManagerEvent(ev)}
+                          className="text-xs bg-gray-700/60 hover:bg-gray-700 text-gray-200 px-3 py-1.5 rounded-lg transition-colors font-medium"
+                        >
+                          💰 Manage Expenses
+                        </button>
+                      </div>
+                    )}
                   </div>
                 )
               })
@@ -2108,6 +2170,45 @@ export default function DashboardPage() {
                   className="bg-gray-900 border border-gray-700 rounded-lg px-3 py-2.5 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-orange-500" />
                 <input value={memberPassword} onChange={e => setMemberPassword(e.target.value)} placeholder="Password (min 8 characters)" type="password"
                   className="bg-gray-900 border border-gray-700 rounded-lg px-3 py-2.5 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-orange-500" />
+
+                {/* Event access */}
+                <div>
+                  <label className="block text-[10px] uppercase font-bold text-gray-500 tracking-wider mb-1.5">Event Access</label>
+                  <div className="grid grid-cols-2 gap-2 mb-2">
+                    <button type="button" onClick={() => setMemberEventScope('all')}
+                      className={`py-2 rounded-lg text-xs font-medium border transition-colors
+                        ${memberEventScope === 'all' ? 'bg-orange-500 border-orange-500 text-white' : 'bg-gray-900 border-gray-700 text-gray-400'}`}>
+                      All events
+                    </button>
+                    <button type="button" onClick={() => setMemberEventScope('specific')}
+                      className={`py-2 rounded-lg text-xs font-medium border transition-colors
+                        ${memberEventScope === 'specific' ? 'bg-orange-500 border-orange-500 text-white' : 'bg-gray-900 border-gray-700 text-gray-400'}`}>
+                      Specific event(s)
+                    </button>
+                  </div>
+                  {memberEventScope === 'specific' && (
+                    events.length === 0 ? (
+                      <p className="text-xs text-gray-500">No events created yet.</p>
+                    ) : (
+                      <div className="max-h-36 overflow-y-auto flex flex-col gap-1.5 bg-gray-900 border border-gray-700 rounded-lg p-2.5">
+                        {events.map(ev => (
+                          <label key={ev.id} className="flex items-center gap-2 text-xs text-gray-300 cursor-pointer">
+                            <input
+                              type="checkbox"
+                              checked={memberEventIds.includes(ev.id)}
+                              onChange={() => setMemberEventIds(prev =>
+                                prev.includes(ev.id) ? prev.filter(id => id !== ev.id) : [...prev, ev.id]
+                              )}
+                              className="accent-orange-500"
+                            />
+                            {ev.name} <span className="text-gray-500">({ev.year})</span>
+                          </label>
+                        ))}
+                      </div>
+                    )
+                  )}
+                </div>
+
                 <div className="flex gap-2">
                   <button onClick={addMember} disabled={memberSubmitting}
                     className="flex-1 bg-orange-500 hover:bg-orange-600 disabled:opacity-50 text-white text-sm font-medium py-2.5 rounded-lg">
@@ -2145,6 +2246,15 @@ export default function DashboardPage() {
                       )}
                     </div>
                     <p className="text-xs text-gray-400 mt-1">{m.phone}</p>
+                    {m.role !== 'admin' && (
+                      <p className="text-[11px] text-gray-500 mt-0.5">
+                        {(!m.event_ids || m.event_ids.length === 0)
+                          ? 'Access: all events'
+                          : `Access: ${m.event_ids.length} event${m.event_ids.length !== 1 ? 's' : ''} — ${
+                              m.event_ids.map(id => events.find(e => e.id === id)?.name || '?').join(', ')
+                            }`}
+                      </p>
+                    )}
                   </div>
                   {/* Cannot edit/remove/reset yourself, another admin, or super_admin */}
                   {m.id !== userId && !['admin', 'super_admin'].includes(m.role) ? (
@@ -2542,6 +2652,17 @@ export default function DashboardPage() {
           </div>
         )}
 
+        {/* ── Expense Management Modal (#8, #11) ── */}
+        {expenseManagerEvent && mandalId && (
+          <ExpenseManager
+            mandalId={mandalId}
+            eventId={expenseManagerEvent.id}
+            eventLabel={`${expenseManagerEvent.name} ${expenseManagerEvent.year}`}
+            showToast={showToast}
+            onClose={() => setExpenseManagerEvent(null)}
+          />
+        )}
+
         {/* ── Edit Member Modal Popup ── */}
         {editUser && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm animate-fade-in">
@@ -2584,6 +2705,42 @@ export default function DashboardPage() {
                       </button>
                     ))}
                   </div>
+                </div>
+                <div>
+                  <label className="block text-[10px] uppercase font-bold text-gray-500 tracking-wider mb-1.5">Event Access</label>
+                  <div className="grid grid-cols-2 gap-2 mb-2">
+                    <button type="button" onClick={() => setEditEventScope('all')}
+                      className={`py-2 rounded-lg text-xs font-semibold border transition-colors cursor-pointer
+                        ${editEventScope === 'all' ? 'bg-orange-500 border-orange-500 text-white' : 'bg-gray-950 border-gray-800 text-gray-400 hover:border-gray-700'}`}>
+                      All events
+                    </button>
+                    <button type="button" onClick={() => setEditEventScope('specific')}
+                      className={`py-2 rounded-lg text-xs font-semibold border transition-colors cursor-pointer
+                        ${editEventScope === 'specific' ? 'bg-orange-500 border-orange-500 text-white' : 'bg-gray-950 border-gray-800 text-gray-400 hover:border-gray-700'}`}>
+                      Specific event(s)
+                    </button>
+                  </div>
+                  {editEventScope === 'specific' && (
+                    events.length === 0 ? (
+                      <p className="text-xs text-gray-500">No events created yet.</p>
+                    ) : (
+                      <div className="max-h-36 overflow-y-auto flex flex-col gap-1.5 bg-gray-950 border border-gray-800 rounded-lg p-2.5">
+                        {events.map(ev => (
+                          <label key={ev.id} className="flex items-center gap-2 text-xs text-gray-300 cursor-pointer">
+                            <input
+                              type="checkbox"
+                              checked={editEventIds.includes(ev.id)}
+                              onChange={() => setEditEventIds(prev =>
+                                prev.includes(ev.id) ? prev.filter(id => id !== ev.id) : [...prev, ev.id]
+                              )}
+                              className="accent-orange-500"
+                            />
+                            {ev.name} <span className="text-gray-500">({ev.year})</span>
+                          </label>
+                        ))}
+                      </div>
+                    )
+                  )}
                 </div>
               </div>
 
