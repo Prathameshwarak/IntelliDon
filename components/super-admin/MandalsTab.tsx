@@ -97,7 +97,10 @@ export default function MandalsTab({ showToast }: MandalsTabProps) {
   async function fetchMandals(status: StatusTab) {
     setLoading(true)
     try {
-      const res = await fetch(`/api/super-admin/mandals?status=${status}`)
+      const { data: { session } } = await supabase.auth.getSession()
+      const token = session?.access_token
+      const headers: HeadersInit = token ? { Authorization: `Bearer ${token}` } : {}
+      const res = await fetch(`/api/super-admin/mandals?status=${status}`, { headers })
       const data = await res.json()
       if (data.error) throw new Error(data.error)
       const list = data.mandals || []
@@ -138,9 +141,14 @@ export default function MandalsTab({ showToast }: MandalsTabProps) {
 
     setActionLoading(mandalId)
     try {
+      const { data: { session } } = await supabase.auth.getSession()
+      const token = session?.access_token
       const res = await fetch('/api/super-admin/mandals', {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {})
+        },
         body: JSON.stringify({ 
           mandalId, 
           action, 
@@ -217,9 +225,14 @@ export default function MandalsTab({ showToast }: MandalsTabProps) {
       documentStatuses: docStatuses[mandalId] || {}
     })
     try {
+      const { data: { session } } = await supabase.auth.getSession()
+      const token = session?.access_token
       const res = await fetch('/api/super-admin/mandals', {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {})
+        },
         body: JSON.stringify({
           mandalId,
           kycStatus: status,
@@ -255,9 +268,14 @@ export default function MandalsTab({ showToast }: MandalsTabProps) {
     const kycStatus = currentMandal?.kyc_status || 'pending'
 
     try {
+      const { data: { session } } = await supabase.auth.getSession()
+      const token = session?.access_token
       const res = await fetch('/api/super-admin/mandals', {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {})
+        },
         body: JSON.stringify({
           mandalId,
           kycStatus,

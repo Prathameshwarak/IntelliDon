@@ -230,9 +230,14 @@ export default function AllOrganizationsTab({ showToast }: AllOrganizationsTabPr
       if (uploadError) throw new Error(`Upload error: ${uploadError.message}`)
 
       // 2. Update DB via PATCH api
+      const { data: { session } } = await supabase.auth.getSession()
+      const token = session?.access_token
       const res = await fetch('/api/super-admin/mandals', {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {})
+        },
         body: JSON.stringify({
           mandalId: viewingOrg.id,
           documentKey: uploadingDocKey,
@@ -267,7 +272,10 @@ export default function AllOrganizationsTab({ showToast }: AllOrganizationsTabPr
     setShowDetailedUserModal(true)
     setDetailedUser(null)
     try {
-      const res = await fetch(`/api/super-admin/users/${userId}`)
+      const { data: { session } } = await supabase.auth.getSession()
+      const token = session?.access_token
+      const headers: HeadersInit = token ? { Authorization: `Bearer ${token}` } : {}
+      const res = await fetch(`/api/super-admin/users/${userId}`, { headers })
       const data = await res.json()
       if (data.error) throw new Error(data.error)
       setDetailedUser(data.user)
@@ -285,9 +293,14 @@ export default function AllOrganizationsTab({ showToast }: AllOrganizationsTabPr
 
     setResettingPassword(true)
     try {
+      const { data: { session } } = await supabase.auth.getSession()
+      const token = session?.access_token
       const res = await fetch(`/api/super-admin/users/${resetPasswordUserId}`, {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {})
+        },
         body: JSON.stringify({ password: newPasswordValue })
       })
       const data = await res.json()
@@ -381,7 +394,10 @@ export default function AllOrganizationsTab({ showToast }: AllOrganizationsTabPr
   async function fetchAllOrganizations() {
     setLoading(true)
     try {
-      const res = await fetch('/api/super-admin/mandals?status=all')
+      const { data: { session } } = await supabase.auth.getSession()
+      const token = session?.access_token
+      const headers: HeadersInit = token ? { Authorization: `Bearer ${token}` } : {}
+      const res = await fetch('/api/super-admin/mandals?status=all', { headers })
       const data = await res.json()
       if (data.error) throw new Error(data.error)
       setOrganizations(data.mandals || [])

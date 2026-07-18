@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { supabase } from '@/lib/supabase'
 
 type Expense = {
   id: string
@@ -37,6 +38,14 @@ export default function ExpenseManager({
   showToast,
   onClose,
 }: ExpenseManagerProps) {
+  async function getAuthHeaders() {
+    const { data: { session } } = await supabase.auth.getSession()
+    const token = session?.access_token
+    return {
+      'Content-Type': 'application/json',
+      ...(token ? { Authorization: `Bearer ${token}` } : {})
+    }
+  }
   const [expenses, setExpenses] = useState<Expense[]>([])
   const [loading, setLoading] = useState(true)
   const [description, setDescription] = useState('')
@@ -53,7 +62,8 @@ export default function ExpenseManager({
   async function fetchExpenses() {
     setLoading(true)
     try {
-      const res = await fetch(`/api/expenses?mandal_id=${mandalId}&event_id=${eventId}`)
+      const headers = await getAuthHeaders()
+      const res = await fetch(`/api/expenses?mandal_id=${mandalId}&event_id=${eventId}`, { headers })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || 'Failed to load expenses')
       setExpenses(data.expenses || [])
@@ -75,9 +85,10 @@ export default function ExpenseManager({
 
     setSubmitting(true)
     try {
+      const headers = await getAuthHeaders()
       const res = await fetch('/api/expenses', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers,
         body: JSON.stringify({
           mandal_id: mandalId,
           event_id: eventId,
@@ -105,7 +116,8 @@ export default function ExpenseManager({
   async function handleDelete(id: string) {
     setDeletingId(id)
     try {
-      const res = await fetch(`/api/expenses/${id}`, { method: 'DELETE' })
+      const headers = await getAuthHeaders()
+      const res = await fetch(`/api/expenses/${id}`, { method: 'DELETE', headers })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || 'Failed to delete expense')
       showToast('Expense deleted', 'success')

@@ -14,14 +14,20 @@ const supabaseAdmin = createClient(
 export async function PATCH(request) {
   try {
     const body = await request.json()
-    const { donation_id, collector_id, payment_mode, verified_by, status = 'verified', rejection_reason } = body
+    const { donation_id, collector_id, payment_mode, status = 'verified', rejection_reason } = body
 
-    if (!verified_by) {
-      return NextResponse.json(
-        { error: 'verified_by is required' },
-        { status: 400 }
-      )
+    // Authenticate token
+    const authHeader = request.headers.get('Authorization')
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return NextResponse.json({ error: 'Unauthorized: Missing or invalid token' }, { status: 401 })
     }
+    const token = authHeader.split(' ')[1]
+    const { data: { user: authUser }, error: authError } = await supabaseAdmin.auth.getUser(token)
+    if (authError || !authUser) {
+      return NextResponse.json({ error: 'Unauthorized: Invalid session' }, { status: 401 })
+    }
+
+    const verified_by = authUser.id
 
     // Confirm the verifier is admin or manager
     const { data: verifier, error: verifierError } = await supabaseAdmin
