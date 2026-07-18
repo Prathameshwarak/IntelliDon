@@ -7,10 +7,36 @@ const supabaseAdmin = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 )
 
+async function verifySuperAdmin(request: Request) {
+  const authHeader = request.headers.get('Authorization')
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    return { error: 'Unauthorized: Missing or invalid token', status: 401 }
+  }
+  const token = authHeader.split(' ')[1]
+  const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(token)
+  if (authError || !user) {
+    return { error: 'Unauthorized: Invalid token', status: 401 }
+  }
+  const { data: profile, error: profileError } = await supabaseAdmin
+    .from('users')
+    .select('role')
+    .eq('id', user.id)
+    .single()
+  if (profileError || !profile || profile.role !== 'super_admin') {
+    return { error: 'Forbidden: Super admin access only', status: 403 }
+  }
+  return { callerId: user.id }
+}
+
 export async function GET(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const authCheck = await verifySuperAdmin(request)
+  if ('error' in authCheck) {
+    return NextResponse.json({ error: authCheck.error }, { status: authCheck.status })
+  }
+
   try {
     const { id } = await params
 
@@ -103,6 +129,11 @@ export async function PATCH(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const authCheck = await verifySuperAdmin(request)
+  if ('error' in authCheck) {
+    return NextResponse.json({ error: authCheck.error }, { status: authCheck.status })
+  }
+
   try {
     const { id } = await params
     const body = await request.json()

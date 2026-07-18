@@ -17,6 +17,7 @@ export default function LoginPage() {
   // Form State
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [rememberMe, setRememberMe] = useState(false);
 
   // Validation States
   const [emailError, setEmailError] = useState("");
@@ -158,6 +159,10 @@ export default function LoginPage() {
         }
       }
 
+      localStorage.setItem("remember_me", rememberMe ? "true" : "false");
+      localStorage.setItem("login_time", Date.now().toString());
+      localStorage.setItem("last_active", Date.now().toString());
+
       // 3. Show success state and redirect
       setSuccess(true);
       setTimeout(() => {
@@ -183,7 +188,7 @@ export default function LoginPage() {
 
   return (
     <main className="min-h-screen w-full flex flex-col md:flex-row bg-[#f8fafc] dark:bg-[#07090e] transition-colors duration-300">
-      
+
       {/* SUCCESS REDIRECT OVERLAY */}
       {success && (
         <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-[#07090e]/95 p-6 text-center animate-fade-in-up">
@@ -215,7 +220,7 @@ export default function LoginPage() {
 
       {/* LEFT PANEL - DYNAMIC PORTAL WELCOME & DASHBOARD PREVIEW */}
       <section className="relative w-full md:w-[45%] lg:w-[40%] bg-gradient-to-b from-[#0b0f19] to-[#04060b] flex flex-col justify-between p-8 md:p-12 overflow-hidden border-b md:border-b-0 md:border-r border-white/5">
-        
+
         {/* Floating Ambient Orbs */}
         <div className="absolute top-1/3 -left-1/4 w-80 h-80 rounded-full bg-amber-500/10 blur-3xl animate-float-slow animate-pulse-soft pointer-events-none" />
         <div className="absolute bottom-1/3 -right-1/4 w-80 h-80 rounded-full bg-indigo-600/20 blur-3xl animate-float-medium animate-pulse-soft pointer-events-none" />
@@ -238,10 +243,10 @@ export default function LoginPage() {
         {/* Centerpiece: Admin Dashboard Preview Graphic */}
         <div className="relative z-10 my-12 flex flex-col items-center">
           <p className="text-slate-400 font-mono text-xs uppercase tracking-widest mb-4">Administration Overview</p>
-          
+
           {/* Dashboard mockup card */}
           <div className="w-full max-w-[340px] bg-white/5 border border-white/10 rounded-2xl p-5 shadow-2xl backdrop-blur-xl space-y-4 transition-all duration-300 hover:scale-[1.02]">
-            
+
             {/* Header: Title and active user stats */}
             <div className="flex justify-between items-center border-b border-white/10 pb-3">
               <div className="flex items-center space-x-2">
@@ -257,7 +262,7 @@ export default function LoginPage() {
                 <span>Monthly Collections</span>
                 <span className="text-emerald-400 font-semibold">+24.8%</span>
               </div>
-              
+
               {/* SVG Wave chart */}
               <div className="w-full h-20 bg-slate-900/50 rounded-lg border border-white/5 relative overflow-hidden flex items-end">
                 <svg className="w-full h-full text-indigo-500/30" viewBox="0 0 100 100" preserveAspectRatio="none">
@@ -303,7 +308,7 @@ export default function LoginPage() {
       {/* RIGHT PANEL - LOGIN FORM */}
       <section className="flex-1 flex flex-col justify-center px-6 py-12 sm:px-12 lg:px-20 bg-white dark:bg-[#07090e] transition-colors duration-300">
         <div className="w-full max-w-md mx-auto space-y-8">
-          
+
           {/* Form Header */}
           <div className="space-y-2">
             <h2 className="text-3xl font-extrabold text-slate-900 dark:text-white tracking-tight animate-fade-in-up">
@@ -326,7 +331,7 @@ export default function LoginPage() {
 
           {/* Form Content */}
           <form onSubmit={handleSubmit} className="space-y-6">
-            
+
             {/* Email Address */}
             <div className="space-y-1.5">
               <label htmlFor="email" className="text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider">
@@ -349,11 +354,10 @@ export default function LoginPage() {
                   }}
                   onBlur={(e) => validateEmail(e.target.value)}
                   placeholder="rajesh@mandalname.com"
-                  className={`w-full pl-11 pr-4 py-3 bg-slate-50 dark:bg-[#0b0f19] border rounded-xl text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 transition-all duration-200 ${
-                    emailError 
-                      ? "border-rose-500 focus:ring-rose-500/20 focus:border-rose-500" 
+                  className={`w-full pl-11 pr-4 py-3 bg-slate-50 dark:bg-[#0b0f19] border rounded-xl text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 transition-all duration-200 ${emailError
+                      ? "border-rose-500 focus:ring-rose-500/20 focus:border-rose-500"
                       : "border-slate-200 dark:border-slate-800 focus:ring-amber-500/20 focus:border-amber-500 dark:focus:border-amber-500"
-                  }`}
+                    }`}
                   required
                 />
               </div>
@@ -401,14 +405,13 @@ export default function LoginPage() {
                   }}
                   onBlur={(e) => validatePassword(e.target.value)}
                   placeholder="••••••••"
-                  className={`w-full pl-11 pr-11 py-3 bg-slate-50 dark:bg-[#0b0f19] border rounded-xl text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 transition-all duration-200 ${
-                    passwordError 
-                      ? "border-rose-500 focus:ring-rose-500/20 focus:border-rose-500" 
+                  className={`w-full pl-11 pr-11 py-3 bg-slate-50 dark:bg-[#0b0f19] border rounded-xl text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 transition-all duration-200 ${passwordError
+                      ? "border-rose-500 focus:ring-rose-500/20 focus:border-rose-500"
                       : "border-slate-200 dark:border-slate-800 focus:ring-amber-500/20 focus:border-amber-500 dark:focus:border-amber-500"
-                  }`}
+                    }`}
                   required
                 />
-                
+
                 {/* Reveal Password Eye Button */}
                 <button
                   type="button"
@@ -435,6 +438,21 @@ export default function LoginPage() {
                   <span>{passwordError}</span>
                 </p>
               )}
+            </div>
+
+            {/* Remember Me Checkbox */}
+            <div className="flex items-center select-none py-1">
+              <input
+                id="rememberMe"
+                name="rememberMe"
+                type="checkbox"
+                checked={rememberMe}
+                onChange={(e) => setRememberMe(e.target.checked)}
+                className="h-4.5 w-4.5 text-amber-500 border-slate-200 dark:border-slate-800 rounded focus:ring-amber-500/20 dark:bg-[#0b0f19] cursor-pointer accent-amber-500"
+              />
+              <label htmlFor="rememberMe" className="ml-2.5 text-sm font-semibold text-slate-700 dark:text-slate-300 cursor-pointer">
+                Remember me
+              </label>
             </div>
 
             {/* Login button */}

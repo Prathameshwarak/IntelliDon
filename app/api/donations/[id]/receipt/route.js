@@ -46,6 +46,17 @@ export async function POST(request, { params }) {
   try {
     const { id } = await params
 
+    // Authenticate token
+    const authHeader = request.headers.get('Authorization')
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return NextResponse.json({ error: 'Unauthorized: Missing or invalid token' }, { status: 401 })
+    }
+    const token = authHeader.split(' ')[1]
+    const { data: { user: authUser }, error: authError } = await supabaseAdmin.auth.getUser(token)
+    if (authError || !authUser) {
+      return NextResponse.json({ error: 'Unauthorized: Invalid session' }, { status: 401 })
+    }
+
     // 1. Fetch the donation with all related data needed for the receipt
     const { data: donation, error: donationError } = await supabaseAdmin
       .from('donations')
@@ -61,6 +72,7 @@ export async function POST(request, { params }) {
         pdf_url,
         created_at,
         collected_by,
+        mandal_id,
         mandals (
           id,
           name,
@@ -82,6 +94,16 @@ export async function POST(request, { params }) {
 
     if (donationError || !donation) {
       return NextResponse.json({ error: 'Donation not found' }, { status: 404 })
+    }
+
+    const { data: profile } = await supabaseAdmin
+      .from('users')
+      .select('role, mandal_id')
+      .eq('id', authUser.id)
+      .single()
+
+    if (!profile || profile.mandal_id !== donation.mandal_id) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 
     // 2. Only generate receipts for verified donations

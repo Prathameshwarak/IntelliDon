@@ -22,6 +22,30 @@ export async function POST(request) {
       screenshot_url
     } = body
 
+    // Verify token if collected_by is provided
+    if (collected_by) {
+      const authHeader = request.headers.get('Authorization')
+      if (!authHeader || !authHeader.startsWith('Bearer ')) {
+        return NextResponse.json({ error: 'Unauthorized: Missing or invalid token' }, { status: 401 })
+      }
+      const token = authHeader.split(' ')[1]
+      const { data: { user: authUser }, error: authError } = await supabaseAdmin.auth.getUser(token)
+      if (authError || !authUser) {
+        return NextResponse.json({ error: 'Unauthorized: Invalid session' }, { status: 401 })
+      }
+
+      if (authUser.id !== collected_by) {
+        const { data: verifier } = await supabaseAdmin
+          .from('users')
+          .select('role, mandal_id')
+          .eq('id', authUser.id)
+          .single()
+        if (!verifier || !['admin', 'manager'].includes(verifier.role) || verifier.mandal_id !== mandal_id) {
+          return NextResponse.json({ error: 'Forbidden: Cannot submit donation on behalf of this collector' }, { status: 403 })
+        }
+      }
+    }
+
     // ── 1. Validate ───────────────────────────────────────────
     if (!mandal_id || !event_id || !donor_name || !amount || !payment_mode) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
@@ -196,7 +220,6 @@ export async function POST(request) {
   }
 }
 
-// ── GET — fetch donations for admin dashboard ─────────────────
 export async function GET(request) {
   try {
     const { searchParams } = new URL(request.url)
@@ -207,6 +230,33 @@ export async function GET(request) {
 
     if (!mandal_id) {
       return NextResponse.json({ error: 'mandal_id is required' }, { status: 400 })
+    }
+
+    // Authenticate token
+    const authHeader = request.headers.get('Authorization')
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return NextResponse.json({ error: 'Unauthorized: Missing or invalid token' }, { status: 401 })
+    }
+    const token = authHeader.split(' ')[1]
+    const { data: { user: authUser }, error: authError } = await supabaseAdmin.auth.getUser(token)
+    if (authError || !authUser) {
+      return NextResponse.json({ error: 'Unauthorized: Invalid session' }, { status: 401 })
+    }
+
+    const { data: profile } = await supabaseAdmin
+      .from('users')
+      .select('role, mandal_id')
+      .eq('id', authUser.id)
+      .single()
+
+    if (!profile || profile.mandal_id !== mandal_id) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    }
+
+    if (!['admin', 'manager'].includes(profile.role)) {
+      if (collected_by !== authUser.id) {
+        return NextResponse.json({ error: 'Forbidden: Collectors can only view their own collections' }, { status: 403 })
+      }
     }
 
     let query = supabaseAdmin

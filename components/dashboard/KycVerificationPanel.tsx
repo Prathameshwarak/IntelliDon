@@ -115,8 +115,13 @@ export default function KycVerificationPanel({ mandal, userId, showToast, onResu
         fd.append(key, file)
       })
 
+      const { data: { session } } = await supabase.auth.getSession()
+      const token = session?.access_token
+      const headers: HeadersInit = token ? { 'Authorization': `Bearer ${token}` } : {}
+
       const res = await fetch('/api/mandals/kyc-resubmit', {
         method: 'POST',
+        headers,
         body: fd
       })
       const data = await res.json()

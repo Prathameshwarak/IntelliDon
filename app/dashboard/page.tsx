@@ -444,7 +444,8 @@ export default function DashboardPage() {
   // ── Donations ─────────────────────────────────────────────────
   async function fetchDonations() {
     setDonationsLoading(true)
-    const res = await fetch(`/api/donations?mandal_id=${mandalId}`)
+    const headers = await getAuthHeaders()
+    const res = await fetch(`/api/donations?mandal_id=${mandalId}`, { headers })
     const data = await res.json()
     if (!data.error) {
       setDonations(data.donations)
@@ -462,9 +463,10 @@ export default function DashboardPage() {
       return
     }
     setVerifyingId(donationId)
+    const headers = await getAuthHeaders()
     const res = await fetch('/api/donations/verify', {
       method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
+      headers,
       body: JSON.stringify({ donation_id: donationId, verified_by: userId, status: 'verified' })
     })
     const data = await res.json()
@@ -488,9 +490,10 @@ export default function DashboardPage() {
   async function rejectDonation(donationId: string, reason: string) {
     if (!CAN.verifyDonation(userRole)) return
     setSubmittingRejection(true)
+    const headers = await getAuthHeaders()
     const res = await fetch('/api/donations/verify', {
       method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
+      headers,
       body: JSON.stringify({
         donation_id: donationId,
         verified_by: userId,
@@ -531,9 +534,10 @@ export default function DashboardPage() {
     setBulkVerifyingCollector(collectorId)
     setBulkVerifyingMode(paymentMode)
 
+    const headers = await getAuthHeaders()
     const res = await fetch('/api/donations/verify', {
       method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
+      headers,
       body: JSON.stringify({
         collector_id: collectorId,
         payment_mode: paymentMode,
@@ -557,7 +561,8 @@ export default function DashboardPage() {
 
   // ── Events ────────────────────────────────────────────────────
   async function fetchEvents() {
-    const res = await fetch(`/api/events?mandal_id=${mandalId}`)
+    const headers = await getAuthHeaders()
+    const res = await fetch(`/api/events?mandal_id=${mandalId}`, { headers })
     const data = await res.json()
     if (!data.error) setEvents(data.events)
   }
@@ -565,27 +570,28 @@ export default function DashboardPage() {
   async function createEvent() {
     if (!CAN.createEvent(userRole)) return
     setDateError('')
-
+ 
     // Client-side validation — matches server rules
     if (!eventName.trim()) { showToast('Event name is required', 'error'); return }
     if (!eventUpiId.trim()) { showToast('UPI ID is required', 'error'); return }
     if (!eventStartDate) { showToast('Start date is required', 'error'); return }
     if (!eventEndDate) { showToast('End date is required', 'error'); return }
-
+ 
     const start = new Date(eventStartDate)
     const end = new Date(eventEndDate)
     const today = new Date(); today.setHours(0,0,0,0)
-
+ 
     if (end <= start) { setDateError('End date must be after start date'); return }
-
+ 
     const days = Math.round((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24))
     if (days > 50) { setDateError(`Duration is ${days} days — maximum is 50 days`); return }
     if (start < today) { setDateError('Start date cannot be in the past'); return }
-
+ 
     setEventSubmitting(true)
+    const headers = await getAuthHeaders()
     const res = await fetch('/api/events', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers,
       body: JSON.stringify({
         mandal_id: mandalId,
         name: eventName,
@@ -610,12 +616,13 @@ export default function DashboardPage() {
     } else showToast(data.error || 'Could not create event', 'error')
     setEventSubmitting(false)
   }
-
+ 
   async function toggleEvent(eventId: string, currentActive: boolean) {
     if (!CAN.toggleEvent(userRole)) return
+    const headers = await getAuthHeaders()
     const res = await fetch('/api/events', {
       method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
+      headers,
       body: JSON.stringify({ event_id: eventId, is_active: !currentActive })
     })
     const data = await res.json()
@@ -634,7 +641,7 @@ export default function DashboardPage() {
       showToast(data.error || 'Could not update event', 'error')
     }
   }
-
+ 
   function startEditingEvent(ev: Event) {
     setEditingEventId(ev.id)
     setEventName(ev.name)
@@ -645,7 +652,7 @@ export default function DashboardPage() {
     setDateError('')
     setShowEventForm(true)
   }
-
+ 
   function cancelEventForm() {
     setEditingEventId(null)
     setEventName('')
@@ -656,35 +663,36 @@ export default function DashboardPage() {
     setDateError('')
     setShowEventForm(false)
   }
-
+ 
   async function updateEvent() {
     if (!CAN.createEvent(userRole) || !editingEventId) return
     setDateError('')
-
+ 
     if (!eventName.trim()) { showToast('Event name is required', 'error'); return }
     if (!eventUpiId.trim()) { showToast('UPI ID is required', 'error'); return }
     if (!eventStartDate) { showToast('Start date is required', 'error'); return }
     if (!eventEndDate) { showToast('End date is required', 'error'); return }
-
+ 
     const start = new Date(eventStartDate)
     const end = new Date(eventEndDate)
-
+ 
     if (end <= start) { setDateError('End date must be after start date'); return }
-
+ 
     const days = Math.round((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24))
     if (days > 50) { setDateError(`Duration is ${days} days — maximum is 50 days`); return }
-
+ 
     const originalEvent = events.find(e => e.id === editingEventId)
     const today = new Date(); today.setHours(0,0,0,0)
     if (originalEvent && eventStartDate !== originalEvent.start_date && start < today) {
       setDateError('Start date cannot be in the past')
       return
     }
-
+ 
     setEventSubmitting(true)
+    const headers = await getAuthHeaders()
     const res = await fetch('/api/events', {
       method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
+      headers,
       body: JSON.stringify({
         event_id: editingEventId,
         name: eventName,
@@ -1096,8 +1104,9 @@ export default function DashboardPage() {
   ]
 
   // Handler called when admin dismisses the upgrade banner
-  function handleBannerContinue() {
+  async function handleBannerContinue() {
     setShowUpgradeBanner(false)
+    const headers = await getAuthHeaders()
     // Execute the pending action they tried before the banner appeared
     if (pendingVerifyId) {
       const id = pendingVerifyId
@@ -1106,7 +1115,7 @@ export default function DashboardPage() {
       setVerifyingId(id)
       fetch('/api/donations/verify', {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
+        headers,
         body: JSON.stringify({ donation_id: id, verified_by: userId, status: 'verified' })
       }).then(r => r.json()).then(data => {
         if (data.success) {
@@ -1129,7 +1138,7 @@ export default function DashboardPage() {
       setBulkVerifyingMode(mode)
       fetch('/api/donations/verify', {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
+        headers,
         body: JSON.stringify({ collector_id: id, payment_mode: mode, verified_by: userId })
       }).then(r => r.json()).then(data => {
         if (data.success) {

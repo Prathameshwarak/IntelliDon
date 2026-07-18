@@ -53,12 +53,23 @@ async function uploadDoc(file: File, mandalId: string, fieldName: string) {
 
 export async function POST(request: Request) {
   try {
+    const authHeader = request.headers.get('Authorization')
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return NextResponse.json({ error: 'Unauthorized: Missing or invalid token' }, { status: 401 })
+    }
+    const token = authHeader.split(' ')[1]
+    const { data: { user: authUser }, error: authError } = await supabaseAdmin.auth.getUser(token)
+    if (authError || !authUser) {
+      return NextResponse.json({ error: 'Unauthorized: Invalid session' }, { status: 401 })
+    }
+
+    const userId = authUser.id
+
     const formData = await request.formData()
     const mandalId = formData.get('mandal_id')?.toString().trim()
-    const userId = formData.get('user_id')?.toString().trim()
 
     if (!mandalId || !userId) {
-      return NextResponse.json({ error: 'mandal_id and user_id are required' }, { status: 400 })
+      return NextResponse.json({ error: 'mandal_id is required' }, { status: 400 })
     }
 
     // Verify user role & relationship to mandal

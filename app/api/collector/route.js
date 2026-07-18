@@ -17,6 +17,16 @@ export async function GET(request) {
       return NextResponse.json({ error: 'user_id is required' }, { status: 400 })
     }
 
+    // Authenticate Bearer token
+    const authHeader = request.headers.get('Authorization')
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return NextResponse.json({ error: 'Unauthorized: Missing or invalid token' }, { status: 401 })
+    }
+    const token = authHeader.split(' ')[1]
+    const { data: { user: authUser }, error: authError } = await supabaseAdmin.auth.getUser(token)
+    if (authError || !authUser) {
+      return NextResponse.json({ error: 'Unauthorized: Invalid session' }, { status: 401 })
+    }
     // Get the collector's user row to find their mandal
     const { data: userRow, error: userError } = await supabaseAdmin
       .from('users')
@@ -30,6 +40,19 @@ export async function GET(request) {
 
     if (!['collector', 'admin', 'manager'].includes(userRow.role)) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
+    }
+
+    // Check authorization: must be the user itself or admin/manager of the same mandal
+    if (authUser.id !== user_id) {
+      const { data: callerProfile } = await supabaseAdmin
+        .from('users')
+        .select('role, mandal_id')
+        .eq('id', authUser.id)
+        .single()
+
+      if (!callerProfile || !['admin', 'manager'].includes(callerProfile.role) || callerProfile.mandal_id !== userRow.mandal_id) {
+        return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+      }
     }
 
     // Get the mandal details

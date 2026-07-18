@@ -6,6 +6,31 @@ const supabaseAdmin = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY
 )
 
+// Helper to authenticate the admin caller and verify they belong to the correct mandal
+async function verifyMandalAdmin(request, mandalIdToCheck) {
+  const authHeader = request.headers.get('Authorization')
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    return { error: 'Unauthorized: Missing or invalid token', status: 401 }
+  }
+  const token = authHeader.split(' ')[1]
+  const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(token)
+  if (authError || !user) {
+    return { error: 'Unauthorized: Invalid session', status: 401 }
+  }
+
+  const { data: profile } = await supabaseAdmin
+    .from('users')
+    .select('role, mandal_id')
+    .eq('id', user.id)
+    .single()
+
+  if (!profile || profile.role !== 'admin' || profile.mandal_id !== mandalIdToCheck) {
+    return { error: 'Forbidden: Admin access only', status: 403 }
+  }
+
+  return { caller: profile }
+}
+
 // ── Validation helpers ────────────────────────────────────────
 function validateEventFields({ name, year, upi_id, start_date, end_date, isEdit, existingStartDate }) {
   if (!name || !name.trim()) return 'Event name is required'
@@ -39,6 +64,27 @@ export async function GET(request) {
 
   if (!mandal_id) {
     return NextResponse.json({ error: 'mandal_id is required' }, { status: 400 })
+  }
+
+  // Authenticate token
+  const authHeader = request.headers.get('Authorization')
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    return NextResponse.json({ error: 'Unauthorized: Missing or invalid token' }, { status: 401 })
+  }
+  const token = authHeader.split(' ')[1]
+  const { data: { user: authUser }, error: authError } = await supabaseAdmin.auth.getUser(token)
+  if (authError || !authUser) {
+    return NextResponse.json({ error: 'Unauthorized: Invalid session' }, { status: 401 })
+  }
+
+  const { data: profile } = await supabaseAdmin
+    .from('users')
+    .select('role, mandal_id')
+    .eq('id', authUser.id)
+    .single()
+
+  if (!profile || profile.mandal_id !== mandal_id || !['admin', 'manager', 'collector'].includes(profile.role)) {
+    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
   }
 
   // Auto-deactivate any events that have passed their end_date before returning
@@ -78,6 +124,11 @@ export async function POST(request) {
 
     if (!mandal_id) {
       return NextResponse.json({ error: 'mandal_id is required' }, { status: 400 })
+    }
+
+    const authCheck = await verifyMandalAdmin(request, mandal_id)
+    if (authCheck.error) {
+      return NextResponse.json({ error: authCheck.error }, { status: authCheck.status })
     }
 
     // Validate all fields
@@ -171,6 +222,11 @@ export async function PATCH(request) {
       return NextResponse.json({ error: 'Event not found' }, { status: 404 })
     }
 
+    const authCheck = await verifyMandalAdmin(request, event.mandal_id)
+    if (authCheck.error) {
+      return NextResponse.json({ error: authCheck.error }, { status: authCheck.status })
+    }
+
     const today = new Date().toISOString().split('T')[0]
 
     // Cannot activate a suspended event
@@ -238,6 +294,11 @@ export async function PUT(request) {
 
     if (!event) {
       return NextResponse.json({ error: 'Event not found' }, { status: 404 })
+    }
+
+    const authCheck = await verifyMandalAdmin(request, event.mandal_id)
+    if (authCheck.error) {
+      return NextResponse.json({ error: authCheck.error }, { status: authCheck.status })
     }
 
     // Cannot edit a suspended event

@@ -7,8 +7,34 @@ const supabaseAdmin = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 )
 
+async function verifySuperAdmin(request: Request) {
+  const authHeader = request.headers.get('Authorization')
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    return { error: 'Unauthorized: Missing or invalid token', status: 401 }
+  }
+  const token = authHeader.split(' ')[1]
+  const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(token)
+  if (authError || !user) {
+    return { error: 'Unauthorized: Invalid token', status: 401 }
+  }
+  const { data: profile, error: profileError } = await supabaseAdmin
+    .from('users')
+    .select('role')
+    .eq('id', user.id)
+    .single()
+  if (profileError || !profile || profile.role !== 'super_admin') {
+    return { error: 'Forbidden: Super admin access only', status: 403 }
+  }
+  return { callerId: user.id }
+}
+
 // GET all mandals - super admin sees pending + active + suspended
 export async function GET(request: Request) {
+  const authCheck = await verifySuperAdmin(request)
+  if ('error' in authCheck) {
+    return NextResponse.json({ error: authCheck.error }, { status: authCheck.status })
+  }
+
   try {
     const { searchParams } = new URL(request.url)
     const status = searchParams.get('status') || 'pending' // default: show pending
@@ -82,6 +108,11 @@ export async function GET(request: Request) {
 // PATCH - approve, reject, or suspend a mandal
 // Body: { mandalId: string, action?: 'approve' | 'reject' | 'suspend', plan?: string, documentKey?: string, documentPath?: string }
 export async function PATCH(request: Request) {
+  const authCheck = await verifySuperAdmin(request)
+  if ('error' in authCheck) {
+    return NextResponse.json({ error: authCheck.error }, { status: authCheck.status })
+  }
+
   try {
     const body = await request.json()
     const { mandalId, action, plan = 'trial', kycStatus, kycNotes, documentKey, documentPath } = body
@@ -208,45 +239,9 @@ export async function PATCH(request: Request) {
 
 // POST create a new organization by super admin
 export async function POST(request: Request) {
-  // Check super-admin access
-  const authHeader = request.headers.get('Authorization')
-  let callerId = ''
-  if (authHeader && authHeader.startsWith('Bearer ')) {
-    const token = authHeader.split(' ')[1]
-    const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(token)
-    if (!authError && user) {
-      const { data: profile } = await supabaseAdmin
-        .from('users')
-        .select('role')
-        .eq('id', user.id)
-        .single()
-      if (profile && profile.role === 'super_admin') {
-        callerId = user.id
-      }
-    }
-  }
-
-  if (!callerId) {
-    // Let's verify auth session via current cookies as fallback
-    const { data: { session } } = await supabaseAdmin.auth.getSession()
-    if (session?.user) {
-      const { data: profile } = await supabaseAdmin
-        .from('users')
-        .select('role')
-        .eq('id', session.user.id)
-        .single()
-      if (profile && profile.role === 'super_admin') {
-        callerId = session.user.id
-      }
-    }
-  }
-
-  // If still not verified, try listing user logic or default fallback (for simplicity of testing we allow if headers fail but session is active)
-  if (!callerId) {
-    // Let's try parsing session token from cookies
-    // To ensure admin works seamlessly, we default callerId to a valid check or throw
-    // (the client will send Bearer Authorization token automatically in headers)
-    return NextResponse.json({ error: 'Unauthorized: Super admin access only' }, { status: 401 })
+  const authCheck = await verifySuperAdmin(request)
+  if ('error' in authCheck) {
+    return NextResponse.json({ error: authCheck.error }, { status: authCheck.status })
   }
 
   try {

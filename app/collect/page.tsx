@@ -74,7 +74,10 @@ export default function CollectPage() {
     setDonationsLoading(true)
     setDonationsError('')
     try {
-      const res = await fetch(`/api/donations?mandal_id=${mId}&collected_by=${uId}`)
+      const { data: { session } } = await supabase.auth.getSession()
+      const token = session?.access_token
+      const headers: HeadersInit = token ? { 'Authorization': `Bearer ${token}` } : {}
+      const res = await fetch(`/api/donations?mandal_id=${mId}&collected_by=${uId}`, { headers })
       const data = await res.json()
       if (data.error) {
         setDonationsError(data.error)
@@ -105,8 +108,11 @@ export default function CollectPage() {
       }
 
       setUserId(user.id)
+      const { data: { session } } = await supabase.auth.getSession()
+      const token = session?.access_token
+      const headers: HeadersInit = token ? { 'Authorization': `Bearer ${token}` } : {}
 
-      const res = await fetch(`/api/collector?user_id=${user.id}`)
+      const res = await fetch(`/api/collector?user_id=${user.id}`, { headers })
       const data = await res.json()
 
       if (data.error) { setError(data.error); setLoading(false); return }
@@ -134,9 +140,14 @@ export default function CollectPage() {
     setSubmitting(true)
     setError('')
     try {
+      const { data: { session } } = await supabase.auth.getSession()
+      const token = session?.access_token
       const res = await fetch('/api/donations', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+        },
         body: JSON.stringify(payload)
       })
       const data = await res.json()
