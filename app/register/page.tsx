@@ -123,7 +123,10 @@ export default function RegisterPage() {
 
   // Handle inputs
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { name, value } = e.target;
+    let { name, value } = e.target;
+    if (name === "phone") {
+      value = value.replace(/[^0-9]/g, "").slice(0, 10);
+    }
     setFormData((prev) => ({ ...prev, [name]: value }));
     if (errorMsg) setErrorMsg("");
     
@@ -746,7 +749,13 @@ export default function RegisterPage() {
                   <input
                     type="tel"
                     value={adminPhone}
-                    onChange={e => setAdminPhone(e.target.value)}
+                    onChange={e => {
+                      const val = e.target.value.replace(/[^0-9]/g, "").slice(0, 10);
+                      setAdminPhone(val);
+                      if (val.length === 10) {
+                        setErrors(prev => ({ ...prev, adminPhone: "" }));
+                      }
+                    }}
                     placeholder="e.g. 9876543210"
                     maxLength={10}
                     className="w-full px-4 py-3 bg-slate-50 dark:bg-[#0b0f19] border border-slate-200 dark:border-slate-800 rounded-xl text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500"

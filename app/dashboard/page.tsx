@@ -755,7 +755,21 @@ export default function DashboardPage() {
     if (!memberName || !memberPhone || !memberEmail || !memberPassword) {
       showToast('All fields required', 'error'); return
     }
-    if (memberPassword.length < 8) { showToast('Password must be at least 8 characters', 'error'); return }
+    const cleanPhone = memberPhone.replace(/[^0-9]/g, "")
+    if (cleanPhone.length !== 10) {
+      showToast('Please enter a valid 10-digit phone number', 'error')
+      return
+    }
+    const hasLength = memberPassword.length >= 8
+    const hasUpper = /[A-Z]/.test(memberPassword)
+    const hasLower = /[a-z]/.test(memberPassword)
+    const hasNumber = /[0-9]/.test(memberPassword)
+    const hasSpecial = /[^A-Za-z0-9]/.test(memberPassword)
+
+    if (!hasLength || !hasUpper || !hasLower || !hasNumber || !hasSpecial) {
+      showToast('Password does not meet complexity requirements', 'error')
+      return
+    }
     if (memberEventScope === 'specific' && memberEventIds.length === 0) {
       showToast('Select at least one event, or switch to "All events"', 'error'); return
     }
@@ -844,6 +858,11 @@ export default function DashboardPage() {
     if (!editUser) return
     if (!editName || !editPhone || !editRole) {
       showToast('All fields required', 'error'); return
+    }
+    const cleanPhone = editPhone.replace(/[^0-9]/g, "")
+    if (cleanPhone.length !== 10) {
+      showToast('Please enter a valid 10-digit phone number', 'error')
+      return
     }
     if (editEventScope === 'specific' && editEventIds.length === 0) {
       showToast('Select at least one event, or switch to "All events"', 'error'); return
@@ -1113,13 +1132,21 @@ export default function DashboardPage() {
   })
   distinctCollectors.sort((a, b) => a.name.localeCompare(b.name))
 
-  // Password complexity check states
+  // Password complexity check states (for Reset Password)
   const passLength = tempPassword.length >= 8
   const passUpper = /[A-Z]/.test(tempPassword)
   const passLower = /[a-z]/.test(tempPassword)
   const passNumber = /[0-9]/.test(tempPassword)
   const passSpecial = /[^A-Za-z0-9]/.test(tempPassword)
   const isPasswordStrong = passLength && passUpper && passLower && passNumber && passSpecial
+
+  // Password complexity check states (for Add Member)
+  const memberPassLength = memberPassword.length >= 8
+  const memberPassUpper = /[A-Z]/.test(memberPassword)
+  const memberPassLower = /[a-z]/.test(memberPassword)
+  const memberPassNumber = /[0-9]/.test(memberPassword)
+  const memberPassSpecial = /[^A-Za-z0-9]/.test(memberPassword)
+  const isMemberPasswordStrong = memberPassLength && memberPassUpper && memberPassLower && memberPassNumber && memberPassSpecial
 
   // Available tabs depend on role
   const availableTabs: Tab[] = [
@@ -2164,12 +2191,49 @@ export default function DashboardPage() {
                 </div>
                 <input value={memberName} onChange={e => setMemberName(e.target.value)} placeholder="Full name"
                   className="bg-gray-900 border border-gray-700 rounded-lg px-3 py-2.5 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-orange-500" />
-                <input value={memberPhone} onChange={e => setMemberPhone(e.target.value)} placeholder="Phone number" type="tel"
+                <input value={memberPhone} onChange={e => setMemberPhone(e.target.value.replace(/[^0-9]/g, "").slice(0, 10))} placeholder="Phone number (10 digits)" type="tel"
+                  maxLength={10}
                   className="bg-gray-900 border border-gray-700 rounded-lg px-3 py-2.5 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-orange-500" />
                 <input value={memberEmail} onChange={e => setMemberEmail(e.target.value)} placeholder="Email (used to login)" type="email"
                   className="bg-gray-900 border border-gray-700 rounded-lg px-3 py-2.5 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-orange-500" />
                 <input value={memberPassword} onChange={e => setMemberPassword(e.target.value)} placeholder="Password (min 8 characters)" type="password"
                   className="bg-gray-900 border border-gray-700 rounded-lg px-3 py-2.5 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-orange-500" />
+
+                {memberPassword && (
+                  <div className="space-y-1 bg-gray-950/45 border border-gray-800/80 rounded-lg p-2.5">
+                    <p className="text-[9px] text-gray-500 font-bold mb-1.5 uppercase tracking-wider">Password Requirements:</p>
+                    
+                    <div className="flex items-center gap-1.5 text-[10px] transition-colors">
+                      <span className={memberPassword ? (memberPassLength ? 'text-emerald-400 font-medium' : 'text-red-400') : 'text-gray-500'}>
+                        {memberPassword ? (memberPassLength ? '✓' : '✗') : '•'} At least 8 characters
+                      </span>
+                    </div>
+
+                    <div className="flex items-center gap-1.5 text-[10px] transition-colors">
+                      <span className={memberPassword ? (memberPassUpper ? 'text-emerald-400 font-medium' : 'text-red-400') : 'text-gray-500'}>
+                        {memberPassword ? (memberPassUpper ? '✓' : '✗') : '•'} Uppercase letter (A-Z)
+                      </span>
+                    </div>
+
+                    <div className="flex items-center gap-1.5 text-[10px] transition-colors">
+                      <span className={memberPassword ? (memberPassLower ? 'text-emerald-400 font-medium' : 'text-red-400') : 'text-gray-500'}>
+                        {memberPassword ? (memberPassLower ? '✓' : '✗') : '•'} Lowercase letter (a-z)
+                      </span>
+                    </div>
+
+                    <div className="flex items-center gap-1.5 text-[10px] transition-colors">
+                      <span className={memberPassword ? (memberPassNumber ? 'text-emerald-400 font-medium' : 'text-red-400') : 'text-gray-500'}>
+                        {memberPassword ? (memberPassNumber ? '✓' : '✗') : '•'} A number (0-9)
+                      </span>
+                    </div>
+
+                    <div className="flex items-center gap-1.5 text-[10px] transition-colors">
+                      <span className={memberPassword ? (memberPassSpecial ? 'text-emerald-400 font-medium' : 'text-red-400') : 'text-gray-500'}>
+                        {memberPassword ? (memberPassSpecial ? '✓' : '✗') : '•'} Special character (e.g. #, @, $, !, %, &, *)
+                      </span>
+                    </div>
+                  </div>
+                )}
 
                 {/* Event access */}
                 <div>
@@ -2210,7 +2274,7 @@ export default function DashboardPage() {
                 </div>
 
                 <div className="flex gap-2">
-                  <button onClick={addMember} disabled={memberSubmitting}
+                  <button onClick={addMember} disabled={memberSubmitting || !memberName || memberPhone.length !== 10 || !memberEmail || !isMemberPasswordStrong}
                     className="flex-1 bg-orange-500 hover:bg-orange-600 disabled:opacity-50 text-white text-sm font-medium py-2.5 rounded-lg">
                     {memberSubmitting ? 'Adding...' : `Add ${memberRole === 'collector' ? 'Sevak' : 'Khajindar'}`}
                   </button>
@@ -2685,8 +2749,9 @@ export default function DashboardPage() {
                   <input
                     type="tel"
                     value={editPhone}
-                    onChange={e => setEditPhone(e.target.value)}
+                    onChange={e => setEditPhone(e.target.value.replace(/[^0-9]/g, "").slice(0, 10))}
                     placeholder="Enter phone number"
+                    maxLength={10}
                     className="w-full bg-gray-950 border border-gray-800 rounded-lg px-3 py-2 text-xs text-white placeholder-gray-600 focus:outline-none focus:border-orange-500"
                   />
                 </div>
@@ -2756,7 +2821,7 @@ export default function DashboardPage() {
                 <button
                   type="button"
                   onClick={updateMember}
-                  disabled={editSubmitting || !editName.trim() || !editPhone.trim()}
+                  disabled={editSubmitting || !editName.trim() || editPhone.length !== 10}
                   className="px-4 py-2 bg-orange-500 hover:bg-orange-600 disabled:opacity-50 text-white rounded-lg text-xs font-semibold transition-colors cursor-pointer"
                 >
                   {editSubmitting ? 'Saving...' : 'Save Changes'}

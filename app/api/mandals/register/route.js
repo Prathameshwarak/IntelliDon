@@ -110,6 +110,23 @@ export async function POST(request) {
       )
     }
 
+    const cleanPhone = phone.replace(/[^0-9]/g, "")
+    const cleanAdminPhone = adminPhone.replace(/[^0-9]/g, "")
+
+    if (cleanPhone.length !== 10) {
+      return NextResponse.json(
+        { error: 'Mandal contact phone number must be a valid 10-digit number.' },
+        { status: 400 }
+      )
+    }
+
+    if (cleanAdminPhone.length !== 10) {
+      return NextResponse.json(
+        { error: 'Admin mobile number must be a valid 10-digit number.' },
+        { status: 400 }
+      )
+    }
+
     // ── Validate required documents ─────────────────────────
     const missingDocs = []
     for (const field of REQUIRED_DOCS) {

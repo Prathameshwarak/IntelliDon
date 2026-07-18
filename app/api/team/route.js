@@ -104,12 +104,26 @@ export async function POST(request) {
       return NextResponse.json({ error: 'All fields are required' }, { status: 400 })
     }
 
+    const cleanPhone = phone.replace(/[^0-9]/g, "")
+    if (cleanPhone.length !== 10) {
+      return NextResponse.json({ error: 'Phone number must be a valid 10-digit number' }, { status: 400 })
+    }
+
     if (!['collector', 'manager'].includes(role)) {
       return NextResponse.json({ error: 'Role must be collector or manager' }, { status: 400 })
     }
 
-    if (password.length < 8) {
-      return NextResponse.json({ error: 'Password must be at least 8 characters' }, { status: 400 })
+    const hasLength = password.length >= 8
+    const hasUpper = /[A-Z]/.test(password)
+    const hasLower = /[a-z]/.test(password)
+    const hasNumber = /[0-9]/.test(password)
+    const hasSpecial = /[^A-Za-z0-9]/.test(password)
+
+    if (!hasLength || !hasUpper || !hasLower || !hasNumber || !hasSpecial) {
+      return NextResponse.json(
+        { error: 'Password must be at least 8 characters and include uppercase, lowercase, numbers, and special characters.' },
+        { status: 400 }
+      )
     }
 
     const normalizedEmail = String(email).trim().toLowerCase()
@@ -258,6 +272,10 @@ export async function PATCH(request) {
     if (action === 'edit') {
       if (!full_name || !phone || !role) {
         return NextResponse.json({ error: 'full_name, phone, and role are required' }, { status: 400 })
+      }
+      const cleanPhone = phone.replace(/[^0-9]/g, "")
+      if (cleanPhone.length !== 10) {
+        return NextResponse.json({ error: 'Phone number must be a valid 10-digit number' }, { status: 400 })
       }
       if (!['collector', 'manager'].includes(role)) {
         return NextResponse.json({ error: 'Invalid role' }, { status: 400 })
