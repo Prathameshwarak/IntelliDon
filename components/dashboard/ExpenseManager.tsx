@@ -5,9 +5,10 @@ import { supabase } from '@/lib/supabase'
 
 type Expense = {
   id: string
-  description: string
+  expense_name: string
   amount: number
-  category: string | null
+  vendor_name: string | null
+  expense_date: string
   created_at: string
   added_by: string | null
   users?: { full_name: string } | null
@@ -60,6 +61,7 @@ export default function ExpenseManager({
   }, [eventId])
 
   async function fetchExpenses() {
+    if (!mandalId || !eventId) return
     setLoading(true)
     try {
       const headers = await getAuthHeaders()
@@ -92,10 +94,11 @@ export default function ExpenseManager({
         body: JSON.stringify({
           mandal_id: mandalId,
           event_id: eventId,
-          description: description.trim(),
+          expense_name: description.trim(),
+          vendor_name: category.trim() || null,
           amount: Number(amount),
-          category: category.trim() || null,
-          added_by: addedBy || null,
+          expense_date: new Date().toISOString().split('T')[0],
+          notes: 'Added via Expense Manager',
         }),
       })
       const data = await res.json()
@@ -219,10 +222,10 @@ export default function ExpenseManager({
                   className="flex items-center justify-between bg-gray-950/60 border border-gray-800 rounded-xl px-3 py-2.5"
                 >
                   <div className="min-w-0 flex-1">
-                    <p className="text-xs font-medium text-white truncate">{exp.description}</p>
+                    <p className="text-xs font-medium text-white truncate">{exp.expense_name}</p>
                     <p className="text-[10px] text-gray-500 mt-0.5">
-                      {exp.category && <span>{exp.category} · </span>}
-                      {formatDate(exp.created_at)}
+                      {exp.vendor_name && <span>{exp.vendor_name} · </span>}
+                      {formatDate(exp.expense_date || exp.created_at)}
                       {exp.users?.full_name && <span> · {exp.users.full_name}</span>}
                     </p>
                   </div>
