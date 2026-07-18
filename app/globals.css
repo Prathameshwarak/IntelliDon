@@ -172,3 +172,9 @@ body {
   animation: confetti-fall 3s linear forwards;
 }
 
+/* Disable browser-native password reveal/clear buttons to prevent duplicate eye icons */
+input::-ms-reveal,
+input::-ms-clear {
+  display: none;
+}
+
