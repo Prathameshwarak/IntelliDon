@@ -34,10 +34,10 @@ type Sponsor = {
   email: string | null
   address: string | null
   gst_no: string | null
-  sponsor_type: 'finance' | 'goods_service' | null
+  sponsor_type: string | null
   package: string | null
   committed_amount: number
-  contribution_type: 'cash' | 'goods'
+  contribution_type: 'cash' | 'goods' | 'service'
   contribution_date: string | null
   contribution_duration: string | null
   payment_method: string | null
@@ -61,7 +61,11 @@ type Props = {
 
 const SPONSOR_TYPES = [
   { value: 'finance', label: 'Finance' },
-  { value: 'goods_service', label: 'Goods/Service' }
+  { value: 'product_service', label: 'Product/Service' },
+  { value: 'media', label: 'Media' },
+  { value: 'venue', label: 'Venue' },
+  { value: 'food', label: 'Food' },
+  { value: 'other', label: 'Other' }
 ]
 const PACKAGES = [
   { value: 'title', label: 'Title' },
@@ -70,13 +74,10 @@ const PACKAGES = [
   { value: 'silver', label: 'Silver' },
   { value: 'supporting', label: 'Supporting' }
 ]
-// Finance sponsor contribution payment method (distinct from the
-// installment-recording payment method further down, which keeps
-// its broader list of options for actually receiving money later)
-const FINANCE_PAYMENT_METHODS = [
+const CONTRIBUTION_TYPES = [
   { value: 'cash', label: 'Cash' },
-  { value: 'upi', label: 'UPI' },
-  { value: 'cheque', label: 'Cheque' }
+  { value: 'goods', label: 'Goods' },
+  { value: 'service', label: 'Service' }
 ]
 const PAYMENT_METHODS = ['cash', 'upi', 'bank_transfer', 'cheque', 'goods', 'service', 'other']
 
@@ -100,24 +101,23 @@ function formatMoney(n: number) {
 const emptyForm = {
   event_id: '',
   company_name: '',
+  reference_name: '',
   contact_person_name: '',
   contact_person_phone: '',
   email: '',
   address: '',
   gst_no: '',
-  reference_name: '',       // moved: now appears after GST No. in the form
-  sponsor_type: '' as '' | 'finance' | 'goods_service',
+  sponsor_type: '',
   package: '',
-  // Finance-only fields
   committed_amount: '',
+  contribution_type: 'cash' as 'cash' | 'goods' | 'service',
   contribution_date: '',
+  contribution_duration: '',
   payment_method: '',
   transaction_id: '',
-  // Goods/Service-only fields
-  goods_service_description: '', // "Goods/Service Name"
-  quantity: '',
   estimated_value: '',
-  // Shared
+  quantity: '',
+  goods_service_description: '',
   notes: ''
 }
 
@@ -186,21 +186,23 @@ export default function SponsorshipSection({ mandalId, events, showToast }: Prop
     setForm({
       event_id: s.event_id,
       company_name: s.company_name,
+      reference_name: s.reference_name || '',
       contact_person_name: s.contact_person_name || '',
       contact_person_phone: s.contact_person_phone || '',
       email: s.email || '',
       address: s.address || '',
       gst_no: s.gst_no || '',
-      reference_name: s.reference_name || '',
-      sponsor_type: (s.sponsor_type as 'finance' | 'goods_service') || '',
+      sponsor_type: s.sponsor_type || '',
       package: s.package || '',
       committed_amount: s.committed_amount ? String(s.committed_amount) : '',
+      contribution_type: s.contribution_type || 'cash',
       contribution_date: s.contribution_date || '',
+      contribution_duration: s.contribution_duration || '',
       payment_method: s.payment_method || '',
       transaction_id: s.transaction_id || '',
-      goods_service_description: s.goods_service_description || '',
-      quantity: s.quantity ? String(s.quantity) : '',
       estimated_value: s.estimated_value ? String(s.estimated_value) : '',
+      quantity: s.quantity ? String(s.quantity) : '',
+      goods_service_description: s.goods_service_description || '',
       notes: s.notes || ''
     })
     setShowForm(true)
@@ -215,15 +217,7 @@ export default function SponsorshipSection({ mandalId, events, showToast }: Prop
     if (!form.company_name.trim()) { showToast('Sponsor Company/Business/Name is required', 'error'); return }
     if (form.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) { showToast('Enter a valid email', 'error'); return }
     if (form.contact_person_phone && !/^[0-9+\-\s()]{7,15}$/.test(form.contact_person_phone)) { showToast('Enter a valid phone number', 'error'); return }
-    if (form.sponsor_type === 'finance' && form.committed_amount && Number(form.committed_amount) < 0) {
-      showToast('Committed amount cannot be negative', 'error'); return
-    }
-    if (form.sponsor_type === 'goods_service' && form.quantity && Number(form.quantity) < 0) {
-      showToast('Quantity cannot be negative', 'error'); return
-    }
-    if (form.sponsor_type === 'goods_service' && form.estimated_value && Number(form.estimated_value) < 0) {
-      showToast('Estimated value cannot be negative', 'error'); return
-    }
+    if (form.committed_amount && Number(form.committed_amount) < 0) { showToast('Committed amount cannot be negative', 'error'); return }
 
     setSubmitting(true)
     const headers = await getAuthHeaders()
@@ -231,23 +225,23 @@ export default function SponsorshipSection({ mandalId, events, showToast }: Prop
       mandal_id: mandalId,
       event_id: form.event_id,
       company_name: form.company_name.trim(),
+      reference_name: form.reference_name.trim() || null,
       contact_person_name: form.contact_person_name.trim() || null,
       contact_person_phone: form.contact_person_phone.trim() || null,
       email: form.email.trim() || null,
       address: form.address.trim() || null,
       gst_no: form.gst_no.trim() || null,
-      reference_name: form.reference_name.trim() || null,
       sponsor_type: form.sponsor_type || null,
       package: form.package || null,
-      // Finance-only
-      committed_amount: form.sponsor_type === 'finance' && form.committed_amount ? Number(form.committed_amount) : 0,
-      contribution_date: form.sponsor_type === 'finance' ? (form.contribution_date || null) : null,
-      payment_method: form.sponsor_type === 'finance' ? (form.payment_method.trim() || null) : null,
-      transaction_id: form.sponsor_type === 'finance' ? (form.transaction_id.trim() || null) : null,
-      // Goods/Service-only
-      goods_service_description: form.sponsor_type === 'goods_service' ? (form.goods_service_description.trim() || null) : null,
-      quantity: form.sponsor_type === 'goods_service' && form.quantity ? Number(form.quantity) : null,
-      estimated_value: form.sponsor_type === 'goods_service' && form.estimated_value ? Number(form.estimated_value) : null,
+      committed_amount: form.committed_amount ? Number(form.committed_amount) : 0,
+      contribution_type: form.contribution_type,
+      contribution_date: form.contribution_date || null,
+      contribution_duration: form.contribution_duration.trim() || null,
+      payment_method: form.payment_method.trim() || null,
+      transaction_id: form.transaction_id.trim() || null,
+      estimated_value: form.estimated_value ? Number(form.estimated_value) : null,
+      quantity: form.quantity ? Number(form.quantity) : null,
+      goods_service_description: form.goods_service_description.trim() || null,
       notes: form.notes.trim() || null
     }
 
@@ -265,6 +259,16 @@ export default function SponsorshipSection({ mandalId, events, showToast }: Prop
     setSubmitting(false)
   }
 
+  async function deleteSponsor(id: string) {
+    if (!confirm('Delete this sponsor along with all recorded payments and promises? This cannot be undone.')) return
+    const headers = await getAuthHeaders()
+    const res = await fetch(`/api/sponsors/${id}`, { method: 'DELETE', headers })
+    const data = await res.json()
+    if (data.success) {
+      showToast('Sponsor deleted', 'success')
+      fetchSponsors()
+    } else showToast(data.error || 'Could not delete sponsor', 'error')
+  }
 
   function toggleExpand(s: Sponsor, panel: 'payments' | 'benefits') {
     if (expandedId === s.id && expandedPanel === panel) {
@@ -416,6 +420,8 @@ export default function SponsorshipSection({ mandalId, events, showToast }: Prop
           <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mt-1">Details</p>
           <input value={form.company_name} onChange={e => setField('company_name', e.target.value)} placeholder="Sponsor Company / Business / Name *"
             className="bg-gray-900 border border-gray-700 rounded-lg px-3 py-2.5 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-orange-500" />
+          <input value={form.reference_name} onChange={e => setField('reference_name', e.target.value)} placeholder="Sponsor reference name"
+            className="bg-gray-900 border border-gray-700 rounded-lg px-3 py-2.5 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-orange-500" />
           <div className="grid grid-cols-2 gap-2">
             <input value={form.contact_person_name} onChange={e => setField('contact_person_name', e.target.value)} placeholder="Contact person name"
               className="bg-gray-900 border border-gray-700 rounded-lg px-3 py-2.5 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-orange-500" />
@@ -428,14 +434,12 @@ export default function SponsorshipSection({ mandalId, events, showToast }: Prop
             className="bg-gray-900 border border-gray-700 rounded-lg px-3 py-2.5 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-orange-500" />
           <input value={form.gst_no} onChange={e => setField('gst_no', e.target.value)} placeholder="GST No. (optional)"
             className="bg-gray-900 border border-gray-700 rounded-lg px-3 py-2.5 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-orange-500" />
-          <input value={form.reference_name} onChange={e => setField('reference_name', e.target.value)} placeholder="Sponsor Reference Name (optional)"
-            className="bg-gray-900 border border-gray-700 rounded-lg px-3 py-2.5 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-orange-500" />
 
           {/* Type + Package */}
           <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mt-1">Sponsor Type</p>
-          <div className="grid grid-cols-2 gap-2">
+          <div className="grid grid-cols-3 gap-2">
             {SPONSOR_TYPES.map(t => (
-              <button key={t.value} type="button" onClick={() => setField('sponsor_type', form.sponsor_type === t.value ? '' : t.value as 'finance' | 'goods_service')}
+              <button key={t.value} type="button" onClick={() => setField('sponsor_type', form.sponsor_type === t.value ? '' : t.value)}
                 className={`py-2 rounded-lg text-xs font-medium border transition-colors
                   ${form.sponsor_type === t.value ? 'bg-orange-500 border-orange-500 text-white' : 'bg-gray-900 border-gray-700 text-gray-400'}`}>
                 {t.label}
@@ -454,54 +458,49 @@ export default function SponsorshipSection({ mandalId, events, showToast }: Prop
             ))}
           </div>
 
-          {/* Finance-only fields */}
-          {form.sponsor_type === 'finance' && (
-            <>
-              <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mt-1">Finance Details</p>
-              <div className="grid grid-cols-2 gap-2">
-                <input value={form.committed_amount} onChange={e => setField('committed_amount', e.target.value)} type="number" min="0" step="0.01"
-                  placeholder="Committed Amount (₹)"
-                  className="bg-gray-900 border border-gray-700 rounded-lg px-3 py-2.5 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-orange-500" />
-                <input value={form.contribution_date} onChange={e => setField('contribution_date', e.target.value)} type="date" placeholder="Date"
-                  className="bg-gray-900 border border-gray-700 rounded-lg px-3 py-2.5 text-sm text-white focus:outline-none focus:border-orange-500" style={{ colorScheme: 'dark' }} />
-              </div>
-              <div>
-                <label className="text-xs text-gray-400 mb-1 block">Payment Method</label>
-                <div className="grid grid-cols-3 gap-2">
-                  {FINANCE_PAYMENT_METHODS.map(m => (
-                    <button key={m.value} type="button" onClick={() => setField('payment_method', form.payment_method === m.value ? '' : m.value)}
-                      className={`py-2 rounded-lg text-xs font-medium border transition-colors
-                        ${form.payment_method === m.value ? 'bg-orange-500 border-orange-500 text-white' : 'bg-gray-900 border-gray-700 text-gray-400'}`}>
-                      {m.label}
-                    </button>
-                  ))}
-                </div>
-              </div>
-              <input value={form.transaction_id} onChange={e => setField('transaction_id', e.target.value)}
-                placeholder={form.payment_method === 'cheque' ? 'Cheque No.' : 'Transaction ID'}
-                className="bg-gray-900 border border-gray-700 rounded-lg px-3 py-2.5 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-orange-500" />
-            </>
-          )}
+          {/* Contribution */}
+          <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mt-1">Contribution Details</p>
+          <div className="grid grid-cols-3 gap-2">
+            {CONTRIBUTION_TYPES.map(c => (
+              <button key={c.value} type="button" onClick={() => setField('contribution_type', c.value as 'cash' | 'goods' | 'service')}
+                className={`py-2 rounded-lg text-xs font-medium border transition-colors
+                  ${form.contribution_type === c.value ? 'bg-orange-500 border-orange-500 text-white' : 'bg-gray-900 border-gray-700 text-gray-400'}`}>
+                {c.label}
+              </button>
+            ))}
+          </div>
+          <div className="grid grid-cols-2 gap-2">
+            <input value={form.committed_amount} onChange={e => setField('committed_amount', e.target.value)} type="number" min="0" step="0.01"
+              placeholder="Committed amount (₹)"
+              className="bg-gray-900 border border-gray-700 rounded-lg px-3 py-2.5 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-orange-500" />
+            <input value={form.contribution_date} onChange={e => setField('contribution_date', e.target.value)} type="date"
+              className="bg-gray-900 border border-gray-700 rounded-lg px-3 py-2.5 text-sm text-white focus:outline-none focus:border-orange-500" style={{ colorScheme: 'dark' }} />
+          </div>
+          <input value={form.contribution_duration} onChange={e => setField('contribution_duration', e.target.value)} placeholder="Contribution duration (e.g. entire event, 3 days)"
+            className="bg-gray-900 border border-gray-700 rounded-lg px-3 py-2.5 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-orange-500" />
+          <div className="grid grid-cols-2 gap-2">
+            <input value={form.payment_method} onChange={e => setField('payment_method', e.target.value)} placeholder="Payment method"
+              className="bg-gray-900 border border-gray-700 rounded-lg px-3 py-2.5 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-orange-500" />
+            <input value={form.transaction_id} onChange={e => setField('transaction_id', e.target.value)} placeholder="Transaction ID"
+              className="bg-gray-900 border border-gray-700 rounded-lg px-3 py-2.5 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-orange-500" />
+          </div>
 
-          {/* Goods/Service-only fields */}
-          {form.sponsor_type === 'goods_service' && (
+          {form.contribution_type !== 'cash' && (
             <>
               <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mt-1">Goods / Service Details</p>
-              <input value={form.goods_service_description} onChange={e => setField('goods_service_description', e.target.value)} placeholder="Goods/Service Name"
-                className="bg-gray-900 border border-gray-700 rounded-lg px-3 py-2.5 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-orange-500" />
               <div className="grid grid-cols-2 gap-2">
+                <input value={form.estimated_value} onChange={e => setField('estimated_value', e.target.value)} type="number" min="0" step="0.01" placeholder="Estimated value (₹)"
+                  className="bg-gray-900 border border-gray-700 rounded-lg px-3 py-2.5 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-orange-500" />
                 <input value={form.quantity} onChange={e => setField('quantity', e.target.value)} type="number" min="0" step="1" placeholder="Quantity"
                   className="bg-gray-900 border border-gray-700 rounded-lg px-3 py-2.5 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-orange-500" />
-                <input value={form.estimated_value} onChange={e => setField('estimated_value', e.target.value)} type="number" min="0" step="0.01" placeholder="Estimated Value (₹)"
-                  className="bg-gray-900 border border-gray-700 rounded-lg px-3 py-2.5 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-orange-500" />
               </div>
+              <textarea value={form.goods_service_description} onChange={e => setField('goods_service_description', e.target.value)} placeholder="Description of goods/service" rows={2}
+                className="bg-gray-900 border border-gray-700 rounded-lg px-3 py-2.5 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-orange-500 resize-none" />
             </>
           )}
 
-          {form.sponsor_type && (
-            <textarea value={form.notes} onChange={e => setField('notes', e.target.value)} placeholder="Notes (optional)" rows={2}
-              className="bg-gray-900 border border-gray-700 rounded-lg px-3 py-2.5 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-orange-500 resize-none" />
-          )}
+          <textarea value={form.notes} onChange={e => setField('notes', e.target.value)} placeholder="Notes (optional)" rows={2}
+            className="bg-gray-900 border border-gray-700 rounded-lg px-3 py-2.5 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-orange-500 resize-none" />
 
           <div className="flex gap-2">
             <button onClick={submitSponsorForm} disabled={submitting}
@@ -550,7 +549,7 @@ export default function SponsorshipSection({ mandalId, events, showToast }: Prop
                     </p>
                   )}
                 </div>
-                <div className="text-right shrink-0">
+                <div className="text-right flex-shrink-0">
                   <p className="text-sm font-semibold text-white">{formatMoney(s.committed_amount)}</p>
                   <p className="text-[11px] text-green-400">Received: {formatMoney(s.amount_received)}</p>
                   {s.amount_pending > 0 && <p className="text-[11px] text-orange-400">Due: {formatMoney(s.amount_pending)}</p>}
@@ -564,7 +563,8 @@ export default function SponsorshipSection({ mandalId, events, showToast }: Prop
                 <button onClick={() => toggleExpand(s, 'benefits')} className="text-xs text-purple-400 hover:text-purple-300 font-medium">
                   {expandedId === s.id && expandedPanel === 'benefits' ? 'Hide promises' : `Promises (${s.benefits.length})`}
                 </button>
-                <button onClick={() => startEdit(s)} className="text-xs text-gray-400 hover:text-white font-medium ml-auto">Edit</button>
+                <button onClick={() => startEdit(s)} className="text-xs text-gray-400 hover:text-white font-medium">Edit</button>
+                <button onClick={() => deleteSponsor(s.id)} className="text-xs text-red-400/70 hover:text-red-400 font-medium ml-auto">Delete</button>
               </div>
 
               {/* Payments panel */}
@@ -633,13 +633,13 @@ export default function SponsorshipSection({ mandalId, events, showToast }: Prop
                       </div>
                       <button
                         onClick={() => toggleDelivered(b)}
-                        className={`text-[11px] px-2 py-1 rounded-lg font-semibold shrink-0 ${
+                        className={`text-[11px] px-2 py-1 rounded-lg font-semibold flex-shrink-0 ${
                           b.delivered ? 'bg-green-900/50 text-green-400' : 'bg-gray-700 text-gray-300'
                         }`}
                       >
                         {b.delivered ? 'Delivered ✓' : 'Mark Delivered'}
                       </button>
-                      <button onClick={() => deleteBenefit(b.id)} className="text-[11px] text-red-400/70 hover:text-red-400 shrink-0">Remove</button>
+                      <button onClick={() => deleteBenefit(b.id)} className="text-[11px] text-red-400/70 hover:text-red-400 flex-shrink-0">Remove</button>
                     </div>
                   ))}
 
