@@ -119,8 +119,19 @@ export default function DashboardPage() {
   const [historySearch, setHistorySearch] = useState('')
   const [historyCollectorFilter, setHistoryCollectorFilter] = useState('all')
   const [historyTypeFilter, setHistoryTypeFilter] = useState('all')
+  const [historyRecordType, setHistoryRecordType] = useState<'donations' | 'sponsors'>('donations')
+  const [historySponsorEventFilter, setHistorySponsorEventFilter] = useState('all')
   //line added by pratham:
-  const [rankingSubTab, setRankingSubTab] = useState<'collectors' | 'donors'>('collectors')
+  const [rankingSubTab, setRankingSubTab] = useState<'collectors' | 'donors' | 'sponsors'>('collectors')
+  const [sponsorRankingList, setSponsorRankingList] = useState<Array<{
+    id: string; event_id: string; company_name: string; sponsor_type: string | null; package: string | null
+    contact_person_name: string | null; contact_person_phone: string | null; email: string | null
+    committed_amount: number; amount_received: number; amount_pending: number; payment_status: string
+    payment_method: string | null; transaction_id: string | null; contribution_date: string | null
+    estimated_value: number | null; quantity: number | null; goods_service_description: string | null
+    notes: string | null
+  }>>([])
+  const [sponsorRankingLoading, setSponsorRankingLoading] = useState(false)
   const [donationSubTab, setDonationSubTab] = useState<'support_fund' | 'sponsorship'>('support_fund')
   const [bulkVerifyModalCollector, setBulkVerifyModalCollector] = useState<CollectorGroup | null>(null)
 
@@ -264,6 +275,171 @@ export default function DashboardPage() {
           </table>
           <div class="footer">
             Generated via Intellidon Donation System. All values verified against official digital ledgers.
+          </div>
+          <script>
+            window.onload = function() {
+              window.print();
+            }
+          </script>
+        </body>
+      </html>
+    `)
+    printWindow.document.close()
+  }
+
+  // Sponsor CSV export (History tab)
+  type SponsorHistoryRow = typeof sponsorRankingList[number]
+  const handleExportSponsorCSV = (sponsorsToExport: SponsorHistoryRow[], filename = 'sponsor_history.csv') => {
+    const eventName = (eventId: string) => {
+      const ev = events.find(e => e.id === eventId)
+      return ev ? `${ev.name} ${ev.year}` : ''
+    }
+    const headers = [
+      'Company Name', 'Sponsor Type', 'Package', 'Event', 'Contact Person', 'Phone', 'Email',
+      'Committed Amount', 'Amount Received', 'Amount Pending', 'Payment Status',
+      'Payment Method', 'Transaction ID', 'Contribution Date',
+      'Goods/Service Name', 'Quantity', 'Estimated Value', 'Notes'
+    ]
+    const rows = sponsorsToExport.map(s => [
+      s.company_name,
+      s.sponsor_type === 'goods_service' ? 'Goods/Service' : 'Finance',
+      s.package || '',
+      eventName(s.event_id),
+      s.contact_person_name || '',
+      s.contact_person_phone || '',
+      s.email || '',
+      s.committed_amount,
+      s.amount_received,
+      s.amount_pending,
+      s.payment_status,
+      s.payment_method || '',
+      s.transaction_id || '',
+      s.contribution_date ? new Date(s.contribution_date).toLocaleDateString('en-IN') : '',
+      s.goods_service_description || '',
+      s.quantity ?? '',
+      s.estimated_value ?? '',
+      s.notes || ''
+    ])
+
+    const csvContent = [
+      headers.join(','),
+      ...rows.map(row => row.map(val => {
+        const strVal = String(val)
+        if (strVal.includes(',') || strVal.includes('"') || strVal.includes('\n')) {
+          return `"${strVal.replace(/"/g, '""')}"`
+        }
+        return strVal
+      }).join(','))
+    ].join('\n')
+
+    const blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8;' })
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.setAttribute('href', url)
+    link.setAttribute('download', filename)
+    link.style.visibility = 'hidden'
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+  }
+
+  // Sponsor PDF export (History tab)
+  const handleExportSponsorPDF = (sponsorsToExport: SponsorHistoryRow[], title = 'Sponsorship History Report') => {
+    const printWindow = window.open('', '_blank')
+    if (!printWindow) {
+      alert('Pop-up blocked. Please allow pop-ups for this site to download the PDF report.')
+      return
+    }
+
+    const eventName = (eventId: string) => {
+      const ev = events.find(e => e.id === eventId)
+      return ev ? `${ev.name} ${ev.year}` : '—'
+    }
+
+    const totalCommitted = sponsorsToExport.reduce((sum, s) => sum + Number(s.committed_amount || 0), 0)
+    const totalReceived = sponsorsToExport.reduce((sum, s) => sum + Number(s.amount_received || 0), 0)
+    const totalEstimatedGoods = sponsorsToExport
+      .filter(s => s.sponsor_type === 'goods_service')
+      .reduce((sum, s) => sum + Number(s.estimated_value || 0), 0)
+
+    const tableRows = sponsorsToExport.map(s => `
+      <tr>
+        <td>${s.company_name}</td>
+        <td class="capitalize">${s.sponsor_type === 'goods_service' ? 'Goods/Service' : 'Finance'}</td>
+        <td>${s.package || '—'}</td>
+        <td>${eventName(s.event_id)}</td>
+        <td>${s.contact_person_name || '—'}${s.contact_person_phone ? ' · ' + s.contact_person_phone : ''}</td>
+        <td>${s.sponsor_type === 'goods_service' ? `₹${Number(s.estimated_value || 0).toLocaleString('en-IN')} (est.)` : `₹${Number(s.committed_amount).toLocaleString('en-IN')}`}</td>
+        <td>₹${Number(s.amount_received).toLocaleString('en-IN')}</td>
+        <td class="status-${s.payment_status === 'completed' ? 'verified' : s.payment_status === 'pending' ? 'pending' : 'rejected'}">${s.payment_status.replace('_', ' ').toUpperCase()}</td>
+      </tr>
+    `).join('')
+
+    printWindow.document.write(`
+      <html>
+        <head>
+          <title>${title}</title>
+          <style>
+            body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; color: #1a1a1a; padding: 24px; margin: 0; }
+            .header { margin-bottom: 24px; border-bottom: 2px solid #e2e8f0; padding-bottom: 16px; }
+            .title { font-size: 24px; font-weight: bold; margin: 0; color: #e8650a; }
+            .mandal { font-size: 14px; color: #4a5568; margin-top: 4px; }
+            .summary { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-bottom: 24px; }
+            .summary-card { background: #f7fafc; border: 1px solid #edf2f7; padding: 12px; border-radius: 8px; }
+            .summary-label { font-size: 10px; color: #718096; text-transform: uppercase; letter-spacing: 0.05em; font-weight: 600; }
+            .summary-value { font-size: 18px; font-weight: bold; margin-top: 4px; color: #1a202c; }
+            table { width: 100%; border-collapse: collapse; text-align: left; font-size: 11px; margin-top: 12px; }
+            th { background: #edf2f7; color: #4a5568; font-weight: 600; padding: 10px; border-bottom: 1px solid #e2e8f0; }
+            td { padding: 10px; border-bottom: 1px solid #edf2f7; color: #2d3748; }
+            tr:nth-child(even) { background: #fcfcfc; }
+            .status-verified { color: #2f855a; font-weight: 600; }
+            .status-pending { color: #c05621; font-weight: 600; }
+            .status-rejected { color: #9b2c2c; font-weight: 600; }
+            .footer { margin-top: 40px; font-size: 10px; color: #a0aec0; text-align: center; border-top: 1px solid #edf2f7; padding-top: 12px; }
+            @media print {
+              body { padding: 0; }
+              .no-print { display: none; }
+            }
+          </style>
+        </head>
+        <body>
+          <div class="header">
+            <h1 class="title">${title}</h1>
+            <div class="mandal">${mandalName || 'Intellidon Mandal'} · Generated on ${new Date().toLocaleDateString('en-IN')}</div>
+          </div>
+          <div class="summary">
+            <div class="summary-card">
+              <div class="summary-label">Total Committed (Finance)</div>
+              <div class="summary-value">₹${totalCommitted.toLocaleString('en-IN')}</div>
+            </div>
+            <div class="summary-card">
+              <div class="summary-label">Total Received</div>
+              <div class="summary-value">₹${totalReceived.toLocaleString('en-IN')}</div>
+            </div>
+            <div class="summary-card">
+              <div class="summary-label">Est. Goods/Service Value</div>
+              <div class="summary-value">₹${totalEstimatedGoods.toLocaleString('en-IN')}</div>
+            </div>
+          </div>
+          <table>
+            <thead>
+              <tr>
+                <th>Company Name</th>
+                <th>Type</th>
+                <th>Package</th>
+                <th>Event</th>
+                <th>Contact</th>
+                <th>Committed / Est. Value</th>
+                <th>Received</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${tableRows}
+            </tbody>
+          </table>
+          <div class="footer">
+            Generated via Intellidon Donation System.
           </div>
           <script>
             window.onload = function() {
@@ -450,12 +626,15 @@ export default function DashboardPage() {
     if (tab === 'donations') { fetchDonations(); fetchEvents() }
     if (tab === 'events') fetchEvents()
     if (tab === 'team') { fetchTeam(); fetchEvents() }
+    if (tab === 'ranking') { fetchDonations(); fetchSponsorRanking() }
+    if (tab === 'history') { fetchDonations(); fetchEvents(); fetchSponsorRanking() }
   }, [tab, mandalId])
 
   // ── Donations ─────────────────────────────────────────────────
   async function fetchDonations() {
     setDonationsLoading(true)
-    const res = await fetch(`/api/donations?mandal_id=${mandalId}`)
+    const headers = await getAuthHeaders()
+    const res = await fetch(`/api/donations?mandal_id=${mandalId}`, { headers })
     const data = await res.json()
     if (!data.error) {
       setDonations(data.donations)
@@ -473,9 +652,10 @@ export default function DashboardPage() {
       return
     }
     setVerifyingId(donationId)
+    const headers = await getAuthHeaders()
     const res = await fetch('/api/donations/verify', {
       method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
+      headers,
       body: JSON.stringify({ donation_id: donationId, verified_by: userId, status: 'verified' })
     })
     const data = await res.json()
@@ -499,9 +679,10 @@ export default function DashboardPage() {
   async function rejectDonation(donationId: string, reason: string) {
     if (!CAN.verifyDonation(userRole)) return
     setSubmittingRejection(true)
+    const headers = await getAuthHeaders()
     const res = await fetch('/api/donations/verify', {
       method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
+      headers,
       body: JSON.stringify({
         donation_id: donationId,
         verified_by: userId,
@@ -542,9 +723,10 @@ export default function DashboardPage() {
     setBulkVerifyingCollector(collectorId)
     setBulkVerifyingMode(paymentMode)
 
+    const headers = await getAuthHeaders()
     const res = await fetch('/api/donations/verify', {
       method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
+      headers,
       body: JSON.stringify({
         collector_id: collectorId,
         payment_mode: paymentMode,
@@ -568,35 +750,49 @@ export default function DashboardPage() {
 
   // ── Events ────────────────────────────────────────────────────
   async function fetchEvents() {
-    const res = await fetch(`/api/events?mandal_id=${mandalId}`)
+    const headers = await getAuthHeaders()
+    const res = await fetch(`/api/events?mandal_id=${mandalId}`, { headers })
     const data = await res.json()
     if (!data.error) setEvents(data.events)
+  }
+
+  // Mandal-wide sponsor list for the Ranking tab's Sponsors leaderboard
+  // and the History tab's Sponsors export/filter view.
+  async function fetchSponsorRanking() {
+    if (!mandalId) return
+    setSponsorRankingLoading(true)
+    const headers = await getAuthHeaders()
+    const res = await fetch(`/api/sponsors?mandal_id=${mandalId}`, { headers })
+    const data = await res.json()
+    if (!data.error) setSponsorRankingList(data.sponsors)
+    setSponsorRankingLoading(false)
   }
 
   async function createEvent() {
     if (!CAN.createEvent(userRole)) return
     setDateError('')
-
+ 
     // Client-side validation — matches server rules
     if (!eventName.trim()) { showToast('Event name is required', 'error'); return }
     if (!eventUpiId.trim()) { showToast('UPI ID is required', 'error'); return }
     if (!eventStartDate) { showToast('Start date is required', 'error'); return }
     if (!eventEndDate) { showToast('End date is required', 'error'); return }
-
+ 
     const start = new Date(eventStartDate)
     const end = new Date(eventEndDate)
     const today = new Date(); today.setHours(0,0,0,0)
-
+ 
     if (end <= start) { setDateError('End date must be after start date'); return }
-
+ 
     const days = Math.round((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24))
     if (days > 50) { setDateError(`Duration is ${days} days — maximum is 50 days`); return }
     if (start < today) { setDateError('Start date cannot be in the past'); return }
-
+ 
     setEventSubmitting(true)
+    const headers = await getAuthHeaders()
     const res = await fetch('/api/events', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers,
       body: JSON.stringify({
         mandal_id: mandalId,
         name: eventName,
@@ -621,12 +817,13 @@ export default function DashboardPage() {
     } else showToast(data.error || 'Could not create event', 'error')
     setEventSubmitting(false)
   }
-
+ 
   async function toggleEvent(eventId: string, currentActive: boolean) {
     if (!CAN.toggleEvent(userRole)) return
+    const headers = await getAuthHeaders()
     const res = await fetch('/api/events', {
       method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
+      headers,
       body: JSON.stringify({ event_id: eventId, is_active: !currentActive })
     })
     const data = await res.json()
@@ -645,7 +842,7 @@ export default function DashboardPage() {
       showToast(data.error || 'Could not update event', 'error')
     }
   }
-
+ 
   function startEditingEvent(ev: Event) {
     setEditingEventId(ev.id)
     setEventName(ev.name)
@@ -656,7 +853,7 @@ export default function DashboardPage() {
     setDateError('')
     setShowEventForm(true)
   }
-
+ 
   function cancelEventForm() {
     setEditingEventId(null)
     setEventName('')
@@ -667,35 +864,36 @@ export default function DashboardPage() {
     setDateError('')
     setShowEventForm(false)
   }
-
+ 
   async function updateEvent() {
     if (!CAN.createEvent(userRole) || !editingEventId) return
     setDateError('')
-
+ 
     if (!eventName.trim()) { showToast('Event name is required', 'error'); return }
     if (!eventUpiId.trim()) { showToast('UPI ID is required', 'error'); return }
     if (!eventStartDate) { showToast('Start date is required', 'error'); return }
     if (!eventEndDate) { showToast('End date is required', 'error'); return }
-
+ 
     const start = new Date(eventStartDate)
     const end = new Date(eventEndDate)
-
+ 
     if (end <= start) { setDateError('End date must be after start date'); return }
-
+ 
     const days = Math.round((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24))
     if (days > 50) { setDateError(`Duration is ${days} days — maximum is 50 days`); return }
-
+ 
     const originalEvent = events.find(e => e.id === editingEventId)
     const today = new Date(); today.setHours(0,0,0,0)
     if (originalEvent && eventStartDate !== originalEvent.start_date && start < today) {
       setDateError('Start date cannot be in the past')
       return
     }
-
+ 
     setEventSubmitting(true)
+    const headers = await getAuthHeaders()
     const res = await fetch('/api/events', {
       method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
+      headers,
       body: JSON.stringify({
         event_id: editingEventId,
         name: eventName,
@@ -747,7 +945,21 @@ export default function DashboardPage() {
     if (!memberName || !memberPhone || !memberEmail || !memberPassword) {
       showToast('All fields required', 'error'); return
     }
-    if (memberPassword.length < 8) { showToast('Password must be at least 8 characters', 'error'); return }
+    const cleanPhone = memberPhone.replace(/[^0-9]/g, "")
+    if (cleanPhone.length !== 10) {
+      showToast('Please enter a valid 10-digit phone number', 'error')
+      return
+    }
+    const hasLength = memberPassword.length >= 8
+    const hasUpper = /[A-Z]/.test(memberPassword)
+    const hasLower = /[a-z]/.test(memberPassword)
+    const hasNumber = /[0-9]/.test(memberPassword)
+    const hasSpecial = /[^A-Za-z0-9]/.test(memberPassword)
+
+    if (!hasLength || !hasUpper || !hasLower || !hasNumber || !hasSpecial) {
+      showToast('Password does not meet complexity requirements', 'error')
+      return
+    }
     if (memberEventScope === 'specific' && memberEventIds.length === 0) {
       showToast('Select at least one event, or switch to "All events"', 'error'); return
     }
@@ -836,6 +1048,11 @@ export default function DashboardPage() {
     if (!editUser) return
     if (!editName || !editPhone || !editRole) {
       showToast('All fields required', 'error'); return
+    }
+    const cleanPhone = editPhone.replace(/[^0-9]/g, "")
+    if (cleanPhone.length !== 10) {
+      showToast('Please enter a valid 10-digit phone number', 'error')
+      return
     }
     if (editEventScope === 'specific' && editEventIds.length === 0) {
       showToast('Select at least one event, or switch to "All events"', 'error'); return
@@ -1094,6 +1311,13 @@ export default function DashboardPage() {
     return matchesSearch && matchesCollector && matchesType
   })
 
+  const filteredHistorySponsors = sponsorRankingList.filter(s => {
+    const query = historySearch.toLowerCase().trim()
+    const matchesSearch = !query || s.company_name.toLowerCase().includes(query)
+    const matchesEvent = historySponsorEventFilter === 'all' || s.event_id === historySponsorEventFilter
+    return matchesSearch && matchesEvent
+  })
+
   // Get distinct list of collectors who have collections
   const distinctCollectors: { id: string; name: string }[] = []
   nonSelfDonations.forEach(d => {
@@ -1105,13 +1329,21 @@ export default function DashboardPage() {
   })
   distinctCollectors.sort((a, b) => a.name.localeCompare(b.name))
 
-  // Password complexity check states
+  // Password complexity check states (for Reset Password)
   const passLength = tempPassword.length >= 8
   const passUpper = /[A-Z]/.test(tempPassword)
   const passLower = /[a-z]/.test(tempPassword)
   const passNumber = /[0-9]/.test(tempPassword)
   const passSpecial = /[^A-Za-z0-9]/.test(tempPassword)
   const isPasswordStrong = passLength && passUpper && passLower && passNumber && passSpecial
+
+  // Password complexity check states (for Add Member)
+  const memberPassLength = memberPassword.length >= 8
+  const memberPassUpper = /[A-Z]/.test(memberPassword)
+  const memberPassLower = /[a-z]/.test(memberPassword)
+  const memberPassNumber = /[0-9]/.test(memberPassword)
+  const memberPassSpecial = /[^A-Za-z0-9]/.test(memberPassword)
+  const isMemberPasswordStrong = memberPassLength && memberPassUpper && memberPassLower && memberPassNumber && memberPassSpecial
 
   // Available tabs depend on role
   const availableTabs: Tab[] = [
@@ -1126,8 +1358,9 @@ export default function DashboardPage() {
   ]
 
   // Handler called when admin dismisses the upgrade banner
-  function handleBannerContinue() {
+  async function handleBannerContinue() {
     setShowUpgradeBanner(false)
+    const headers = await getAuthHeaders()
     // Execute the pending action they tried before the banner appeared
     if (pendingVerifyId) {
       const id = pendingVerifyId
@@ -1136,7 +1369,7 @@ export default function DashboardPage() {
       setVerifyingId(id)
       fetch('/api/donations/verify', {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
+        headers,
         body: JSON.stringify({ donation_id: id, verified_by: userId, status: 'verified' })
       }).then(r => r.json()).then(data => {
         if (data.success) {
@@ -1159,7 +1392,7 @@ export default function DashboardPage() {
       setBulkVerifyingMode(mode)
       fetch('/api/donations/verify', {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
+        headers,
         body: JSON.stringify({ collector_id: id, payment_mode: mode, verified_by: userId })
       }).then(r => r.json()).then(data => {
         if (data.success) {
@@ -1663,14 +1896,14 @@ export default function DashboardPage() {
 
             {/* Sub-tab toggle */}
             <div className="flex gap-1 bg-gray-900 rounded-xl p-1 border border-gray-800 w-full sm:w-fit">
-              {(['collectors', 'donors'] as const).map(st => (
+              {(['collectors', 'donors', 'sponsors'] as const).map(st => (
                 <button
                   key={st}
                   onClick={() => setRankingSubTab(st)}
                   className={`flex-1 sm:flex-none px-3 sm:px-5 py-2 rounded-lg text-xs sm:text-sm font-medium capitalize transition-colors whitespace-nowrap
                     ${rankingSubTab === st ? 'bg-orange-500 text-white' : 'text-gray-400 hover:text-white'}`}
                 >
-                  {st === 'collectors' ? '👥 Collectors' : '🎗️ Donors'}
+                  {st === 'collectors' ? '👥 Collectors' : st === 'donors' ? '🎗️ Donors' : '🤝 Sponsors'}
                 </button>
               ))}
             </div>
@@ -1762,14 +1995,77 @@ export default function DashboardPage() {
               )
             )}
 
+            {/* ── Sponsor Ranking ── */}
+            {rankingSubTab === 'sponsors' && (
+              sponsorRankingLoading ? (
+                <p className="text-gray-400 text-sm text-center py-12">Loading ranking...</p>
+              ) : sponsorRankingList.length === 0 ? (
+                <div className="text-center py-12 bg-gray-900/30 border border-gray-800 rounded-xl">
+                  <p className="text-gray-500 text-sm">No sponsors added yet.</p>
+                </div>
+              ) : (
+                <div className="flex flex-col gap-3">
+                  <p className="text-xs text-gray-400 font-medium px-1 uppercase tracking-wider">
+                    Sponsors — by contribution value
+                  </p>
+                  {[...sponsorRankingList]
+                    .sort((a, b) => {
+                      const valueOf = (s: typeof a) => s.sponsor_type === 'goods_service' ? (s.estimated_value || 0) : s.committed_amount
+                      return valueOf(b) - valueOf(a)
+                    })
+                    .map((s, index) => {
+                      const rank = index + 1
+                      const medal = rank === 1 ? '🥇' : rank === 2 ? '🥈' : rank === 3 ? '🥉' : null
+                      const isGoods = s.sponsor_type === 'goods_service'
+                      const value = isGoods ? (s.estimated_value || 0) : s.committed_amount
+                      return (
+                        <div
+                          key={s.id}
+                          className={`bg-gray-900 border rounded-xl p-4 flex items-center gap-4
+                            ${rank === 1 ? 'border-yellow-500/40 shadow-lg' : 'border-gray-800'}`}
+                        >
+                          <div className={`w-10 h-10 flex-shrink-0 rounded-full flex items-center justify-center text-sm font-bold
+                            ${rank <= 3 ? 'bg-gray-800' : 'bg-gray-800 text-gray-400'}`}>
+                            {medal ? <span className="text-xl">{medal}</span> : <span>#{rank}</span>}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center justify-between gap-2 mb-1.5">
+                              <span className="text-sm font-semibold text-white truncate">{s.company_name}</span>
+                              <span className="text-sm font-bold text-white flex-shrink-0">{formatAmount(value)}</span>
+                            </div>
+                            <div className="flex gap-3 mt-1.5 text-[11px] text-gray-500">
+                              <span>{isGoods ? '📦 Goods/Service' : '💰 Finance'}</span>
+                              {!isGoods && <span>Received: {formatAmount(s.amount_received)}</span>}
+                            </div>
+                          </div>
+                        </div>
+                      )
+                    })}
+                </div>
+              )
+            )}
+
           </div>
         )}
-
-
-        {/* ── TAB: Collection History ── */}
         {tab === 'history' && (
           <div className="flex flex-col gap-4">
+
+            {/* Record type toggle */}
+            <div className="flex gap-1 bg-gray-900 rounded-xl p-1 border border-gray-800 w-full sm:w-fit">
+              {(['donations', 'sponsors'] as const).map(rt => (
+                <button
+                  key={rt}
+                  onClick={() => setHistoryRecordType(rt)}
+                  className={`flex-1 sm:flex-none px-3 sm:px-5 py-2 rounded-lg text-xs sm:text-sm font-medium capitalize transition-colors whitespace-nowrap
+                    ${historyRecordType === rt ? 'bg-orange-500 text-white' : 'text-gray-400 hover:text-white'}`}
+                >
+                  {rt === 'donations' ? '🎗️ Donations' : '🤝 Sponsors'}
+                </button>
+              ))}
+            </div>
             
+            {historyRecordType === 'donations' && (
+            <>
             {/* Search and Filters Bar */}
             <div className="bg-gray-900 border border-gray-800 rounded-xl p-4 flex flex-col gap-3 md:flex-row md:items-center">
               
@@ -1902,6 +2198,109 @@ export default function DashboardPage() {
                   </table>
                 </div>
               </div>
+            )}
+            </>
+            )}
+
+            {historyRecordType === 'sponsors' && (
+              <>
+                {/* Search and Event filter */}
+                <div className="bg-gray-900 border border-gray-800 rounded-xl p-4 flex flex-col gap-3 md:flex-row md:items-center">
+                  <div className="flex-1 relative">
+                    <input
+                      type="text"
+                      placeholder="Search by sponsor company name..."
+                      value={historySearch}
+                      onChange={e => setHistorySearch(e.target.value)}
+                      className="w-full bg-gray-950 border border-gray-800 rounded-lg pl-9 pr-3 py-2 text-xs text-white placeholder-gray-500 focus:outline-none focus:border-orange-500 transition-colors"
+                    />
+                    <span className="absolute left-3 top-2 text-gray-500 text-xs">🔍</span>
+                  </div>
+                  <select
+                    value={historySponsorEventFilter}
+                    onChange={e => setHistorySponsorEventFilter(e.target.value)}
+                    className="w-full md:w-auto bg-gray-950 border border-gray-800 rounded-lg px-3 py-2 text-xs text-gray-300 focus:outline-none focus:border-orange-500 transition-colors"
+                  >
+                    <option value="all" className="bg-gray-900 text-white">All Events</option>
+                    {events.map(ev => (
+                      <option key={ev.id} value={ev.id} className="bg-gray-900 text-white">{ev.name} {ev.year}</option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Export buttons */}
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => handleExportSponsorCSV(filteredHistorySponsors, `sponsor_history_${new Date().toISOString().slice(0, 10)}.csv`)}
+                    disabled={filteredHistorySponsors.length === 0}
+                    className="flex-1 sm:flex-initial sm:px-6 py-2 bg-gray-900 border border-gray-800 text-gray-300 font-semibold rounded-lg text-xs hover:bg-gray-850 hover:text-white transition-colors disabled:opacity-50"
+                  >
+                    📥 Export CSV
+                  </button>
+                  <button
+                    onClick={() => handleExportSponsorPDF(filteredHistorySponsors, 'Sponsorship History Report')}
+                    disabled={filteredHistorySponsors.length === 0}
+                    className="flex-1 sm:flex-initial sm:px-6 py-2 bg-gray-900 border border-gray-800 text-gray-300 font-semibold rounded-lg text-xs hover:bg-gray-850 hover:text-white transition-colors disabled:opacity-50"
+                  >
+                    📄 Export PDF
+                  </button>
+                </div>
+
+                {/* Sponsors Table */}
+                {sponsorRankingLoading ? (
+                  <p className="text-gray-400 text-sm text-center py-12">Loading sponsors...</p>
+                ) : filteredHistorySponsors.length === 0 ? (
+                  <div className="text-center py-12 bg-gray-900/30 border border-gray-800 rounded-xl">
+                    <p className="text-gray-500 text-sm">No sponsors match your filters.</p>
+                  </div>
+                ) : (
+                  <div className="bg-gray-900 border border-gray-800 rounded-xl overflow-hidden">
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-left text-xs">
+                        <thead>
+                          <tr className="border-b border-gray-800 bg-gray-950/40 text-gray-500 font-medium">
+                            <th className="p-3">Company</th>
+                            <th className="p-3">Type</th>
+                            <th className="p-3">Event</th>
+                            <th className="p-3">Contact</th>
+                            <th className="p-3">Committed / Est. Value</th>
+                            <th className="p-3">Received</th>
+                            <th className="p-3">Status</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-gray-800/50">
+                          {filteredHistorySponsors.map(s => {
+                            const ev = events.find(e => e.id === s.event_id)
+                            const isGoods = s.sponsor_type === 'goods_service'
+                            return (
+                              <tr key={s.id} className="hover:bg-gray-800/10 transition-colors">
+                                <td className="p-3 font-medium text-white">{s.company_name}</td>
+                                <td className="p-3 text-gray-400">{isGoods ? '📦 Goods/Service' : '💰 Finance'}</td>
+                                <td className="p-3 text-gray-400">{ev ? `${ev.name} ${ev.year}` : '—'}</td>
+                                <td className="p-3 text-gray-300">
+                                  {s.contact_person_name || '—'}{s.contact_person_phone ? ` · ${s.contact_person_phone}` : ''}
+                                </td>
+                                <td className="p-3 font-bold text-white">
+                                  {formatAmount(isGoods ? (s.estimated_value || 0) : s.committed_amount)}
+                                </td>
+                                <td className="p-3 text-gray-300">{formatAmount(s.amount_received)}</td>
+                                <td className="p-3">
+                                  <span className={`px-2 py-0.5 rounded-full font-semibold text-[10px] uppercase tracking-wide
+                                    ${s.payment_status === 'completed' ? 'bg-green-950 text-green-400 border border-green-900/20'
+                                    : s.payment_status === 'pending' ? 'bg-yellow-950 text-yellow-400 border border-yellow-900/20'
+                                    : 'bg-orange-950 text-orange-400 border border-orange-900/20'}`}>
+                                    {s.payment_status.replace('_', ' ')}
+                                  </span>
+                                </td>
+                              </tr>
+                            )
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                )}
+              </>
             )}
           </div>
         )}
@@ -2155,12 +2554,49 @@ export default function DashboardPage() {
                 </div>
                 <input value={memberName} onChange={e => setMemberName(e.target.value)} placeholder="Full name"
                   className="bg-gray-900 border border-gray-700 rounded-lg px-3 py-2.5 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-orange-500" />
-                <input value={memberPhone} onChange={e => setMemberPhone(e.target.value)} placeholder="Phone number" type="tel"
+                <input value={memberPhone} onChange={e => setMemberPhone(e.target.value.replace(/[^0-9]/g, "").slice(0, 10))} placeholder="Phone number (10 digits)" type="tel"
+                  maxLength={10}
                   className="bg-gray-900 border border-gray-700 rounded-lg px-3 py-2.5 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-orange-500" />
                 <input value={memberEmail} onChange={e => setMemberEmail(e.target.value)} placeholder="Email (used to login)" type="email"
                   className="bg-gray-900 border border-gray-700 rounded-lg px-3 py-2.5 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-orange-500" />
                 <input value={memberPassword} onChange={e => setMemberPassword(e.target.value)} placeholder="Password (min 8 characters)" type="password"
                   className="bg-gray-900 border border-gray-700 rounded-lg px-3 py-2.5 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-orange-500" />
+
+                {memberPassword && (
+                  <div className="space-y-1 bg-gray-950/45 border border-gray-800/80 rounded-lg p-2.5">
+                    <p className="text-[9px] text-gray-500 font-bold mb-1.5 uppercase tracking-wider">Password Requirements:</p>
+                    
+                    <div className="flex items-center gap-1.5 text-[10px] transition-colors">
+                      <span className={memberPassword ? (memberPassLength ? 'text-emerald-400 font-medium' : 'text-red-400') : 'text-gray-500'}>
+                        {memberPassword ? (memberPassLength ? '✓' : '✗') : '•'} At least 8 characters
+                      </span>
+                    </div>
+
+                    <div className="flex items-center gap-1.5 text-[10px] transition-colors">
+                      <span className={memberPassword ? (memberPassUpper ? 'text-emerald-400 font-medium' : 'text-red-400') : 'text-gray-500'}>
+                        {memberPassword ? (memberPassUpper ? '✓' : '✗') : '•'} Uppercase letter (A-Z)
+                      </span>
+                    </div>
+
+                    <div className="flex items-center gap-1.5 text-[10px] transition-colors">
+                      <span className={memberPassword ? (memberPassLower ? 'text-emerald-400 font-medium' : 'text-red-400') : 'text-gray-500'}>
+                        {memberPassword ? (memberPassLower ? '✓' : '✗') : '•'} Lowercase letter (a-z)
+                      </span>
+                    </div>
+
+                    <div className="flex items-center gap-1.5 text-[10px] transition-colors">
+                      <span className={memberPassword ? (memberPassNumber ? 'text-emerald-400 font-medium' : 'text-red-400') : 'text-gray-500'}>
+                        {memberPassword ? (memberPassNumber ? '✓' : '✗') : '•'} A number (0-9)
+                      </span>
+                    </div>
+
+                    <div className="flex items-center gap-1.5 text-[10px] transition-colors">
+                      <span className={memberPassword ? (memberPassSpecial ? 'text-emerald-400 font-medium' : 'text-red-400') : 'text-gray-500'}>
+                        {memberPassword ? (memberPassSpecial ? '✓' : '✗') : '•'} Special character (e.g. #, @, $, !, %, &, *)
+                      </span>
+                    </div>
+                  </div>
+                )}
 
                 {/* Event access */}
                 <div>
@@ -2201,7 +2637,7 @@ export default function DashboardPage() {
                 </div>
 
                 <div className="flex gap-2">
-                  <button onClick={addMember} disabled={memberSubmitting}
+                  <button onClick={addMember} disabled={memberSubmitting || !memberName || memberPhone.length !== 10 || !memberEmail || !isMemberPasswordStrong}
                     className="flex-1 bg-orange-500 hover:bg-orange-600 disabled:opacity-50 text-white text-sm font-medium py-2.5 rounded-lg">
                     {memberSubmitting ? 'Adding...' : `Add ${memberRole === 'collector' ? 'Sevak' : 'Khajindar'}`}
                   </button>
@@ -2676,8 +3112,9 @@ export default function DashboardPage() {
                   <input
                     type="tel"
                     value={editPhone}
-                    onChange={e => setEditPhone(e.target.value)}
+                    onChange={e => setEditPhone(e.target.value.replace(/[^0-9]/g, "").slice(0, 10))}
                     placeholder="Enter phone number"
+                    maxLength={10}
                     className="w-full bg-gray-950 border border-gray-800 rounded-lg px-3 py-2 text-xs text-white placeholder-gray-600 focus:outline-none focus:border-orange-500"
                   />
                 </div>
@@ -2747,7 +3184,7 @@ export default function DashboardPage() {
                 <button
                   type="button"
                   onClick={updateMember}
-                  disabled={editSubmitting || !editName.trim() || !editPhone.trim()}
+                  disabled={editSubmitting || !editName.trim() || editPhone.length !== 10}
                   className="px-4 py-2 bg-orange-500 hover:bg-orange-600 disabled:opacity-50 text-white rounded-lg text-xs font-semibold transition-colors cursor-pointer"
                 >
                   {editSubmitting ? 'Saving...' : 'Save Changes'}
