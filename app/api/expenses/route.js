@@ -6,7 +6,7 @@ const supabaseAdmin = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY
 )
 
-// Admin (Adhyaksha) and Manager (Khajindar) can manage expenses (#11).
+// Admin (Adhyaksha) and Manager (Khajindar) can manage expenses.
 // Collectors (Sevak) have no access to this endpoint.
 async function verifyCaller(request, mandalIdToCheck) {
   const authHeader = request.headers.get('Authorization')
@@ -41,28 +41,52 @@ async function verifyCaller(request, mandalIdToCheck) {
   return { caller: profile, callerId: user.id }
 }
 
-// Derive amount_paid / amount_pending / payment_status from payment rows.
-function withComputedTotals(expense, payments) {
-  const amountPaid = payments.reduce((sum, p) => sum + Number(p.amount), 0)
-  const amountPending = Math.max(0, Number(expense.amount) - amountPaid)
-  let paymentStatus = 'pending'
-  if (amountPaid > 0 && amountPending > 0) paymentStatus = 'partially_paid'
-  else if (amountPaid > 0 && amountPending <= 0) paymentStatus = 'completed'
+// ── Field validation (mirrors the DB-level CHECK constraints — this
+//    is the primary line of defense; the DB constraints are the backstop) ──
+const MAX_AMOUNT = 999999999 // 9 digits
 
-  return {
-    ...expense,
-    amount_paid: amountPaid,
-    amount_pending: amountPending,
-    payment_status: paymentStatus,
-    payments: payments.sort((a, b) => new Date(b.paid_at) - new Date(a.paid_at))
+function validateExpenseFields({ expense_date, vendor_name, vendor_phone, title, description, amount, transaction_id }) {
+  if (!expense_date || isNaN(new Date(expense_date).getTime())) {
+    return 'A valid expense date is required'
   }
+  if (!vendor_name || !vendor_name.trim()) {
+    return 'Vendor name is required'
+  }
+  if (vendor_name.trim().length > 50) {
+    return 'Vendor name must be 50 characters or fewer'
+  }
+  if (vendor_phone && !/^[0-9]{10}$/.test(vendor_phone.trim())) {
+    return 'Vendor phone must be exactly 10 digits'
+  }
+  if (!title || !title.trim()) {
+    return 'Title is required'
+  }
+  if (title.trim().length > 75) {
+    return 'Title must be 75 characters or fewer'
+  }
+  if (description && description.trim().length > 500) {
+    return 'Description must be 500 characters or fewer'
+  }
+  if (amount === undefined || amount === null || amount === '' || isNaN(amount) || Number(amount) <= 0) {
+    return 'Amount must be a positive number'
+  }
+  if (Number(amount) > MAX_AMOUNT) {
+    return 'Amount cannot exceed 9 digits'
+  }
+  if (transaction_id && transaction_id.trim()) {
+    if (transaction_id.trim().length > 25) return 'Transaction ID must be 25 characters or fewer'
+    if (!/^[A-Za-z0-9]+$/.test(transaction_id.trim())) return 'Transaction ID must be alphanumeric'
+  }
+  return null
 }
 
-// GET — list all expenses (+ their payments) for one event
+// GET — list expenses for an event, optionally filtered by date range
 export async function GET(request) {
   const { searchParams } = new URL(request.url)
   const event_id = searchParams.get('event_id')
   const mandal_id = searchParams.get('mandal_id')
+  const from_date = searchParams.get('from_date') // inclusive, YYYY-MM-DD
+  const to_date = searchParams.get('to_date')     // inclusive, YYYY-MM-DD
 
   if (!event_id || !mandal_id) {
     return NextResponse.json({ error: 'event_id and mandal_id are required' }, { status: 400 })
@@ -73,63 +97,60 @@ export async function GET(request) {
     return NextResponse.json({ error: authCheck.error }, { status: authCheck.status })
   }
 
-  const { data: expenses, error: expenseError } = await supabaseAdmin
+  let query = supabaseAdmin
     .from('event_expenses')
     .select('*')
     .eq('event_id', event_id)
     .eq('mandal_id', mandal_id)
-    .order('expense_date', { ascending: false })
+
+  if (from_date && !isNaN(new Date(from_date).getTime())) query = query.gte('expense_date', from_date)
+  if (to_date && !isNaN(new Date(to_date).getTime())) query = query.lte('expense_date', to_date)
+
+  const { data: expenses, error: expenseError } = await query.order('expense_date', { ascending: false })
 
   if (expenseError) {
     return NextResponse.json({ error: 'Could not fetch expenses' }, { status: 500 })
   }
 
   if (expenses.length === 0) {
-    return NextResponse.json({ expenses: [], summary: { total_amount: 0, total_paid: 0, total_pending: 0 } })
+    return NextResponse.json({ expenses: [], summary: { total_amount: 0, count: 0 } })
   }
 
-  const { data: payments, error: paymentsError } = await supabaseAdmin
-    .from('expense_payments')
-    .select('*')
-    .in('expense_id', expenses.map(e => e.id))
-
-  if (paymentsError) {
-    return NextResponse.json({ error: 'Could not fetch payments' }, { status: 500 })
+  // Resolve created_by / updated_by ids to display names in one batch query
+  const userIds = [...new Set(expenses.flatMap(e => [e.created_by, e.updated_by]).filter(Boolean))]
+  let namesById = {}
+  if (userIds.length > 0) {
+    const { data: creators } = await supabaseAdmin.from('users').select('id, full_name').in('id', userIds)
+    namesById = Object.fromEntries((creators || []).map(u => [u.id, u.full_name]))
   }
 
-  const paymentsByExpense = {}
-  for (const p of payments) {
-    if (!paymentsByExpense[p.expense_id]) paymentsByExpense[p.expense_id] = []
-    paymentsByExpense[p.expense_id].push(p)
+  const fullExpenses = expenses.map(e => ({
+    ...e,
+    created_by_name: e.created_by ? (namesById[e.created_by] || 'Unknown') : null,
+    updated_by_name: e.updated_by ? (namesById[e.updated_by] || 'Unknown') : null
+  }))
+
+  const summary = {
+    total_amount: fullExpenses.reduce((sum, e) => sum + Number(e.amount), 0),
+    count: fullExpenses.length
   }
-
-  const fullExpenses = expenses.map(e => withComputedTotals(e, paymentsByExpense[e.id] || []))
-
-  const summary = fullExpenses.reduce((acc, e) => ({
-    total_amount: acc.total_amount + Number(e.amount),
-    total_paid: acc.total_paid + e.amount_paid,
-    total_pending: acc.total_pending + e.amount_pending
-  }), { total_amount: 0, total_paid: 0, total_pending: 0 })
 
   return NextResponse.json({ expenses: fullExpenses, summary })
 }
 
-// POST — create a new expense line item for an event
+// POST — create a new (flat) expense
 export async function POST(request) {
   try {
     const body = await request.json()
-    const { mandal_id, event_id, expense_name, vendor_name, amount, expense_date, notes } = body
+    const { mandal_id, event_id, expense_date, vendor_name, vendor_phone, title, description, amount, transaction_id } = body
 
-    if (!mandal_id || !event_id || !expense_name || !amount || !expense_date) {
-      return NextResponse.json({ error: 'expense_name, amount and expense_date are required' }, { status: 400 })
+    if (!mandal_id || !event_id) {
+      return NextResponse.json({ error: 'mandal_id and event_id are required' }, { status: 400 })
     }
 
-    if (isNaN(amount) || Number(amount) <= 0) {
-      return NextResponse.json({ error: 'Amount must be a positive number' }, { status: 400 })
-    }
-
-    if (isNaN(new Date(expense_date).getTime())) {
-      return NextResponse.json({ error: 'Expense date is invalid' }, { status: 400 })
+    const validationError = validateExpenseFields({ expense_date, vendor_name, vendor_phone, title, description, amount, transaction_id })
+    if (validationError) {
+      return NextResponse.json({ error: validationError }, { status: 400 })
     }
 
     const authCheck = await verifyCaller(request, mandal_id)
@@ -137,7 +158,8 @@ export async function POST(request) {
       return NextResponse.json({ error: authCheck.error }, { status: authCheck.status })
     }
 
-    // Confirm the event actually belongs to this mandal
+    // Confirm the event actually belongs to this mandal (prevents IDOR
+    // via a crafted event_id from another organization)
     const { data: event, error: eventError } = await supabaseAdmin
       .from('events')
       .select('id')
@@ -154,11 +176,13 @@ export async function POST(request) {
       .insert({
         mandal_id,
         event_id,
-        expense_name: expense_name.trim(),
-        vendor_name: vendor_name?.trim() || null,
-        amount: Number(amount),
         expense_date,
-        notes: notes?.trim() || null,
+        vendor_name: vendor_name.trim(),
+        vendor_phone: vendor_phone?.trim() || null,
+        title: title.trim(),
+        description: description?.trim() || null,
+        amount: Number(amount),
+        transaction_id: transaction_id?.trim() || null,
         created_by: authCheck.callerId,
         updated_by: authCheck.callerId
       })
@@ -169,7 +193,7 @@ export async function POST(request) {
       return NextResponse.json({ error: 'Could not create expense' }, { status: 500 })
     }
 
-    return NextResponse.json({ success: true, expense: withComputedTotals(expense, []) })
+    return NextResponse.json({ success: true, expense })
   } catch (err) {
     return NextResponse.json({ error: 'Something went wrong' }, { status: 500 })
   }
