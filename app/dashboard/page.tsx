@@ -119,8 +119,19 @@ export default function DashboardPage() {
   const [historySearch, setHistorySearch] = useState('')
   const [historyCollectorFilter, setHistoryCollectorFilter] = useState('all')
   const [historyTypeFilter, setHistoryTypeFilter] = useState('all')
+  const [historyRecordType, setHistoryRecordType] = useState<'donations' | 'sponsors'>('donations')
+  const [historySponsorEventFilter, setHistorySponsorEventFilter] = useState('all')
   //line added by pratham:
-  const [rankingSubTab, setRankingSubTab] = useState<'collectors' | 'donors'>('collectors')
+  const [rankingSubTab, setRankingSubTab] = useState<'collectors' | 'donors' | 'sponsors'>('collectors')
+  const [sponsorRankingList, setSponsorRankingList] = useState<Array<{
+    id: string; event_id: string; company_name: string; sponsor_type: string | null; package: string | null
+    contact_person_name: string | null; contact_person_phone: string | null; email: string | null
+    committed_amount: number; amount_received: number; amount_pending: number; payment_status: string
+    payment_method: string | null; transaction_id: string | null; contribution_date: string | null
+    estimated_value: number | null; quantity: number | null; goods_service_description: string | null
+    notes: string | null
+  }>>([])
+  const [sponsorRankingLoading, setSponsorRankingLoading] = useState(false)
   const [donationSubTab, setDonationSubTab] = useState<'support_fund' | 'sponsorship'>('support_fund')
   const [bulkVerifyModalCollector, setBulkVerifyModalCollector] = useState<CollectorGroup | null>(null)
 
@@ -264,6 +275,171 @@ export default function DashboardPage() {
           </table>
           <div class="footer">
             Generated via Intellidon Donation System. All values verified against official digital ledgers.
+          </div>
+          <script>
+            window.onload = function() {
+              window.print();
+            }
+          </script>
+        </body>
+      </html>
+    `)
+    printWindow.document.close()
+  }
+
+  // Sponsor CSV export (History tab)
+  type SponsorHistoryRow = typeof sponsorRankingList[number]
+  const handleExportSponsorCSV = (sponsorsToExport: SponsorHistoryRow[], filename = 'sponsor_history.csv') => {
+    const eventName = (eventId: string) => {
+      const ev = events.find(e => e.id === eventId)
+      return ev ? `${ev.name} ${ev.year}` : ''
+    }
+    const headers = [
+      'Company Name', 'Sponsor Type', 'Package', 'Event', 'Contact Person', 'Phone', 'Email',
+      'Committed Amount', 'Amount Received', 'Amount Pending', 'Payment Status',
+      'Payment Method', 'Transaction ID', 'Contribution Date',
+      'Goods/Service Name', 'Quantity', 'Estimated Value', 'Notes'
+    ]
+    const rows = sponsorsToExport.map(s => [
+      s.company_name,
+      s.sponsor_type === 'goods_service' ? 'Goods/Service' : 'Finance',
+      s.package || '',
+      eventName(s.event_id),
+      s.contact_person_name || '',
+      s.contact_person_phone || '',
+      s.email || '',
+      s.committed_amount,
+      s.amount_received,
+      s.amount_pending,
+      s.payment_status,
+      s.payment_method || '',
+      s.transaction_id || '',
+      s.contribution_date ? new Date(s.contribution_date).toLocaleDateString('en-IN') : '',
+      s.goods_service_description || '',
+      s.quantity ?? '',
+      s.estimated_value ?? '',
+      s.notes || ''
+    ])
+
+    const csvContent = [
+      headers.join(','),
+      ...rows.map(row => row.map(val => {
+        const strVal = String(val)
+        if (strVal.includes(',') || strVal.includes('"') || strVal.includes('\n')) {
+          return `"${strVal.replace(/"/g, '""')}"`
+        }
+        return strVal
+      }).join(','))
+    ].join('\n')
+
+    const blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8;' })
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.setAttribute('href', url)
+    link.setAttribute('download', filename)
+    link.style.visibility = 'hidden'
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+  }
+
+  // Sponsor PDF export (History tab)
+  const handleExportSponsorPDF = (sponsorsToExport: SponsorHistoryRow[], title = 'Sponsorship History Report') => {
+    const printWindow = window.open('', '_blank')
+    if (!printWindow) {
+      alert('Pop-up blocked. Please allow pop-ups for this site to download the PDF report.')
+      return
+    }
+
+    const eventName = (eventId: string) => {
+      const ev = events.find(e => e.id === eventId)
+      return ev ? `${ev.name} ${ev.year}` : '—'
+    }
+
+    const totalCommitted = sponsorsToExport.reduce((sum, s) => sum + Number(s.committed_amount || 0), 0)
+    const totalReceived = sponsorsToExport.reduce((sum, s) => sum + Number(s.amount_received || 0), 0)
+    const totalEstimatedGoods = sponsorsToExport
+      .filter(s => s.sponsor_type === 'goods_service')
+      .reduce((sum, s) => sum + Number(s.estimated_value || 0), 0)
+
+    const tableRows = sponsorsToExport.map(s => `
+      <tr>
+        <td>${s.company_name}</td>
+        <td class="capitalize">${s.sponsor_type === 'goods_service' ? 'Goods/Service' : 'Finance'}</td>
+        <td>${s.package || '—'}</td>
+        <td>${eventName(s.event_id)}</td>
+        <td>${s.contact_person_name || '—'}${s.contact_person_phone ? ' · ' + s.contact_person_phone : ''}</td>
+        <td>${s.sponsor_type === 'goods_service' ? `₹${Number(s.estimated_value || 0).toLocaleString('en-IN')} (est.)` : `₹${Number(s.committed_amount).toLocaleString('en-IN')}`}</td>
+        <td>₹${Number(s.amount_received).toLocaleString('en-IN')}</td>
+        <td class="status-${s.payment_status === 'completed' ? 'verified' : s.payment_status === 'pending' ? 'pending' : 'rejected'}">${s.payment_status.replace('_', ' ').toUpperCase()}</td>
+      </tr>
+    `).join('')
+
+    printWindow.document.write(`
+      <html>
+        <head>
+          <title>${title}</title>
+          <style>
+            body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; color: #1a1a1a; padding: 24px; margin: 0; }
+            .header { margin-bottom: 24px; border-bottom: 2px solid #e2e8f0; padding-bottom: 16px; }
+            .title { font-size: 24px; font-weight: bold; margin: 0; color: #e8650a; }
+            .mandal { font-size: 14px; color: #4a5568; margin-top: 4px; }
+            .summary { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-bottom: 24px; }
+            .summary-card { background: #f7fafc; border: 1px solid #edf2f7; padding: 12px; border-radius: 8px; }
+            .summary-label { font-size: 10px; color: #718096; text-transform: uppercase; letter-spacing: 0.05em; font-weight: 600; }
+            .summary-value { font-size: 18px; font-weight: bold; margin-top: 4px; color: #1a202c; }
+            table { width: 100%; border-collapse: collapse; text-align: left; font-size: 11px; margin-top: 12px; }
+            th { background: #edf2f7; color: #4a5568; font-weight: 600; padding: 10px; border-bottom: 1px solid #e2e8f0; }
+            td { padding: 10px; border-bottom: 1px solid #edf2f7; color: #2d3748; }
+            tr:nth-child(even) { background: #fcfcfc; }
+            .status-verified { color: #2f855a; font-weight: 600; }
+            .status-pending { color: #c05621; font-weight: 600; }
+            .status-rejected { color: #9b2c2c; font-weight: 600; }
+            .footer { margin-top: 40px; font-size: 10px; color: #a0aec0; text-align: center; border-top: 1px solid #edf2f7; padding-top: 12px; }
+            @media print {
+              body { padding: 0; }
+              .no-print { display: none; }
+            }
+          </style>
+        </head>
+        <body>
+          <div class="header">
+            <h1 class="title">${title}</h1>
+            <div class="mandal">${mandalName || 'Intellidon Mandal'} · Generated on ${new Date().toLocaleDateString('en-IN')}</div>
+          </div>
+          <div class="summary">
+            <div class="summary-card">
+              <div class="summary-label">Total Committed (Finance)</div>
+              <div class="summary-value">₹${totalCommitted.toLocaleString('en-IN')}</div>
+            </div>
+            <div class="summary-card">
+              <div class="summary-label">Total Received</div>
+              <div class="summary-value">₹${totalReceived.toLocaleString('en-IN')}</div>
+            </div>
+            <div class="summary-card">
+              <div class="summary-label">Est. Goods/Service Value</div>
+              <div class="summary-value">₹${totalEstimatedGoods.toLocaleString('en-IN')}</div>
+            </div>
+          </div>
+          <table>
+            <thead>
+              <tr>
+                <th>Company Name</th>
+                <th>Type</th>
+                <th>Package</th>
+                <th>Event</th>
+                <th>Contact</th>
+                <th>Committed / Est. Value</th>
+                <th>Received</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${tableRows}
+            </tbody>
+          </table>
+          <div class="footer">
+            Generated via Intellidon Donation System.
           </div>
           <script>
             window.onload = function() {
@@ -450,6 +626,8 @@ export default function DashboardPage() {
     if (tab === 'donations') { fetchDonations(); fetchEvents() }
     if (tab === 'events') fetchEvents()
     if (tab === 'team') { fetchTeam(); fetchEvents() }
+    if (tab === 'ranking') { fetchDonations(); fetchSponsorRanking() }
+    if (tab === 'history') { fetchDonations(); fetchEvents(); fetchSponsorRanking() }
   }, [tab, mandalId])
 
   // ── Donations ─────────────────────────────────────────────────
@@ -576,6 +754,18 @@ export default function DashboardPage() {
     const res = await fetch(`/api/events?mandal_id=${mandalId}`, { headers })
     const data = await res.json()
     if (!data.error) setEvents(data.events)
+  }
+
+  // Mandal-wide sponsor list for the Ranking tab's Sponsors leaderboard
+  // and the History tab's Sponsors export/filter view.
+  async function fetchSponsorRanking() {
+    if (!mandalId) return
+    setSponsorRankingLoading(true)
+    const headers = await getAuthHeaders()
+    const res = await fetch(`/api/sponsors?mandal_id=${mandalId}`, { headers })
+    const data = await res.json()
+    if (!data.error) setSponsorRankingList(data.sponsors)
+    setSponsorRankingLoading(false)
   }
 
   async function createEvent() {
@@ -1121,6 +1311,13 @@ export default function DashboardPage() {
     return matchesSearch && matchesCollector && matchesType
   })
 
+  const filteredHistorySponsors = sponsorRankingList.filter(s => {
+    const query = historySearch.toLowerCase().trim()
+    const matchesSearch = !query || s.company_name.toLowerCase().includes(query)
+    const matchesEvent = historySponsorEventFilter === 'all' || s.event_id === historySponsorEventFilter
+    return matchesSearch && matchesEvent
+  })
+
   // Get distinct list of collectors who have collections
   const distinctCollectors: { id: string; name: string }[] = []
   nonSelfDonations.forEach(d => {
@@ -1335,7 +1532,7 @@ export default function DashboardPage() {
 
       {/* Toast */}
       {toast && (
-        <div className={`fixed top-4 right-4 z-[100] px-4 py-3 rounded-lg text-sm font-medium shadow-xl
+        <div className={`fixed top-4 right-4 z-100 px-4 py-3 rounded-lg text-sm font-medium shadow-xl
           ${toast.type === 'success' ? 'bg-green-600' : 'bg-red-600'} text-white`}>
           {toast.msg}
         </div>
@@ -1368,7 +1565,7 @@ export default function DashboardPage() {
       <div className="bg-gray-900 border-b border-gray-800 px-3 sm:px-6 py-3 sm:py-4 flex flex-wrap items-center justify-between gap-2">
         <div className="min-w-0">
           <p className="text-xs text-gray-400">Intellidon</p>
-          <p className="text-sm sm:text-base font-semibold truncate max-w-[160px] sm:max-w-none">{mandalName}</p>
+          <p className="text-sm sm:text-base font-semibold truncate max-w-40 sm:max-w-none">{mandalName}</p>
         </div>
         <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
           <span className={`text-[10px] sm:text-xs font-medium px-2 sm:px-2.5 py-1 rounded-full capitalize
@@ -1425,7 +1622,7 @@ export default function DashboardPage() {
           </div>
           <button
             onClick={() => router.push('/dashboard/subscription')}
-            className={`flex-shrink-0 font-semibold px-3 py-1.5 rounded-lg transition-colors
+            className={`shrink-0 font-semibold px-3 py-1.5 rounded-lg transition-colors
               ${sub.isExpired
                 ? 'bg-red-600 hover:bg-red-500 text-white'
                 : sub.daysRemaining <= 7
@@ -1481,7 +1678,7 @@ export default function DashboardPage() {
             <button
               key={t}
               onClick={() => setTab(t)}
-              className={`px-3 sm:px-5 py-2 rounded-lg text-xs sm:text-sm font-medium capitalize transition-colors whitespace-nowrap flex-shrink-0
+              className={`px-3 sm:px-5 py-2 rounded-lg text-xs sm:text-sm font-medium capitalize transition-colors whitespace-nowrap shrink-0
                 ${tab === t ? 'bg-orange-500 text-white' : 'text-gray-400 hover:text-white'}`}
             >
               {t}
@@ -1699,14 +1896,14 @@ export default function DashboardPage() {
 
             {/* Sub-tab toggle */}
             <div className="flex gap-1 bg-gray-900 rounded-xl p-1 border border-gray-800 w-full sm:w-fit">
-              {(['collectors', 'donors'] as const).map(st => (
+              {(['collectors', 'donors', 'sponsors'] as const).map(st => (
                 <button
                   key={st}
                   onClick={() => setRankingSubTab(st)}
                   className={`flex-1 sm:flex-none px-3 sm:px-5 py-2 rounded-lg text-xs sm:text-sm font-medium capitalize transition-colors whitespace-nowrap
                     ${rankingSubTab === st ? 'bg-orange-500 text-white' : 'text-gray-400 hover:text-white'}`}
                 >
-                  {st === 'collectors' ? '👥 Collectors' : '🎗️ Donors'}
+                  {st === 'collectors' ? '👥 Collectors' : st === 'donors' ? '🎗️ Donors' : '🤝 Sponsors'}
                 </button>
               ))}
             </div>
@@ -1733,14 +1930,14 @@ export default function DashboardPage() {
                         className={`bg-gray-900 border rounded-xl p-4 flex items-center gap-4
                           ${rank === 1 ? 'border-yellow-500/40 shadow-lg' : 'border-gray-800'}`}
                       >
-                        <div className={`w-10 h-10 flex-shrink-0 rounded-full flex items-center justify-center text-sm font-bold
+                        <div className={`w-10 h-10 shrink-0 rounded-full flex items-center justify-center text-sm font-bold
                           ${rank <= 3 ? 'bg-gray-800' : 'bg-gray-800 text-gray-400'}`}>
                           {medal ? <span className="text-xl">{medal}</span> : <span>#{rank}</span>}
                         </div>
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center justify-between gap-2 mb-1.5">
                             <span className="text-sm font-semibold text-white truncate">{c.name}</span>
-                            <span className="text-sm font-bold text-white flex-shrink-0">{formatAmount(c.totalAmount)}</span>
+                            <span className="text-sm font-bold text-white shrink-0">{formatAmount(c.totalAmount)}</span>
                           </div>
                           <div className="flex gap-3 mt-1.5 text-[11px] text-gray-500">
                             <span>💵 Cash: {formatAmount(c.totalCash)}</span>
@@ -1777,14 +1974,14 @@ export default function DashboardPage() {
                         className={`bg-gray-900 border rounded-xl p-4 flex items-center gap-4
                           ${rank === 1 ? 'border-yellow-500/40 shadow-lg' : 'border-gray-800'}`}
                       >
-                        <div className={`w-10 h-10 flex-shrink-0 rounded-full flex items-center justify-center text-sm font-bold
+                        <div className={`w-10 h-10 shrink-0 rounded-full flex items-center justify-center text-sm font-bold
                           ${rank <= 3 ? 'bg-gray-800' : 'bg-gray-800 text-gray-400'}`}>
                           {medal ? <span className="text-xl">{medal}</span> : <span>#{rank}</span>}
                         </div>
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center justify-between gap-2 mb-1.5">
                             <span className="text-sm font-semibold text-white truncate">{d.name}</span>
-                            <span className="text-sm font-bold text-white flex-shrink-0">{formatAmount(d.totalAmount)}</span>
+                            <span className="text-sm font-bold text-white shrink-0">{formatAmount(d.totalAmount)}</span>
                           </div>
                           <div className="flex gap-3 mt-1.5 text-[11px] text-gray-500">
                             <span>{d.phone}</span>
@@ -1798,14 +1995,77 @@ export default function DashboardPage() {
               )
             )}
 
+            {/* ── Sponsor Ranking ── */}
+            {rankingSubTab === 'sponsors' && (
+              sponsorRankingLoading ? (
+                <p className="text-gray-400 text-sm text-center py-12">Loading ranking...</p>
+              ) : sponsorRankingList.length === 0 ? (
+                <div className="text-center py-12 bg-gray-900/30 border border-gray-800 rounded-xl">
+                  <p className="text-gray-500 text-sm">No sponsors added yet.</p>
+                </div>
+              ) : (
+                <div className="flex flex-col gap-3">
+                  <p className="text-xs text-gray-400 font-medium px-1 uppercase tracking-wider">
+                    Sponsors — by contribution value
+                  </p>
+                  {[...sponsorRankingList]
+                    .sort((a, b) => {
+                      const valueOf = (s: typeof a) => s.sponsor_type === 'goods_service' ? (s.estimated_value || 0) : s.committed_amount
+                      return valueOf(b) - valueOf(a)
+                    })
+                    .map((s, index) => {
+                      const rank = index + 1
+                      const medal = rank === 1 ? '🥇' : rank === 2 ? '🥈' : rank === 3 ? '🥉' : null
+                      const isGoods = s.sponsor_type === 'goods_service'
+                      const value = isGoods ? (s.estimated_value || 0) : s.committed_amount
+                      return (
+                        <div
+                          key={s.id}
+                          className={`bg-gray-900 border rounded-xl p-4 flex items-center gap-4
+                            ${rank === 1 ? 'border-yellow-500/40 shadow-lg' : 'border-gray-800'}`}
+                        >
+                          <div className={`w-10 h-10 shrink-0 rounded-full flex items-center justify-center text-sm font-bold
+                            ${rank <= 3 ? 'bg-gray-800' : 'bg-gray-800 text-gray-400'}`}>
+                            {medal ? <span className="text-xl">{medal}</span> : <span>#{rank}</span>}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center justify-between gap-2 mb-1.5">
+                              <span className="text-sm font-semibold text-white truncate">{s.company_name}</span>
+                              <span className="text-sm font-bold text-white shrink-0">{formatAmount(value)}</span>
+                            </div>
+                            <div className="flex gap-3 mt-1.5 text-[11px] text-gray-500">
+                              <span>{isGoods ? '📦 Goods/Service' : '💰 Finance'}</span>
+                              {!isGoods && <span>Received: {formatAmount(s.amount_received)}</span>}
+                            </div>
+                          </div>
+                        </div>
+                      )
+                    })}
+                </div>
+              )
+            )}
+
           </div>
         )}
-
-
-        {/* ── TAB: Collection History ── */}
         {tab === 'history' && (
           <div className="flex flex-col gap-4">
+
+            {/* Record type toggle */}
+            <div className="flex gap-1 bg-gray-900 rounded-xl p-1 border border-gray-800 w-full sm:w-fit">
+              {(['donations', 'sponsors'] as const).map(rt => (
+                <button
+                  key={rt}
+                  onClick={() => setHistoryRecordType(rt)}
+                  className={`flex-1 sm:flex-none px-3 sm:px-5 py-2 rounded-lg text-xs sm:text-sm font-medium capitalize transition-colors whitespace-nowrap
+                    ${historyRecordType === rt ? 'bg-orange-500 text-white' : 'text-gray-400 hover:text-white'}`}
+                >
+                  {rt === 'donations' ? '🎗️ Donations' : '🤝 Sponsors'}
+                </button>
+              ))}
+            </div>
             
+            {historyRecordType === 'donations' && (
+            <>
             {/* Search and Filters Bar */}
             <div className="bg-gray-900 border border-gray-800 rounded-xl p-4 flex flex-col gap-3 md:flex-row md:items-center">
               
@@ -1938,6 +2198,109 @@ export default function DashboardPage() {
                   </table>
                 </div>
               </div>
+            )}
+            </>
+            )}
+
+            {historyRecordType === 'sponsors' && (
+              <>
+                {/* Search and Event filter */}
+                <div className="bg-gray-900 border border-gray-800 rounded-xl p-4 flex flex-col gap-3 md:flex-row md:items-center">
+                  <div className="flex-1 relative">
+                    <input
+                      type="text"
+                      placeholder="Search by sponsor company name..."
+                      value={historySearch}
+                      onChange={e => setHistorySearch(e.target.value)}
+                      className="w-full bg-gray-950 border border-gray-800 rounded-lg pl-9 pr-3 py-2 text-xs text-white placeholder-gray-500 focus:outline-none focus:border-orange-500 transition-colors"
+                    />
+                    <span className="absolute left-3 top-2 text-gray-500 text-xs">🔍</span>
+                  </div>
+                  <select
+                    value={historySponsorEventFilter}
+                    onChange={e => setHistorySponsorEventFilter(e.target.value)}
+                    className="w-full md:w-auto bg-gray-950 border border-gray-800 rounded-lg px-3 py-2 text-xs text-gray-300 focus:outline-none focus:border-orange-500 transition-colors"
+                  >
+                    <option value="all" className="bg-gray-900 text-white">All Events</option>
+                    {events.map(ev => (
+                      <option key={ev.id} value={ev.id} className="bg-gray-900 text-white">{ev.name} {ev.year}</option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Export buttons */}
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => handleExportSponsorCSV(filteredHistorySponsors, `sponsor_history_${new Date().toISOString().slice(0, 10)}.csv`)}
+                    disabled={filteredHistorySponsors.length === 0}
+                    className="flex-1 sm:flex-initial sm:px-6 py-2 bg-gray-900 border border-gray-800 text-gray-300 font-semibold rounded-lg text-xs hover:bg-gray-850 hover:text-white transition-colors disabled:opacity-50"
+                  >
+                    📥 Export CSV
+                  </button>
+                  <button
+                    onClick={() => handleExportSponsorPDF(filteredHistorySponsors, 'Sponsorship History Report')}
+                    disabled={filteredHistorySponsors.length === 0}
+                    className="flex-1 sm:flex-initial sm:px-6 py-2 bg-gray-900 border border-gray-800 text-gray-300 font-semibold rounded-lg text-xs hover:bg-gray-850 hover:text-white transition-colors disabled:opacity-50"
+                  >
+                    📄 Export PDF
+                  </button>
+                </div>
+
+                {/* Sponsors Table */}
+                {sponsorRankingLoading ? (
+                  <p className="text-gray-400 text-sm text-center py-12">Loading sponsors...</p>
+                ) : filteredHistorySponsors.length === 0 ? (
+                  <div className="text-center py-12 bg-gray-900/30 border border-gray-800 rounded-xl">
+                    <p className="text-gray-500 text-sm">No sponsors match your filters.</p>
+                  </div>
+                ) : (
+                  <div className="bg-gray-900 border border-gray-800 rounded-xl overflow-hidden">
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-left text-xs">
+                        <thead>
+                          <tr className="border-b border-gray-800 bg-gray-950/40 text-gray-500 font-medium">
+                            <th className="p-3">Company</th>
+                            <th className="p-3">Type</th>
+                            <th className="p-3">Event</th>
+                            <th className="p-3">Contact</th>
+                            <th className="p-3">Committed / Est. Value</th>
+                            <th className="p-3">Received</th>
+                            <th className="p-3">Status</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-gray-800/50">
+                          {filteredHistorySponsors.map(s => {
+                            const ev = events.find(e => e.id === s.event_id)
+                            const isGoods = s.sponsor_type === 'goods_service'
+                            return (
+                              <tr key={s.id} className="hover:bg-gray-800/10 transition-colors">
+                                <td className="p-3 font-medium text-white">{s.company_name}</td>
+                                <td className="p-3 text-gray-400">{isGoods ? '📦 Goods/Service' : '💰 Finance'}</td>
+                                <td className="p-3 text-gray-400">{ev ? `${ev.name} ${ev.year}` : '—'}</td>
+                                <td className="p-3 text-gray-300">
+                                  {s.contact_person_name || '—'}{s.contact_person_phone ? ` · ${s.contact_person_phone}` : ''}
+                                </td>
+                                <td className="p-3 font-bold text-white">
+                                  {formatAmount(isGoods ? (s.estimated_value || 0) : s.committed_amount)}
+                                </td>
+                                <td className="p-3 text-gray-300">{formatAmount(s.amount_received)}</td>
+                                <td className="p-3">
+                                  <span className={`px-2 py-0.5 rounded-full font-semibold text-[10px] uppercase tracking-wide
+                                    ${s.payment_status === 'completed' ? 'bg-green-950 text-green-400 border border-green-900/20'
+                                    : s.payment_status === 'pending' ? 'bg-yellow-950 text-yellow-400 border border-yellow-900/20'
+                                    : 'bg-orange-950 text-orange-400 border border-orange-900/20'}`}>
+                                    {s.payment_status.replace('_', ' ')}
+                                  </span>
+                                </td>
+                              </tr>
+                            )
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                )}
+              </>
             )}
           </div>
         )}
@@ -2100,7 +2463,7 @@ export default function DashboardPage() {
                           )}
                         </p>
                       </div>
-                      <div className="flex items-center gap-2 flex-shrink-0">
+                      <div className="flex items-center gap-2 shrink-0">
                         <span className={`text-xs font-medium px-2.5 py-1 rounded-full
                           ${isSuspended
                             ? 'bg-red-900/50 text-red-400'
@@ -2432,7 +2795,7 @@ export default function DashboardPage() {
                           <p className="text-xs font-mono text-gray-600 mt-1">{d.receipt_number}</p>
                         </div>
 
-                        <div className="text-right flex-shrink-0 flex flex-col items-end gap-2">
+                        <div className="text-right shrink-0 flex flex-col items-end gap-2">
                           <p className="text-lg font-bold text-white">{formatAmount(d.amount)}</p>
                           
                           {d.status === 'pending' && CAN.verifyDonation(userRole) && !isReviewing && (
@@ -2487,7 +2850,7 @@ export default function DashboardPage() {
                           )}
 
                           <label className="flex items-start gap-3 cursor-pointer group">
-                            <div className="relative flex-shrink-0 mt-0.5">
+                            <div className="relative shrink-0 mt-0.5">
                               <input
                                 type="checkbox"
                                 checked={screenshotChecked}
