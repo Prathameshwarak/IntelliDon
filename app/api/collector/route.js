@@ -58,7 +58,7 @@ export async function GET(request) {
     // Get the mandal details
     const { data: mandal, error: mandalError } = await supabaseAdmin
       .from('mandals')
-      .select('id, name, city, status')
+      .select('id, name, city, address, phone, status')
       .eq('id', userRow.mandal_id)
       .single()
 

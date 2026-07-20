@@ -3,7 +3,7 @@
 
 import { createClient } from '@supabase/supabase-js'
 import { NextResponse } from 'next/server'
-import { generateReceiptPDF } from '@/lib/generateReceiptPDF'
+import { buildReceiptData } from '@/lib/receiptData'
 
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL,
@@ -53,10 +53,29 @@ export async function PATCH(request) {
         return NextResponse.json({ error: 'Invalid payment mode for bulk verification' }, { status: 400 })
       }
 
-      // Fetch pending donations for this collector and payment mode
+      // Fetch pending donations for this collector and payment mode with joins
       const { data: pendingDonations, error: fetchErr } = await supabaseAdmin
         .from('donations')
-        .select('id')
+        .select(`
+          id,
+          receipt_number,
+          donor_name,
+          donor_phone,
+          donor_address,
+          amount,
+          payment_mode,
+          created_at,
+          mandal_id,
+          mandals (
+            id, name, address, city, phone
+          ),
+          events (
+            id, name, year
+          ),
+          users!collected_by (
+            full_name
+          )
+        `)
         .eq('collected_by', collector_id)
         .eq('payment_mode', payment_mode)
         .eq('status', 'pending')
@@ -73,17 +92,34 @@ export async function PATCH(request) {
 
       const donationIds = pendingDonations.map(d => d.id)
 
-      // Bulk update
-      const { error: updateError } = await supabaseAdmin
-        .from('donations')
-        .update({
-          status: 'verified',
-          verified_by,
-          verified_at: new Date().toISOString()
+      // Bulk update per-row to generate receipt_data
+      try {
+        const verified_at = new Date().toISOString()
+        const updatePromises = pendingDonations.map(async (donation) => {
+          const receiptData = buildReceiptData({
+            donation: {
+              ...donation,
+              verification_type: verifier.role,
+              verified_at
+            },
+            mandal: donation.mandals,
+            event: donation.events,
+            collectorName: donation.users?.full_name
+          })
+          const { error } = await supabaseAdmin
+            .from('donations')
+            .update({
+              status: 'verified',
+              verified_by,
+              verified_at,
+              verification_type: verifier.role,
+              receipt_data: receiptData
+            })
+            .eq('id', donation.id)
+          if (error) throw error
         })
-        .in('id', donationIds)
-
-      if (updateError) {
+        await Promise.all(updatePromises)
+      } catch (updateError) {
         console.error('Bulk update error:', updateError)
         return NextResponse.json({ error: 'Could not bulk verify donations' }, { status: 500 })
       }
@@ -118,7 +154,6 @@ export async function PATCH(request) {
         amount,
         payment_mode,
         status,
-        pdf_url,
         created_at,
         mandal_id,
         mandals (
@@ -158,6 +193,22 @@ export async function PATCH(request) {
       updateData.rejection_reason = null // Clear if verified
     }
 
+    let receiptData = null
+    if (status === 'verified') {
+      receiptData = buildReceiptData({
+        donation: {
+          ...donation,
+          verification_type: verifier.role,
+          verified_at: updateData.verified_at
+        },
+        mandal: donation.mandals,
+        event: donation.events,
+        collectorName: donation.users?.full_name
+      })
+      updateData.receipt_data = receiptData
+      updateData.verification_type = verifier.role
+    }
+
     const { error: updateError } = await supabaseAdmin
       .from('donations')
       .update(updateData)
@@ -168,61 +219,10 @@ export async function PATCH(request) {
       return NextResponse.json({ error: 'Could not update donation status' }, { status: 500 })
     }
 
-    // For upi_self donations — generate receipt now (wasn't done at entry time)
-    // For cash/upi_collector — receipt was already generated at entry, just return existing url
-    let pdfUrl = donation.pdf_url
-
-    if (status === 'verified' && donation.payment_mode === 'upi_self' && !pdfUrl) {
-      try {
-        const mandal = donation.mandals
-        const event = donation.events
-        const collector = donation.users
-
-        const pdfBytes = await generateReceiptPDF({
-          receiptNumber: donation.receipt_number,
-          mandalName:    mandal.name,
-          mandalAddress: [mandal.address, mandal.city].filter(Boolean).join(', '),
-          mandalPhone:   mandal.phone,
-          eventName:     `${event.name} ${event.year}`,
-          donorName:     donation.donor_name,
-          donorPhone:    donation.donor_phone,
-          donorAddress:  donation.donor_address,
-          amount:        donation.amount,
-          paymentMode:   donation.payment_mode,
-          createdAt:     donation.created_at,
-          collectedBy:   collector?.full_name || null
-        })
-
-        const filePath = `${mandal.id}/${donation.receipt_number}.pdf`
-
-        const { error: uploadError } = await supabaseAdmin.storage
-          .from('receipts')
-          .upload(filePath, pdfBytes, {
-            contentType: 'application/pdf',
-            upsert: true
-          })
-
-        if (!uploadError) {
-          const { data: urlData } = supabaseAdmin.storage
-            .from('receipts')
-            .getPublicUrl(filePath)
-
-          pdfUrl = urlData.publicUrl
-
-          await supabaseAdmin
-            .from('donations')
-            .update({ pdf_url: pdfUrl })
-            .eq('id', donation_id)
-        }
-      } catch (pdfErr) {
-        console.error('PDF generation on verify error:', pdfErr)
-      }
-    }
-
     return NextResponse.json({
       success: true,
       status,
-      pdf_url: status === 'verified' ? (pdfUrl || null) : null
+      receipt_data: receiptData
     })
 
   } catch (err) {
