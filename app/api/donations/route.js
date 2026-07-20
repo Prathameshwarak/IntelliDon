@@ -1,6 +1,6 @@
 import { createClient } from '@supabase/supabase-js'
 import { NextResponse } from 'next/server'
-import { generateReceiptPDF } from '@/lib/generateReceiptPDF'
+import { buildReceiptData } from '@/lib/receiptData'
 
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL,
@@ -130,7 +130,7 @@ export async function POST(request) {
       isDuplicate = !!existingDonation
     }
 
-    // ── 5. Get collector name for receipt ─────────────────────
+    // Fetch collector full_name if collected_by is provided
     let collectorName = null
     if (collected_by) {
       const { data: collector } = await supabaseAdmin
@@ -141,7 +141,7 @@ export async function POST(request) {
       collectorName = collector?.full_name || null
     }
 
-    // ── 6. Insert donation — receipt_number auto by trigger ───
+    const isCollectorRecorded = (payment_mode === 'cash' || payment_mode === 'upi_collector') && !!collected_by
     const { data: donation, error: donationError } = await supabaseAdmin
       .from('donations')
       .insert({
@@ -154,7 +154,10 @@ export async function POST(request) {
         payment_mode,
         collected_by: collected_by || null,
         screenshot_url: screenshot_url || null,
-        status: 'pending'
+        status: isCollectorRecorded ? 'verified' : 'pending',
+        verified_by: isCollectorRecorded ? collected_by : null,
+        verified_at: isCollectorRecorded ? new Date().toISOString() : null,
+        verification_type: isCollectorRecorded ? 'collector' : null
       })
       .select()
       .single()
@@ -164,57 +167,21 @@ export async function POST(request) {
       return NextResponse.json({ error: 'Could not record donation' }, { status: 500 })
     }
 
-    // ── 7. Auto-generate receipt PDF immediately ──────────────
-    // This happens right after recording — donor gets receipt
-    // regardless of admin verification status
-    let pdfUrl = null
-
-    try {
-      const pdfBytes = await generateReceiptPDF({
-        receiptNumber: donation.receipt_number,
-        mandalName:    mandal.name,
-        mandalAddress: [mandal.address, mandal.city].filter(Boolean).join(', '),
-        mandalPhone:   mandal.phone,
-        eventName:     `${event.name} ${event.year}`,
-        donorName:     donation.donor_name,
-        donorPhone:    donation.donor_phone,
-        donorAddress:  donation.donor_address,
-        amount:        donation.amount,
-        paymentMode:   donation.payment_mode,
-        createdAt:     donation.created_at,
-        collectedBy:   collectorName
+    let receiptData = null
+    if (isCollectorRecorded && donation) {
+      receiptData = buildReceiptData({
+        donation,
+        mandal,
+        event,
+        collectorName
       })
-
-      // Upload to Supabase storage — receipts/{mandal_id}/{receipt_number}.pdf
-      const filePath = `${mandal_id}/${donation.receipt_number}.pdf`
-
-      const { error: uploadError } = await supabaseAdmin.storage
-        .from('receipts')
-        .upload(filePath, pdfBytes, {
-          contentType: 'application/pdf',
-          upsert: true
-        })
-
-      if (!uploadError) {
-        const { data: urlData } = supabaseAdmin.storage
-          .from('receipts')
-          .getPublicUrl(filePath)
-
-        pdfUrl = urlData.publicUrl
-
-        // Save pdf_url back to donation row
-        await supabaseAdmin
-          .from('donations')
-          .update({ pdf_url: pdfUrl })
-          .eq('id', donation.id)
-      } else {
-        // PDF upload failed — log but don't block the donation
-        console.error('PDF upload error:', uploadError)
+      const { error: updateError } = await supabaseAdmin
+        .from('donations')
+        .update({ receipt_data: receiptData })
+        .eq('id', donation.id)
+      if (updateError) {
+        console.error('Receipt data update error:', updateError)
       }
-    } catch (pdfErr) {
-      // PDF generation failed — log but don't block the donation
-      // The donation is recorded, receipt can be regenerated via /api/donations/[id]/receipt
-      console.error('PDF generation error:', pdfErr)
     }
 
     // ── 8. Return response ────────────────────────────────────
@@ -227,8 +194,8 @@ export async function POST(request) {
         amount: donation.amount,
         payment_mode: donation.payment_mode,
         status: donation.status,
-        pdf_url: pdfUrl,           // ← collector shows this to donor immediately
-        created_at: donation.created_at
+        created_at: donation.created_at,
+        receipt_data: receiptData
       },
       duplicate_warning: isDuplicate ? {
         message: `This phone donated Rs.${existingDonation.amount} earlier in this event.`,
@@ -293,10 +260,12 @@ export async function GET(request) {
         payment_mode,
         status,
         screenshot_url,
-        pdf_url,
+        receipt_data,
         created_at,
         collected_by,
         rejection_reason,
+        verification_type,
+        settlement_id,
         users!collected_by (
           full_name
         )
@@ -324,9 +293,11 @@ export async function GET(request) {
           payment_mode,
           status,
           screenshot_url,
-          pdf_url,
+          receipt_data,
           created_at,
           collected_by,
+          verification_type,
+          settlement_id,
           users!collected_by (
             full_name
           )

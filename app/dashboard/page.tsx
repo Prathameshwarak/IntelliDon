@@ -9,6 +9,7 @@ import UpgradeBanner from '@/components/UpgradeBanner'
 import KycVerificationPanel from '@/components/dashboard/KycVerificationPanel'
 import ExpenseManager from '@/components/dashboard/ExpenseManager'
 import SponsorshipSection from '@/components/dashboard/SponsorshipSection'
+import { downloadReceipt, shareReceipt, type ReceiptData } from '@/lib/downloadReceipt'
 
 // ── TESTING / MIGRATION CONFIGURATION ──────────────────────────
 // Set to true to bypass KYC blocks and mandatory document upload popups (for testing / old accounts migration).
@@ -30,9 +31,10 @@ type Donation = {
   screenshot_url: string | null
   created_at: string
   users: { full_name: string } | null
-  pdf_url: string | null
+  receipt_data: ReceiptData | null
   collected_by: string | null
   rejection_reason: string | null
+  settlement_id: string | null
 }
 
 type Summary = {
@@ -663,7 +665,7 @@ export default function DashboardPage() {
       showToast('Donation verified — receipt generated', 'success')
       setDonations(prev => prev.map(d =>
         d.id === donationId
-          ? { ...d, status: 'verified', pdf_url: data.pdf_url || d.pdf_url, rejection_reason: null }
+          ? { ...d, status: 'verified', receipt_data: data.receipt_data || d.receipt_data, rejection_reason: null }
           : d
       ))
       fetchDonations()
@@ -747,6 +749,52 @@ export default function DashboardPage() {
     setBulkVerifyingCollector(null)
     setBulkVerifyingMode(null)
   }
+
+  async function settleCollector(collectorId: string, paymentMode?: 'cash' | 'upi') {
+    if (!CAN.verifyDonation(userRole)) return
+    const activeEvent = events.find(e => e.is_active)
+    if (!activeEvent) {
+      showToast('No active event found to settle collections', 'error')
+      return
+    }
+    if (sub.isExpired) {
+      showToast('Subscription expired. Please renew plan.', 'error')
+      return
+    }
+    
+    const modeLabel = paymentMode ? (paymentMode === 'cash' ? 'Cash' : 'UPI') : 'all'
+    if (!confirm(`Are you sure you want to verify ${modeLabel} received and settle collections for this collector?`)) return
+
+    setBulkVerifyModalCollector(null)
+    setBulkVerifyingCollector(collectorId)
+
+    try {
+      const headers = await getAuthHeaders()
+      const res = await fetch('/api/settlements', {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({
+          collector_id: collectorId,
+          event_id: activeEvent.id,
+          verified_by: userId,
+          payment_mode: paymentMode,
+          notes: `Settled from admin dashboard: ${modeLabel} only`
+        })
+      })
+      const data = await res.json()
+      if (data.success) {
+        showToast(`Collector ${modeLabel} collections settled successfully!`, 'success')
+        fetchDonations()
+      } else {
+        showToast(data.error || 'Could not settle collections', 'error')
+      }
+    } catch (err) {
+      showToast('Failed to connect to server', 'error')
+    } finally {
+      setBulkVerifyingCollector(null)
+    }
+  }
+
 
   // ── Events ────────────────────────────────────────────────────
   async function fetchEvents() {
@@ -1222,12 +1270,12 @@ export default function DashboardPage() {
     const amount = Number(d.amount)
     if (d.payment_mode === 'cash') {
       collectorGroups[collectorId].totalCash += amount
-      if (d.status === 'pending') {
+      if (d.status === 'verified' && !d.settlement_id) {
         collectorGroups[collectorId].pendingCash += amount
       }
     } else {
       collectorGroups[collectorId].totalUpi += amount
-      if (d.status === 'pending') {
+      if (d.status === 'verified' && d.payment_mode === 'upi_collector' && !d.settlement_id) {
         collectorGroups[collectorId].pendingUpi += amount
       }
     }
@@ -1375,7 +1423,7 @@ export default function DashboardPage() {
         if (data.success) {
           showToast('Donation verified', 'success')
           setDonations(prev => prev.map(d =>
-            d.id === id ? { ...d, status: 'verified', pdf_url: data.pdf_url || d.pdf_url, rejection_reason: null } : d
+            d.id === id ? { ...d, status: 'verified', receipt_data: data.receipt_data || d.receipt_data, rejection_reason: null } : d
           ))
           fetchDonations()
           setReviewingId(null)
@@ -1729,16 +1777,16 @@ export default function DashboardPage() {
               <p className="text-gray-400 text-sm text-center py-12">Loading donations...</p>
             ) : visibleCollectorList.length === 0 ? (
               <div className="text-center py-12 bg-gray-900/30 border border-gray-800 rounded-xl">
-                <p className="text-gray-500 text-sm">No pending collector collections to verify.</p>
-                <p className="text-gray-600 text-xs mt-1">All collections have been verified, or collectors have not entered new ones yet.</p>
+                <p className="text-gray-550 text-sm">No collectors awaiting settlement.</p>
+                <p className="text-gray-600 text-xs mt-1">All collections have been settled successfully.</p>
               </div>
             ) : (
               <div className="flex flex-col gap-3">
-                <p className="text-xs text-gray-400 font-medium px-1 uppercase tracking-wider">Pending Verification by Collector</p>
+                <p className="text-xs text-gray-400 font-medium px-1 uppercase tracking-wider">Collectors Awaiting Settlement</p>
                 {visibleCollectorList.map(c => {
                   const isExpanded = expandedCollectors[c.id]
                   const hasPendingCash = c.pendingCash > 0
-                  const hasPendingUpi = c.pendingUpi > 0
+                  const isPending = c.pendingCash > 0 || c.pendingUpi > 0
 
                   return (
                     <div 
@@ -1755,18 +1803,18 @@ export default function DashboardPage() {
                           <div className="flex items-center gap-2 flex-wrap">
                             <span className="text-base font-semibold text-white">{c.name}</span>
                             <span className="text-xs bg-gray-800 text-gray-400 px-2 py-0.5 rounded-full font-medium">
-                              {c.donations.filter(d => d.status === 'pending').length} pending collection{c.donations.filter(d => d.status === 'pending').length !== 1 ? 's' : ''}
+                              {c.donations.filter(d => d.status === 'verified' && !d.settlement_id).length} unsettled collection{c.donations.filter(d => d.status === 'verified' && !d.settlement_id).length !== 1 ? 's' : ''}
                             </span>
                           </div>
                           
                           {/* Cash & UPI breakdown */}
                           <div className="flex gap-4 mt-2 text-xs flex-wrap">
                             <div className="bg-gray-950/60 rounded-lg px-3 py-1.5 border border-gray-800/80">
-                              <span className="text-gray-500 mr-1.5">Cash Pending:</span>
+                              <span className="text-gray-500 mr-1.5">Unsettled Cash:</span>
                               <span className="font-bold text-yellow-400">{formatAmount(c.pendingCash)}</span>
                             </div>
                             <div className="bg-gray-950/60 rounded-lg px-3 py-1.5 border border-gray-800/80">
-                              <span className="text-gray-500 mr-1.5">UPI Pending:</span>
+                              <span className="text-gray-500 mr-1.5">Unsettled UPI:</span>
                               <span className="font-bold text-yellow-400">{formatAmount(c.pendingUpi)}</span>
                             </div>
                           </div>
@@ -1774,33 +1822,34 @@ export default function DashboardPage() {
 
                         {/* Action buttons & Arrow */}
                         <div className="flex items-center gap-2 flex-wrap justify-end self-end md:self-auto" onClick={e => e.stopPropagation()}>
-                          {hasPendingCash && !hasPendingUpi && CAN.verifyDonation(userRole) && (
-                            <button
-                              onClick={() => verifyCollectorBulk(c.id, 'cash')}
-                              disabled={bulkVerifyingCollector === c.id}
-                              className="bg-green-650 hover:bg-green-700 text-white font-medium text-xs px-3 py-2 rounded-lg transition-colors flex items-center gap-1 disabled:opacity-50 cursor-pointer"
-                            >
-                              {bulkVerifyingCollector === c.id && bulkVerifyingMode === 'cash' ? '...' : '✓ Verify Cash'}
-                            </button>
-                          )}
-
-                          {!hasPendingCash && hasPendingUpi && CAN.verifyDonation(userRole) && (
-                            <button
-                              onClick={() => verifyCollectorBulk(c.id, 'upi_collector')}
-                              disabled={bulkVerifyingCollector === c.id}
-                              className="bg-green-650 hover:bg-green-700 text-white font-medium text-xs px-3 py-2 rounded-lg transition-colors flex items-center gap-1 disabled:opacity-50 cursor-pointer"
-                            >
-                              {bulkVerifyingCollector === c.id && bulkVerifyingMode === 'upi_collector' ? '...' : '✓ Verify UPI'}
-                            </button>
-                          )}
-
-                          {hasPendingCash && hasPendingUpi && CAN.verifyDonation(userRole) && (
-                            <button
-                              onClick={() => setBulkVerifyModalCollector(c)}
-                              className="bg-green-650 hover:bg-green-700 text-white font-medium text-xs px-3 py-2 rounded-lg transition-colors flex items-center gap-1 cursor-pointer"
-                            >
-                              ✓ Verify
-                            </button>
+                          {isPending && CAN.verifyDonation(userRole) && (
+                            <>
+                              {c.pendingCash > 0 && c.pendingUpi > 0 ? (
+                                <button
+                                  onClick={() => setBulkVerifyModalCollector(c)}
+                                  disabled={bulkVerifyingCollector === c.id}
+                                  className="bg-green-650 hover:bg-green-700 text-white font-medium text-xs px-3 py-2 rounded-lg transition-colors flex items-center gap-1 disabled:opacity-50 cursor-pointer shadow-md"
+                                >
+                                  {bulkVerifyingCollector === c.id ? 'Settling...' : '✓ Settle Handover'}
+                                </button>
+                              ) : c.pendingCash > 0 ? (
+                                <button
+                                  onClick={() => settleCollector(c.id, 'cash')}
+                                  disabled={bulkVerifyingCollector === c.id}
+                                  className="bg-green-650 hover:bg-green-700 text-white font-medium text-xs px-3 py-2 rounded-lg transition-colors flex items-center gap-1 disabled:opacity-50 cursor-pointer shadow-md"
+                                >
+                                  {bulkVerifyingCollector === c.id ? 'Settling...' : `✓ Verify Cash Handover (${formatAmount(c.pendingCash)})`}
+                                </button>
+                              ) : (
+                                <button
+                                  onClick={() => settleCollector(c.id, 'upi')}
+                                  disabled={bulkVerifyingCollector === c.id}
+                                  className="bg-green-650 hover:bg-green-700 text-white font-medium text-xs px-3 py-2 rounded-lg transition-colors flex items-center gap-1 disabled:opacity-50 cursor-pointer shadow-md"
+                                >
+                                  {bulkVerifyingCollector === c.id ? 'Settling...' : `✓ Verify UPI Handover (${formatAmount(c.pendingUpi)})`}
+                                </button>
+                              )}
+                            </>
                           )}
 
                           <button 
@@ -1855,15 +1904,13 @@ export default function DashboardPage() {
                                       </span>
                                     </td>
                                     <td className="py-3 text-right">
-                                      {d.pdf_url && d.status === 'verified' ? (
-                                        <a
-                                          href={d.pdf_url}
-                                          target="_blank"
-                                          rel="noopener noreferrer"
-                                          className="inline-block bg-gray-800 hover:bg-gray-700 text-gray-300 font-medium px-2 py-1 rounded transition-colors text-[10px]"
+                                      {d.receipt_data && d.status === 'verified' ? (
+                                        <button
+                                          onClick={() => downloadReceipt(d.receipt_data!)}
+                                          className="inline-block bg-gray-800 hover:bg-gray-700 text-gray-300 font-medium px-2 py-1 rounded transition-colors text-[10px] cursor-pointer"
                                         >
                                           ↓ Receipt
-                                        </a>
+                                        </button>
                                       ) : (
                                         <span className="text-gray-600">—</span>
                                       )}
@@ -2179,15 +2226,13 @@ export default function DashboardPage() {
                             </span>
                           </td>
                           <td className="p-3 text-right">
-                            {d.pdf_url && d.status === 'verified' ? (
-                              <a
-                                href={d.pdf_url}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="inline-block bg-gray-800 hover:bg-gray-700 text-gray-300 font-medium px-2 py-1 rounded transition-colors text-[10px]"
+                            {d.receipt_data && d.status === 'verified' ? (
+                              <button
+                                onClick={() => downloadReceipt(d.receipt_data!)}
+                                className="inline-block bg-gray-800 hover:bg-gray-700 text-gray-300 font-medium px-2 py-1 rounded transition-colors text-[10px] cursor-pointer"
                               >
                                 ↓ Receipt
-                              </a>
+                              </button>
                             ) : (
                               <span className="text-gray-600">—</span>
                             )}
@@ -2810,15 +2855,21 @@ export default function DashboardPage() {
                             </button>
                           )}
 
-                          {d.pdf_url && d.status === 'verified' && (
-                            <a
-                              href={d.pdf_url}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="text-xs bg-gray-800 hover:bg-gray-700 text-gray-300 px-2 py-1 rounded transition-colors"
-                            >
-                              ↓ Receipt
-                            </a>
+                          {d.receipt_data && d.status === 'verified' && (
+                            <div className="flex gap-1.5">
+                              <button
+                                onClick={() => downloadReceipt(d.receipt_data!)}
+                                className="text-xs bg-gray-800 hover:bg-gray-700 text-gray-300 px-2 py-1 rounded transition-colors cursor-pointer"
+                              >
+                                ↓ Receipt
+                              </button>
+                              <button
+                                onClick={() => shareReceipt(d.receipt_data!)}
+                                className="text-xs bg-gray-800 hover:bg-gray-700 text-gray-300 px-2 py-1 rounded transition-colors cursor-pointer"
+                              >
+                                Share
+                              </button>
+                            </div>
                           )}
                         </div>
                       </div>
@@ -3194,55 +3245,40 @@ export default function DashboardPage() {
           </div>
         )}
 
-        {/* Bulk Verification Modal for Both Cash & UPI Pending */}
         {bulkVerifyModalCollector && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm animate-fade-in">
             <div className="bg-gray-900 border border-gray-800 rounded-2xl w-full max-w-sm p-5 shadow-2xl">
-              <h3 className="text-sm font-semibold text-white mb-1">Verify Collections</h3>
+              <h3 className="text-sm font-semibold text-white mb-1">Settle Handover</h3>
               <p className="text-xs text-gray-400 mb-4">
-                Select which pending collections to verify for <strong>{bulkVerifyModalCollector.name}</strong>:
+                Verify received amounts for <strong>{bulkVerifyModalCollector.name}</strong>:
               </p>
 
-              <div className="space-y-3 mb-5">
-                {/* Cash Info & Verify Button */}
-                {bulkVerifyModalCollector.pendingCash > 0 && (
-                  <div className="flex items-center justify-between p-3 bg-gray-950/60 rounded-xl border border-gray-800">
-                    <div>
-                      <p className="text-xs font-medium text-gray-400">Cash Pending</p>
-                      <p className="text-lg font-bold text-yellow-400">{formatAmount(bulkVerifyModalCollector.pendingCash)}</p>
-                    </div>
-                    <button
-                      onClick={() => verifyCollectorBulk(bulkVerifyModalCollector.id, 'cash')}
-                      className="bg-green-650 hover:bg-green-700 text-white font-semibold text-xs px-3.5 py-2 rounded-lg transition-colors cursor-pointer"
-                    >
-                      ✓ Verify Cash
-                    </button>
-                  </div>
-                )}
+              <div className="flex flex-col gap-3 mb-5">
+                <button
+                  onClick={() => {
+                    settleCollector(bulkVerifyModalCollector.id, 'cash')
+                  }}
+                  className="w-full bg-orange-600 hover:bg-orange-500 text-white font-semibold text-xs px-4 py-3 rounded-lg transition-colors cursor-pointer text-center shadow-md font-sans"
+                >
+                  Verify Cash Settlement ({formatAmount(bulkVerifyModalCollector.pendingCash)})
+                </button>
 
-                {/* UPI Info & Verify Button */}
-                {bulkVerifyModalCollector.pendingUpi > 0 && (
-                  <div className="flex items-center justify-between p-3 bg-gray-950/60 rounded-xl border border-gray-800">
-                    <div>
-                      <p className="text-xs font-medium text-gray-400">UPI Pending</p>
-                      <p className="text-lg font-bold text-yellow-400">{formatAmount(bulkVerifyModalCollector.pendingUpi)}</p>
-                    </div>
-                    <button
-                      onClick={() => verifyCollectorBulk(bulkVerifyModalCollector.id, 'upi_collector')}
-                      className="bg-green-650 hover:bg-green-700 text-white font-semibold text-xs px-3.5 py-2 rounded-lg transition-colors cursor-pointer"
-                    >
-                      ✓ Verify UPI
-                    </button>
-                  </div>
-                )}
+                <button
+                  onClick={() => {
+                    settleCollector(bulkVerifyModalCollector.id, 'upi')
+                  }}
+                  className="w-full bg-blue-600 hover:bg-blue-500 text-white font-semibold text-xs px-4 py-3 rounded-lg transition-colors cursor-pointer text-center shadow-md font-sans"
+                >
+                  Verify UPI Settlement ({formatAmount(bulkVerifyModalCollector.pendingUpi)})
+                </button>
               </div>
 
-              <div className="flex justify-end">
+              <div className="flex justify-end border-t border-gray-800 pt-3">
                 <button
                   onClick={() => setBulkVerifyModalCollector(null)}
-                  className="px-4 py-2 bg-gray-800 hover:bg-gray-700 text-gray-300 rounded-lg text-xs font-medium transition-colors w-full sm:w-auto cursor-pointer"
+                  className="px-4 py-2 bg-gray-800 hover:bg-gray-700 text-gray-300 rounded-lg text-xs font-semibold transition-colors w-full sm:w-auto cursor-pointer"
                 >
-                  Close
+                  Cancel
                 </button>
               </div>
             </div>

@@ -1,24 +1,24 @@
 // app/api/donations/[id]/receipt/route.js
-// POST — generates PDF receipt for a donation and stores it in Supabase storage
-// GET  — returns the existing download URL for a receipt
+// GET  — returns the existing receipt_data for a receipt
+// POST — backfills receipt_data for historical donations verified before this change existed
 
 import { createClient } from '@supabase/supabase-js'
 import { NextResponse } from 'next/server'
-import { generateReceiptPDF } from '@/lib/generateReceiptPDF'
+import { buildReceiptData } from '@/lib/receiptData'
 
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL,
   process.env.SUPABASE_SERVICE_ROLE_KEY
 )
 
-// ── GET — return existing receipt URL ─────────────────────────
+// ── GET — return existing receipt data ─────────────────────────
 export async function GET(request, { params }) {
   try {
     const { id } = await params
 
     const { data: donation, error } = await supabaseAdmin
       .from('donations')
-      .select('id, receipt_number, pdf_url, status')
+      .select('id, receipt_number, receipt_data, status')
       .eq('id', id)
       .single()
 
@@ -26,13 +26,13 @@ export async function GET(request, { params }) {
       return NextResponse.json({ error: 'Donation not found' }, { status: 404 })
     }
 
-    if (!donation.pdf_url) {
+    if (!donation.receipt_data) {
       return NextResponse.json({ error: 'Receipt not yet generated' }, { status: 404 })
     }
 
     return NextResponse.json({
       receipt_number: donation.receipt_number,
-      pdf_url: donation.pdf_url
+      receipt_data: donation.receipt_data
     })
 
   } catch (err) {
@@ -41,7 +41,7 @@ export async function GET(request, { params }) {
   }
 }
 
-// ── POST — generate and store the PDF ─────────────────────────
+// ── POST — backfill receipt_data ──────────────────────────────
 export async function POST(request, { params }) {
   try {
     const { id } = await params
@@ -69,8 +69,10 @@ export async function POST(request, { params }) {
         amount,
         payment_mode,
         status,
-        pdf_url,
+        receipt_data,
         created_at,
+        verified_at,
+        verification_type,
         collected_by,
         mandal_id,
         mandals (
@@ -114,78 +116,47 @@ export async function POST(request, { params }) {
       )
     }
 
-    // 3. If PDF already exists, just return the existing URL — don't regenerate
-    if (donation.pdf_url) {
+    // 3. If receipt_data already exists, just return it
+    if (donation.receipt_data) {
       return NextResponse.json({
         success: true,
         receipt_number: donation.receipt_number,
-        pdf_url: donation.pdf_url,
+        receipt_data: donation.receipt_data,
         already_existed: true
       })
     }
 
-    // 4. Generate the PDF bytes
+    // 4. Build receipt data
     const mandal = donation.mandals
     const event = donation.events
     const collector = donation.users
 
-    const pdfBytes = await generateReceiptPDF({
-      receiptNumber:  donation.receipt_number,
-      mandalName:     mandal.name,
-      mandalAddress:  [mandal.address, mandal.city].filter(Boolean).join(', '),
-      mandalPhone:    mandal.phone,
-      eventName:      `${event.name} ${event.year}`,
-      donorName:      donation.donor_name,
-      donorPhone:     donation.donor_phone,
-      donorAddress:   donation.donor_address,
-      amount:         donation.amount,
-      paymentMode:    donation.payment_mode,
-      createdAt:      donation.created_at,
-      collectedBy:    collector?.full_name || null
+    const receiptData = buildReceiptData({
+      donation,
+      mandal,
+      event,
+      collectorName: collector?.full_name || null
     })
 
-    // 5. Upload PDF to Supabase storage — receipts bucket
-    // File path: receipts/{mandal_id}/{receipt_number}.pdf
-    const filePath = `${mandal.id}/${donation.receipt_number}.pdf`
-
-    const { error: uploadError } = await supabaseAdmin.storage
-      .from('receipts')
-      .upload(filePath, pdfBytes, {
-        contentType: 'application/pdf',
-        upsert: true  // overwrite if regenerating
-      })
-
-    if (uploadError) {
-      console.error('PDF upload error:', uploadError)
-      return NextResponse.json({ error: 'Could not store receipt PDF' }, { status: 500 })
-    }
-
-    // 6. Get the public URL (receipts bucket is public)
-    const { data: urlData } = supabaseAdmin.storage
-      .from('receipts')
-      .getPublicUrl(filePath)
-
-    const pdfUrl = urlData.publicUrl
-
-    // 7. Save the URL back to the donation row
+    // 5. Save the receipt_data back to the donation row
     const { error: updateError } = await supabaseAdmin
       .from('donations')
-      .update({ pdf_url: pdfUrl })
+      .update({ receipt_data: receiptData })
       .eq('id', id)
 
     if (updateError) {
-      console.error('PDF URL update error:', updateError)
-      // Don't fail — PDF is already uploaded, just log the error
+      console.error('Receipt data update error:', updateError)
+      return NextResponse.json({ error: 'Could not update receipt data' }, { status: 500 })
     }
 
     return NextResponse.json({
       success: true,
       receipt_number: donation.receipt_number,
-      pdf_url: pdfUrl
+      receipt_data: receiptData
     })
 
   } catch (err) {
     console.error('POST receipt error:', err)
-    return NextResponse.json({ error: 'Something went wrong generating the receipt' }, { status: 500 })
+    return NextResponse.json({ error: 'Something went wrong backfilling the receipt' }, { status: 500 })
   }
 }

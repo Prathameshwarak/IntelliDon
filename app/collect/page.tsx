@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
 import UpiQR from '@/components/UpiQR'
+import { downloadReceipt, shareReceipt, type ReceiptData } from '@/lib/downloadReceipt'
 
 type Event = {
   id: string
@@ -17,6 +18,8 @@ type Mandal = {
   id: string
   name: string
   city: string
+  address: string | null
+  phone: string | null
 }
 
 type DuplicateWarning = {
@@ -29,7 +32,10 @@ type SuccessData = {
   donor_name: string
   amount: number
   payment_mode: string
-  pdf_url: string | null
+  created_at: string
+  status?: string
+  receipt_data?: ReceiptData | null
+  settlement_id?: string | null
 }
 
 type Step = 'form' | 'duplicate_warning' | 'cash_confirm' | 'upi_qr' | 'success'
@@ -171,6 +177,28 @@ export default function CollectPage() {
       setError('Network error. Please try again.')
     } finally {
       setSubmitting(false)
+    }
+  }
+
+  function buildProvisionalReceiptData(): ReceiptData | null {
+    if (!successData || !mandal || !selectedEvent) return null
+    const isVerified = successData.status === 'verified'
+    return {
+      receiptNumber: successData.receipt_number,
+      mandalName: mandal.name,
+      mandalAddress: [mandal.address, mandal.city].filter(Boolean).join(', '),
+      mandalPhone: mandal.phone || '',
+      eventName: `${selectedEvent.name} ${selectedEvent.year}`,
+      donorName: successData.donor_name,
+      donorPhone: donorPhone || '',
+      donorAddress: donorAddress || null,
+      amount: successData.amount,
+      paymentMode: successData.payment_mode,
+      createdAt: successData.created_at,
+      collectedBy: collectorName || null,
+      verified: isVerified,
+      verifiedByRole: isVerified ? 'collector' : undefined,
+      verifiedAt: isVerified ? successData.created_at : undefined
     }
   }
 
@@ -403,6 +431,16 @@ export default function CollectPage() {
   const rejectedAmount = donations.filter(d => d.status === 'rejected').reduce((sum, d) => sum + Number(d.amount), 0)
   const totalDonors = donations.length
 
+  const unsettledCash = donations
+    .filter(d => d.status === 'verified' && d.payment_mode === 'cash' && !d.settlement_id)
+    .reduce((sum, d) => sum + Number(d.amount), 0)
+
+  const unsettledUpi = donations
+    .filter(d => d.status === 'verified' && d.payment_mode === 'upi_collector' && !d.settlement_id)
+    .reduce((sum, d) => sum + Number(d.amount), 0)
+
+  const totalUnsettled = unsettledCash + unsettledUpi
+
   const cashAmount = donations.filter(d => d.payment_mode === 'cash').reduce((sum, d) => sum + Number(d.amount), 0)
   const upiAmount = donations.filter(d => d.payment_mode === 'upi_collector' || d.payment_mode === 'upi_self').reduce((sum, d) => sum + Number(d.amount), 0)
 
@@ -606,6 +644,34 @@ export default function CollectPage() {
               </div>
             </div>
 
+            {/* Handover & Settlement Summary Card */}
+            <div className="bg-gray-900 border border-gray-800 rounded-xl p-4 shadow-sm">
+              <div className="flex justify-between items-center mb-3">
+                <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Handovers & Settlements</h3>
+                <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wide border ${
+                  totalUnsettled > 0 
+                    ? 'bg-yellow-950/60 text-yellow-400 border-yellow-900/20' 
+                    : 'bg-green-950/60 text-green-400 border-green-900/20'
+                }`}>
+                  {totalUnsettled > 0 ? 'Pending Settlement' : '✓ Settled'}
+                </span>
+              </div>
+              <div className="grid grid-cols-3 gap-2.5 text-center mt-2">
+                <div className="bg-gray-950/60 rounded-lg p-2.5 border border-gray-850">
+                  <span className="text-[10px] text-gray-500 block font-medium">Pending Cash</span>
+                  <span className="text-sm font-bold text-white">₹{unsettledCash.toLocaleString('en-IN')}</span>
+                </div>
+                <div className="bg-gray-950/60 rounded-lg p-2.5 border border-gray-850">
+                  <span className="text-[10px] text-gray-500 block font-medium">Pending UPI</span>
+                  <span className="text-sm font-bold text-white">₹{unsettledUpi.toLocaleString('en-IN')}</span>
+                </div>
+                <div className="bg-gray-950/60 rounded-lg p-2.5 border border-gray-850">
+                  <span className="text-[10px] text-gray-500 block font-medium font-sans">Unsettled Total</span>
+                  <span className="text-sm font-bold text-orange-400">₹{totalUnsettled.toLocaleString('en-IN')}</span>
+                </div>
+              </div>
+            </div>
+
             {/* Payment Mode Breakdown */}
             <div className="bg-gray-900 border border-gray-800 rounded-xl p-4 shadow-sm">
               <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-4">Collection Modes</h3>
@@ -683,19 +749,32 @@ export default function CollectPage() {
                           </span>
                         </div>
                       </div>
-                      <div className="text-right">
+                      <div className="text-right flex flex-col items-end gap-1">
                         <p className="text-sm font-bold text-white">₹{Number(d.amount).toLocaleString('en-IN')}</p>
-                        <span
-                          className={`inline-block text-[9px] font-bold px-2 py-0.5 rounded-full mt-1 border uppercase tracking-wide
-                            ${d.status === 'verified'
-                              ? 'bg-green-950 text-green-400 border-green-900/20'
-                              : d.status === 'pending'
-                              ? 'bg-yellow-950 text-yellow-400 border-yellow-900/20'
-                              : 'bg-red-950 text-red-400 border-red-900/20'
-                            }`}
-                        >
-                          {d.status}
-                        </span>
+                        <div className="flex gap-1 items-center">
+                          <span
+                            className={`inline-block text-[9px] font-bold px-2 py-0.5 rounded-full border uppercase tracking-wide
+                              ${d.status === 'verified'
+                                ? 'bg-green-950 text-green-400 border-green-900/20'
+                                : d.status === 'pending'
+                                ? 'bg-yellow-950 text-yellow-400 border-yellow-900/20'
+                                : 'bg-red-950 text-red-400 border-red-900/20'
+                              }`}
+                          >
+                            {d.status}
+                          </span>
+                          {d.status === 'verified' && (
+                            <span
+                              className={`inline-block text-[8px] font-bold px-1.5 py-0.5 rounded-full border uppercase tracking-wide
+                                ${d.settlement_id
+                                  ? 'bg-green-950/60 text-green-400 border-green-900/10'
+                                  : 'bg-yellow-950/60 text-yellow-450 border-yellow-900/10'
+                                }`}
+                            >
+                              {d.settlement_id ? '✓ Settled' : 'Pending'}
+                            </span>
+                          )}
+                        </div>
                       </div>
                     </div>
                   ))}
@@ -855,7 +934,7 @@ export default function CollectPage() {
                   disabled={submitting}
                   className="w-full bg-green-600 hover:bg-green-700 disabled:opacity-50 text-white font-semibold py-4 rounded-xl text-base transition-colors shadow-md"
                 >
-                  {submitting ? 'Recording...' : '✓ Cash Collected — Record Donation'}
+                  {submitting ? 'Recording...' : '✓ Confirm Collection & Record Donation'}
                 </button>
 
                 <button onClick={() => setStep('form')} className="w-full bg-gray-800 hover:bg-gray-750 text-gray-400 font-medium py-3 rounded-xl text-sm transition-colors">
@@ -941,6 +1020,12 @@ export default function CollectPage() {
                     <span className="text-green-400 text-2xl font-bold">✓</span>
                   </div>
 
+                  {successData.status === 'verified' && (
+                    <div className="mb-3 inline-block bg-green-950/40 border border-green-500/30 text-green-400 text-xs font-semibold px-3 py-1 rounded-full">
+                      🟢 VERIFIED &bull; Verified by Collector
+                    </div>
+                  )}
+
                   <p className="text-green-400 font-semibold text-xl mb-1">Donation Recorded!</p>
                   <p className="text-gray-400 text-sm">{successData.donor_name}</p>
 
@@ -969,28 +1054,27 @@ export default function CollectPage() {
                 </div>
 
                 {/* Receipt links & actions */}
-                {successData.pdf_url ? (
+                {successData.receipt_data || buildProvisionalReceiptData() ? (
                   <div className="flex flex-col gap-2">
-                    <a
-                      href={successData.pdf_url}
-                      target="_blank"
-                      rel="noopener noreferrer"
+                    <button
+                      onClick={() => downloadReceipt(successData.receipt_data || buildProvisionalReceiptData()!)}
                       className="w-full flex items-center justify-center gap-2 bg-white text-gray-900
-                        font-semibold py-4 rounded-xl text-base transition-colors hover:bg-gray-100 shadow-md"
+                        font-semibold py-4 rounded-xl text-base transition-colors hover:bg-gray-100 shadow-md cursor-pointer"
                     >
                       <span>↓</span>
                       <span>Download Receipt</span>
-                    </a>
-                    <button
-                      onClick={() => handleCopyLink(successData.pdf_url!, 'success')}
-                      className={`w-full py-4 text-base font-semibold rounded-xl transition-all shadow-md border ${
-                        copiedId === 'success'
-                          ? 'bg-emerald-955/40 text-emerald-450 border-emerald-500/30'
-                          : 'bg-gray-800 text-white border-gray-700 hover:bg-gray-750'
-                      }`}
-                    >
-                      {copiedId === 'success' ? '✓ Link Copied to Clipboard!' : '🔗 Copy Receipt Link'}
                     </button>
+                    <button
+                      onClick={() => shareReceipt(successData.receipt_data || buildProvisionalReceiptData()!)}
+                      className="w-full py-4 text-base font-semibold rounded-xl transition-all shadow-md border bg-gray-800 text-white border-gray-700 hover:bg-gray-750 cursor-pointer"
+                    >
+                      Share Receipt
+                    </button>
+                    {successData.status === 'verified' ? (
+                      <p className="text-xs text-green-500 font-medium">🟢 VERIFIED - Verified by Collector</p>
+                    ) : (
+                      <p className="text-xs text-yellow-500 font-medium">Pending verification</p>
+                    )}
                   </div>
                 ) : (
                   <div className="bg-gray-800 border border-gray-700 rounded-xl px-4 py-3 text-center">
@@ -1132,9 +1216,9 @@ export default function CollectPage() {
                           <p className="text-[11px] text-gray-500 mt-1 italic leading-relaxed">{d.donor_address}</p>
                         )}
                       </div>
-                      <div className="text-right">
+                      <div className="text-right flex flex-col items-end gap-1">
                         <span className="text-base font-extrabold text-white">₹{Number(d.amount).toLocaleString('en-IN')}</span>
-                        <div className="mt-1">
+                        <div className="mt-1 flex flex-col items-end gap-1">
                           <span
                             className={`inline-block text-[9px] font-bold px-2 py-0.5 rounded-full border uppercase tracking-wide
                               ${d.status === 'verified'
@@ -1146,6 +1230,17 @@ export default function CollectPage() {
                           >
                             {d.status}
                           </span>
+                          {d.status === 'verified' && (
+                            <span
+                              className={`inline-block text-[8px] font-bold px-1.5 py-0.5 rounded-full border uppercase tracking-wide
+                                ${d.settlement_id
+                                  ? 'bg-green-950/60 text-green-400 border-green-900/10'
+                                  : 'bg-yellow-950/60 text-yellow-450 border-yellow-900/10'
+                                }`}
+                            >
+                              {d.settlement_id ? '✓ Settled' : 'Pending Settlement'}
+                            </span>
+                          )}
                         </div>
                       </div>
                     </div>
@@ -1175,29 +1270,23 @@ export default function CollectPage() {
                       </div>
 
                       {/* PDF actions */}
-                      {d.pdf_url ? (
+                      {d.receipt_data ? (
                         <div className="flex gap-1.5">
-                          <a
-                            href={d.pdf_url}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="px-2.5 py-1.5 bg-gray-850 hover:bg-gray-800 text-gray-300 font-medium rounded-lg text-[11px] transition-colors border border-gray-800"
+                          <button
+                            onClick={() => downloadReceipt(d.receipt_data)}
+                            className="px-2.5 py-1.5 bg-gray-850 hover:bg-gray-800 text-gray-300 font-medium rounded-lg text-[11px] transition-colors border border-gray-800 cursor-pointer"
                           >
                             PDF
-                          </a>
+                          </button>
                           <button
-                            onClick={() => handleCopyLink(d.pdf_url!, d.id)}
-                            className={`px-2.5 py-1.5 text-[11px] font-medium rounded-lg transition-colors border ${
-                              copiedId === d.id
-                                ? 'bg-emerald-955/40 text-emerald-400 border-emerald-500/30'
-                                : 'bg-gray-850 hover:bg-gray-800 text-gray-300 border-gray-800'
-                            }`}
+                            onClick={() => shareReceipt(d.receipt_data)}
+                            className="px-2.5 py-1.5 bg-gray-850 hover:bg-gray-800 text-gray-300 font-medium rounded-lg text-[11px] transition-colors border border-gray-800 cursor-pointer"
                           >
-                            {copiedId === d.id ? 'Copied ✓' : 'Copy Link'}
+                            Share
                           </button>
                         </div>
                       ) : (
-                        <span className="text-[10px] text-gray-505 italic">No receipt link</span>
+                        <span className="text-[10px] text-yellow-500 font-medium italic">Pending verification</span>
                       )}
                     </div>
 
