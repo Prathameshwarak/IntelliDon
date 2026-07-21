@@ -252,6 +252,7 @@ export async function GET(request) {
       .from('donations')
       .select(`
         id,
+        event_id,
         receipt_number,
         donor_name,
         donor_phone,
@@ -285,6 +286,7 @@ export async function GET(request) {
         .from('donations')
         .select(`
           id,
+          event_id,
           receipt_number,
           donor_name,
           donor_phone,
