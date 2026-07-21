@@ -21,6 +21,7 @@ type Tab = 'donations' | 'ranking' | 'history' | 'events' | 'team'
 
 type Donation = {
   id: string
+  event_id: string
   receipt_number: string
   donor_name: string
   donor_phone: string
@@ -1223,8 +1224,13 @@ export default function DashboardPage() {
   }
 
   // ── Categorize & Group Donations ─────────────────────────────
-  const selfDonations = donations.filter(d => d.payment_mode === 'upi_self')
-  const nonSelfDonations = donations.filter(d => d.payment_mode !== 'upi_self')
+  const activeEvent = events.find(e => e.is_active)
+  const activeEventDonations = activeEvent
+    ? donations.filter(d => d.event_id === activeEvent.id)
+    : []
+
+  const selfDonations = activeEventDonations.filter(d => d.payment_mode === 'upi_self')
+  const nonSelfDonations = activeEventDonations.filter(d => d.payment_mode !== 'upi_self')
 
   // Calculate stats for non-self (collector) donations
   const collectorTotalCount = nonSelfDonations.length
@@ -1243,9 +1249,9 @@ export default function DashboardPage() {
   const selfPendingCount = selfDonations.filter(d => d.status === 'pending').length
 
   // Unified summary calculations
-  const totalVerifiedCount = donations.filter(d => d.status === 'verified').length
-  const totalAmount = donations.filter(d => d.status === 'verified').reduce((sum, d) => sum + Number(d.amount), 0)
-  const totalPendingAmount = donations.filter(d => d.status === 'pending').reduce((sum, d) => sum + Number(d.amount), 0)
+  const totalVerifiedCount = activeEventDonations.filter(d => d.status === 'verified').length
+  const totalAmount = activeEventDonations.filter(d => d.status === 'verified').reduce((sum, d) => sum + Number(d.amount), 0)
+  const totalPendingAmount = activeEventDonations.filter(d => d.status === 'pending').reduce((sum, d) => sum + Number(d.amount), 0)
 
 
   const collectorGroups: Record<string, CollectorGroup> = {}
@@ -1316,7 +1322,7 @@ export default function DashboardPage() {
 
   const donorGroupsMap: Record<string, DonorGroup> = {}
 
-  donations.filter(d => d.status === 'verified').forEach(d => {
+  activeEventDonations.filter(d => d.status === 'verified').forEach(d => {
     const key = d.donor_phone || d.donor_name || 'unknown'
     if (!donorGroupsMap[key]) {
       donorGroupsMap[key] = {
@@ -1366,10 +1372,10 @@ export default function DashboardPage() {
     return matchesSearch && matchesEvent
   })
 
-  // Get distinct list of collectors who have collections
+  // Get distinct list of collectors who have collections across all events (for history filtering)
   const distinctCollectors: { id: string; name: string }[] = []
-  nonSelfDonations.forEach(d => {
-    if (d.collected_by && d.users?.full_name) {
+  donations.forEach(d => {
+    if (d.payment_mode !== 'upi_self' && d.collected_by && d.users?.full_name) {
       if (!distinctCollectors.some(col => col.id === d.collected_by)) {
         distinctCollectors.push({ id: d.collected_by, name: d.users.full_name })
       }
