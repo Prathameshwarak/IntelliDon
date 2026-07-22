@@ -121,7 +121,7 @@ export async function POST(request: Request) {
       .from('donations')
       .select('id, amount, payment_mode, event_id')
       .eq('collected_by', collector_id)
-      .eq('status', 'verified')
+      .neq('status', 'rejected')
       .is('settlement_id', null)
 
     if (event_id && event_id !== 'all') {
@@ -142,7 +142,7 @@ export async function POST(request: Request) {
     }
 
     if (!pendingDonations || pendingDonations.length === 0) {
-      return NextResponse.json({ error: 'No verified donations awaiting settlement' }, { status: 400 })
+      return NextResponse.json({ error: 'No collections awaiting settlement' }, { status: 400 })
     }
 
     // Calculate amounts
@@ -186,11 +186,17 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Could not record settlement' }, { status: 500 })
     }
 
-    // Update donations with settlement_id
+    // Update donations with settlement_id and set status to verified
     const donationIds = pendingDonations.map(d => d.id)
     const { error: updateErr } = await supabaseAdmin
       .from('donations')
-      .update({ settlement_id: settlement.id })
+      .update({
+        settlement_id: settlement.id,
+        status: 'verified',
+        verified_by,
+        verified_at,
+        verification_type: 'settlement'
+      })
       .in('id', donationIds)
 
     if (updateErr) {
