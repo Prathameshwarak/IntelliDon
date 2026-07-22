@@ -1,6 +1,7 @@
 import { createClient } from '@supabase/supabase-js'
 import { NextResponse } from 'next/server'
 import { buildReceiptData } from '@/lib/receiptData'
+import { resolveScreenshotUrls } from '@/lib/resolveScreenshotUrl'
 
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL,
@@ -320,6 +321,13 @@ export async function GET(request) {
       console.error('Fetch donations error:', error)
       return NextResponse.json({ error: 'Could not fetch donations' }, { status: 500 })
     }
+
+    // Screenshot values stored on the donation are storage paths (or, for
+    // older rows, a legacy signed URL that may have expired) — never a URL
+    // that's guaranteed to still work. Re-sign a fresh URL for each right
+    // before responding, so the screenshot always renders regardless of how
+    // long ago it was uploaded.
+    donations = await resolveScreenshotUrls(supabaseAdmin, donations)
 
     const total_amount = donations.reduce((sum, d) => sum + Number(d.amount), 0)
     const verified_amount = donations
