@@ -1,8 +1,7 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
-import { SPONSOR_PAYMENT_METHODS, PAYMENT_EDIT_WINDOW_MS } from '@/lib/sponsorPaymentMethods'
 
 type EventLite = { id: string; name: string; year: number }
 
@@ -13,7 +12,6 @@ type SponsorPayment = {
   payment_method: string | null
   transaction_id: string | null
   notes: string | null
-  created_at: string
 }
 
 type SponsorBenefit = {
@@ -26,8 +24,6 @@ type SponsorBenefit = {
   duration_text: string | null
 }
 
-type SponsorType = 'finance' | 'goods_service' | 'ads_package'
-
 type Sponsor = {
   id: string
   event_id: string
@@ -38,14 +34,14 @@ type Sponsor = {
   email: string | null
   address: string | null
   gst_no: string | null
-  sponsor_type: SponsorType | null
+  sponsor_type: 'finance' | 'goods_service' | null
   package: string | null
-  package_name: string | null
   committed_amount: number
   contribution_type: 'cash' | 'goods'
   contribution_date: string | null
   contribution_duration: string | null
-  weight: string | null
+  payment_method: string | null
+  transaction_id: string | null
   estimated_value: number | null
   quantity: number | null
   goods_service_description: string | null
@@ -63,19 +59,26 @@ type Props = {
   showToast: (msg: string, type: 'success' | 'error') => void
 }
 
-const SPONSOR_TYPES: { value: SponsorType; label: string }[] = [
+const SPONSOR_TYPES = [
   { value: 'finance', label: 'Finance' },
-  { value: 'goods_service', label: 'Goods/Service' },
-  { value: 'ads_package', label: 'Ads Package' }
+  { value: 'goods_service', label: 'Goods/Service' }
 ]
 const PACKAGES = [
   { value: 'title', label: 'Title' },
   { value: 'platinum', label: 'Platinum' },
   { value: 'gold', label: 'Gold' },
   { value: 'silver', label: 'Silver' },
-  { value: 'supporting', label: 'Supporting' },
-  { value: 'others', label: 'Others' }
+  { value: 'supporting', label: 'Supporting' }
 ]
+// Finance sponsor contribution payment method (distinct from the
+// installment-recording payment method further down, which keeps
+// its broader list of options for actually receiving money later)
+const FINANCE_PAYMENT_METHODS = [
+  { value: 'cash', label: 'Cash' },
+  { value: 'upi', label: 'UPI' },
+  { value: 'cheque', label: 'Cheque' }
+]
+const PAYMENT_METHODS = ['cash', 'upi', 'bank_transfer', 'cheque', 'goods', 'service', 'other']
 
 const STATUS_STYLES: Record<string, string> = {
   completed: 'bg-green-900/50 text-green-400',
@@ -94,17 +97,6 @@ function formatMoney(n: number) {
   return `₹${Number(n || 0).toLocaleString('en-IN', { maximumFractionDigits: 0 })}`
 }
 
-// Only digits, capped at 9 — used for Committed Amount / Quantity / Estimated Value
-function onlyDigits9(value: string) {
-  const digitsOnly = value.replace(/[^0-9]/g, '')
-  return digitsOnly.slice(0, 9)
-}
-
-function paymentMethodLabel(value: string | null) {
-  if (!value) return 'unspecified'
-  return SPONSOR_PAYMENT_METHODS.find(m => m.value === value)?.label || value
-}
-
 const emptyForm = {
   event_id: '',
   company_name: '',
@@ -113,17 +105,16 @@ const emptyForm = {
   email: '',
   address: '',
   gst_no: '',
-  reference_name: '',
-  sponsor_type: '' as '' | SponsorType,
-  // Ads Package-only
+  reference_name: '',       // moved: now appears after GST No. in the form
+  sponsor_type: '' as '' | 'finance' | 'goods_service',
   package: '',
-  package_name: '',
-  // Finance / Ads Package-only
+  // Finance-only fields
   committed_amount: '',
   contribution_date: '',
-  // Goods/Service-only
+  payment_method: '',
+  transaction_id: '',
+  // Goods/Service-only fields
   goods_service_description: '', // "Goods/Service Name"
-  weight: '',
   quantity: '',
   estimated_value: '',
   // Shared
@@ -140,11 +131,9 @@ export default function SponsorshipSection({ mandalId, events, showToast }: Prop
   const [editingId, setEditingId] = useState<string | null>(null)
   const [form, setForm] = useState(emptyForm)
   const [submitting, setSubmitting] = useState(false)
-  const [showMore, setShowMore] = useState(false) // reveals GST No. + Reference Name
 
   const [expandedId, setExpandedId] = useState<string | null>(null)
   const [expandedPanel, setExpandedPanel] = useState<'payments' | 'benefits'>('payments')
-  const expandedCardRef = useRef<HTMLDivElement | null>(null)
 
   const [payAmount, setPayAmount] = useState('')
   const [payMethod, setPayMethod] = useState('cash')
@@ -152,9 +141,6 @@ export default function SponsorshipSection({ mandalId, events, showToast }: Prop
   const [payTxnId, setPayTxnId] = useState('')
   const [payNotes, setPayNotes] = useState('')
   const [paySubmitting, setPaySubmitting] = useState(false)
-
-  // Editing an existing sponsor payment (within the 3-hour window)
-  const [editingPaymentId, setEditingPaymentId] = useState<string | null>(null)
 
   const [benefitName, setBenefitName] = useState('')
   const [benefitRepetition, setBenefitRepetition] = useState('')
@@ -189,26 +175,10 @@ export default function SponsorshipSection({ mandalId, events, showToast }: Prop
 
   useEffect(() => { if (mandalId) fetchSponsors() }, [mandalId, eventFilter])
 
-  // ── Auto-close the expanded Payments/Promises card on outside click ──
-  useEffect(() => {
-    if (!expandedId) return
-
-    function handleOutsideClick(e: MouseEvent) {
-      const target = e.target as HTMLElement
-      if (expandedCardRef.current && expandedCardRef.current.contains(target)) return
-      setExpandedId(null)
-      setEditingPaymentId(null)
-    }
-
-    document.addEventListener('mousedown', handleOutsideClick)
-    return () => document.removeEventListener('mousedown', handleOutsideClick)
-  }, [expandedId])
-
   function resetForm() {
     setForm(emptyForm)
     setShowForm(false)
     setEditingId(null)
-    setShowMore(false)
   }
 
   function startEdit(s: Sponsor) {
@@ -222,18 +192,17 @@ export default function SponsorshipSection({ mandalId, events, showToast }: Prop
       address: s.address || '',
       gst_no: s.gst_no || '',
       reference_name: s.reference_name || '',
-      sponsor_type: (s.sponsor_type as SponsorType) || '',
+      sponsor_type: (s.sponsor_type as 'finance' | 'goods_service') || '',
       package: s.package || '',
-      package_name: s.package_name || '',
       committed_amount: s.committed_amount ? String(s.committed_amount) : '',
       contribution_date: s.contribution_date || '',
+      payment_method: s.payment_method || '',
+      transaction_id: s.transaction_id || '',
       goods_service_description: s.goods_service_description || '',
-      weight: s.weight || '',
       quantity: s.quantity ? String(s.quantity) : '',
       estimated_value: s.estimated_value ? String(s.estimated_value) : '',
       notes: s.notes || ''
     })
-    setShowMore(!!(s.gst_no || s.reference_name))
     setShowForm(true)
   }
 
@@ -244,34 +213,16 @@ export default function SponsorshipSection({ mandalId, events, showToast }: Prop
   async function submitSponsorForm() {
     if (!form.event_id) { showToast('Select an event', 'error'); return }
     if (!form.company_name.trim()) { showToast('Sponsor Company/Business/Name is required', 'error'); return }
-    if (form.company_name.trim().length > 75) { showToast('Company/Business Name must be 75 characters or fewer', 'error'); return }
-    if (form.contact_person_name.trim().length > 50) { showToast('Contact Person must be 50 characters or fewer', 'error'); return }
-    if (form.contact_person_phone && !/^[0-9]{10}$/.test(form.contact_person_phone.trim())) {
-      showToast('Enter a valid 10-digit phone number', 'error'); return
+    if (form.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) { showToast('Enter a valid email', 'error'); return }
+    if (form.contact_person_phone && !/^[0-9+\-\s()]{7,15}$/.test(form.contact_person_phone)) { showToast('Enter a valid phone number', 'error'); return }
+    if (form.sponsor_type === 'finance' && form.committed_amount && Number(form.committed_amount) < 0) {
+      showToast('Committed amount cannot be negative', 'error'); return
     }
-    if (form.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email.trim())) { showToast('Enter a valid email', 'error'); return }
-    if (form.address.trim().length > 100) { showToast('Address must be 100 characters or fewer', 'error'); return }
-    if (form.gst_no && !/^[0-9]{2}[A-Za-z]{5}[0-9]{4}[A-Za-z][1-9A-Za-z]Z[0-9A-Za-z]$/.test(form.gst_no.trim())) {
-      showToast('Enter a valid GST number', 'error'); return
+    if (form.sponsor_type === 'goods_service' && form.quantity && Number(form.quantity) < 0) {
+      showToast('Quantity cannot be negative', 'error'); return
     }
-    if (form.reference_name.trim().length > 50) { showToast('Reference Name must be 50 characters or fewer', 'error'); return }
-    if (form.notes.trim().length > 100) { showToast('Note must be 100 characters or fewer', 'error'); return }
-
-    if (form.sponsor_type === 'finance' || form.sponsor_type === 'ads_package') {
-      if (!form.committed_amount) { showToast('Committed Amount is required', 'error'); return }
-      if (!form.contribution_date) { showToast('Date is required', 'error'); return }
-    }
-    if (form.sponsor_type === 'ads_package') {
-      if (!form.package) { showToast('Select a Package Type', 'error'); return }
-      if (form.package === 'others' && !form.package_name.trim()) { showToast('Package Name is required', 'error'); return }
-      if (form.package_name.trim().length > 75) { showToast('Package Name must be 75 characters or fewer', 'error'); return }
-    }
-    if (form.sponsor_type === 'goods_service') {
-      if (!form.goods_service_description.trim()) { showToast('Goods/Service Name is required', 'error'); return }
-      if (form.goods_service_description.trim().length > 75) { showToast('Goods/Service Name must be 75 characters or fewer', 'error'); return }
-      if (!form.weight.trim()) { showToast('Weight is required', 'error'); return }
-      if (form.weight.trim().length > 10) { showToast('Weight must be 10 characters or fewer', 'error'); return }
-      if (!form.quantity) { showToast('Quantity is required', 'error'); return }
+    if (form.sponsor_type === 'goods_service' && form.estimated_value && Number(form.estimated_value) < 0) {
+      showToast('Estimated value cannot be negative', 'error'); return
     }
 
     setSubmitting(true)
@@ -287,14 +238,14 @@ export default function SponsorshipSection({ mandalId, events, showToast }: Prop
       gst_no: form.gst_no.trim() || null,
       reference_name: form.reference_name.trim() || null,
       sponsor_type: form.sponsor_type || null,
-      package: form.sponsor_type === 'ads_package' ? (form.package || null) : null,
-      package_name: form.sponsor_type === 'ads_package' && form.package === 'others' ? (form.package_name.trim() || null) : null,
-      // Finance / Ads Package
-      committed_amount: (form.sponsor_type === 'finance' || form.sponsor_type === 'ads_package') && form.committed_amount ? Number(form.committed_amount) : 0,
-      contribution_date: (form.sponsor_type === 'finance' || form.sponsor_type === 'ads_package') ? (form.contribution_date || null) : null,
-      // Goods/Service
+      package: form.package || null,
+      // Finance-only
+      committed_amount: form.sponsor_type === 'finance' && form.committed_amount ? Number(form.committed_amount) : 0,
+      contribution_date: form.sponsor_type === 'finance' ? (form.contribution_date || null) : null,
+      payment_method: form.sponsor_type === 'finance' ? (form.payment_method.trim() || null) : null,
+      transaction_id: form.sponsor_type === 'finance' ? (form.transaction_id.trim() || null) : null,
+      // Goods/Service-only
       goods_service_description: form.sponsor_type === 'goods_service' ? (form.goods_service_description.trim() || null) : null,
-      weight: form.sponsor_type === 'goods_service' ? (form.weight.trim() || null) : null,
       quantity: form.sponsor_type === 'goods_service' && form.quantity ? Number(form.quantity) : null,
       estimated_value: form.sponsor_type === 'goods_service' && form.estimated_value ? Number(form.estimated_value) : null,
       notes: form.notes.trim() || null
@@ -314,10 +265,6 @@ export default function SponsorshipSection({ mandalId, events, showToast }: Prop
     setSubmitting(false)
   }
 
-  function resetPaymentForm() {
-    setPayAmount(''); setPayMethod('cash'); setPayDate(new Date().toISOString().slice(0, 16)); setPayTxnId(''); setPayNotes('')
-    setEditingPaymentId(null)
-  }
 
   function toggleExpand(s: Sponsor, panel: 'payments' | 'benefits') {
     if (expandedId === s.id && expandedPanel === panel) {
@@ -325,59 +272,45 @@ export default function SponsorshipSection({ mandalId, events, showToast }: Prop
     } else {
       setExpandedId(s.id)
       setExpandedPanel(panel)
-      resetPaymentForm()
+      setPayAmount(''); setPayMethod('cash'); setPayDate(new Date().toISOString().slice(0, 16)); setPayTxnId(''); setPayNotes('')
       setBenefitName(''); setBenefitRepetition(''); setBenefitStart(''); setBenefitEnd('')
     }
   }
 
-  function canEditPayment(p: SponsorPayment) {
-    return Date.now() - new Date(p.created_at).getTime() <= PAYMENT_EDIT_WINDOW_MS
-  }
-
-  function startEditPayment(p: SponsorPayment) {
-    if (!canEditPayment(p)) {
-      showToast('This payment can no longer be edited — the 3-hour edit window has passed', 'error')
-      return
-    }
-    setEditingPaymentId(p.id)
-    setPayAmount(String(p.amount))
-    setPayMethod(p.payment_method || 'cash')
-    setPayDate(new Date(p.received_at).toISOString().slice(0, 16))
-    setPayTxnId(p.transaction_id || '')
-    setPayNotes(p.notes || '')
-  }
-
   async function submitPayment(s: Sponsor) {
     if (!payAmount || Number(payAmount) <= 0) { showToast('Enter a valid amount', 'error'); return }
-    if (s.committed_amount > 0) {
-      const otherPaymentsTotal = s.payments
-        .filter(p => p.id !== editingPaymentId)
-        .reduce((sum, p) => sum + Number(p.amount), 0)
-      const pendingForThisEntry = s.committed_amount - otherPaymentsTotal
-      if (Number(payAmount) > pendingForThisEntry + 0.01) {
-        showToast(`Amount exceeds pending balance of ${formatMoney(pendingForThisEntry)}`, 'error'); return
-      }
+    if (s.committed_amount > 0 && Number(payAmount) > s.amount_pending + 0.01) {
+      showToast(`Amount exceeds pending balance of ${formatMoney(s.amount_pending)}`, 'error'); return
     }
     setPaySubmitting(true)
     const headers = await getAuthHeaders()
-    const body = JSON.stringify({
-      amount: Number(payAmount),
-      received_at: new Date(payDate).toISOString(),
-      payment_method: payMethod,
-      transaction_id: payTxnId.trim() || null,
-      notes: payNotes.trim() || null
+    const res = await fetch(`/api/sponsors/${s.id}/payments`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({
+        amount: Number(payAmount),
+        received_at: new Date(payDate).toISOString(),
+        payment_method: payMethod,
+        transaction_id: payTxnId.trim() || null,
+        notes: payNotes.trim() || null
+      })
     })
-
-    const res = editingPaymentId
-      ? await fetch(`/api/sponsors/payments/${editingPaymentId}`, { method: 'PATCH', headers, body })
-      : await fetch(`/api/sponsors/${s.id}/payments`, { method: 'POST', headers, body })
     const data = await res.json()
     if (data.success) {
-      showToast(editingPaymentId ? 'Payment updated' : 'Payment recorded', 'success')
-      resetPaymentForm()
+      showToast('Payment recorded', 'success')
+      setPayAmount(''); setPayTxnId(''); setPayNotes('')
       fetchSponsors()
-    } else showToast(data.error || 'Could not save payment', 'error')
+    } else showToast(data.error || 'Could not record payment', 'error')
     setPaySubmitting(false)
+  }
+
+  async function deletePayment(paymentId: string) {
+    if (!confirm('Remove this payment entry?')) return
+    const headers = await getAuthHeaders()
+    const res = await fetch(`/api/sponsors/payments/${paymentId}`, { method: 'DELETE', headers })
+    const data = await res.json()
+    if (data.success) { showToast('Payment removed', 'success'); fetchSponsors() }
+    else showToast(data.error || 'Could not remove payment', 'error')
   }
 
   async function submitBenefit(s: Sponsor) {
@@ -471,7 +404,7 @@ export default function SponsorshipSection({ mandalId, events, showToast }: Prop
           <p className="text-sm font-medium text-white">{editingId ? 'Edit Sponsor' : 'New Sponsor'}</p>
 
           <div>
-            <label className="text-xs text-gray-400 mb-1 block">Event</label>
+            <label className="text-xs text-gray-400 mb-1 block">Event *</label>
             <select value={form.event_id} onChange={e => setField('event_id', e.target.value)}
               className="w-full bg-gray-900 border border-gray-700 rounded-lg px-3 py-2.5 text-sm text-white focus:outline-none focus:border-orange-500">
               <option value="">Select event</option>
@@ -481,57 +414,72 @@ export default function SponsorshipSection({ mandalId, events, showToast }: Prop
 
           {/* Details */}
           <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mt-1">Details</p>
-          <input value={form.company_name} onChange={e => setField('company_name', e.target.value.slice(0, 75))} placeholder="Sponsor Company / Business / Name"
+          <input value={form.company_name} onChange={e => setField('company_name', e.target.value)} placeholder="Sponsor Company / Business / Name *"
             className="bg-gray-900 border border-gray-700 rounded-lg px-3 py-2.5 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-orange-500" />
           <div className="grid grid-cols-2 gap-2">
-            <input value={form.contact_person_name} onChange={e => setField('contact_person_name', e.target.value.slice(0, 50))} placeholder="Contact person name (optional)"
+            <input value={form.contact_person_name} onChange={e => setField('contact_person_name', e.target.value)} placeholder="Contact person name"
               className="bg-gray-900 border border-gray-700 rounded-lg px-3 py-2.5 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-orange-500" />
-            <input value={form.contact_person_phone} onChange={e => setField('contact_person_phone', e.target.value.replace(/[^0-9]/g, '').slice(0, 10))} placeholder="Contact phone (optional)" type="tel" inputMode="numeric"
+            <input value={form.contact_person_phone} onChange={e => setField('contact_person_phone', e.target.value)} placeholder="Contact phone" type="tel"
               className="bg-gray-900 border border-gray-700 rounded-lg px-3 py-2.5 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-orange-500" />
           </div>
-          <input value={form.email} onChange={e => setField('email', e.target.value)} placeholder="Email (optional)" type="email"
+          <input value={form.email} onChange={e => setField('email', e.target.value)} placeholder="Email" type="email"
             className="bg-gray-900 border border-gray-700 rounded-lg px-3 py-2.5 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-orange-500" />
-          <input value={form.address} onChange={e => setField('address', e.target.value.slice(0, 100))} placeholder="Address (optional)"
+          <input value={form.address} onChange={e => setField('address', e.target.value)} placeholder="Address"
+            className="bg-gray-900 border border-gray-700 rounded-lg px-3 py-2.5 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-orange-500" />
+          <input value={form.gst_no} onChange={e => setField('gst_no', e.target.value)} placeholder="GST No. (optional)"
+            className="bg-gray-900 border border-gray-700 rounded-lg px-3 py-2.5 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-orange-500" />
+          <input value={form.reference_name} onChange={e => setField('reference_name', e.target.value)} placeholder="Sponsor Reference Name (optional)"
             className="bg-gray-900 border border-gray-700 rounded-lg px-3 py-2.5 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-orange-500" />
 
-          {!showMore ? (
-            <button type="button" onClick={() => setShowMore(true)} className="text-xs text-orange-400 hover:text-orange-300 font-medium self-start">
-              + More
-            </button>
-          ) : (
-            <>
-              <input value={form.gst_no} onChange={e => setField('gst_no', e.target.value.toUpperCase().slice(0, 15))} placeholder="GST No. (optional)"
-                className="bg-gray-900 border border-gray-700 rounded-lg px-3 py-2.5 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-orange-500" />
-              <input value={form.reference_name} onChange={e => setField('reference_name', e.target.value.slice(0, 50))} placeholder="Sponsor Reference Name (optional)"
-                className="bg-gray-900 border border-gray-700 rounded-lg px-3 py-2.5 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-orange-500" />
-              <button type="button" onClick={() => setShowMore(false)} className="text-xs text-gray-500 hover:text-gray-300 font-medium self-start">
-                − Less
-              </button>
-            </>
-          )}
-
-          {/* Sponsor Type dropdown */}
+          {/* Type + Package */}
           <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mt-1">Sponsor Type</p>
-          <select
-            value={form.sponsor_type}
-            onChange={e => setField('sponsor_type', e.target.value as '' | SponsorType)}
-            className="w-full bg-gray-900 border border-gray-700 rounded-lg px-3 py-2.5 text-sm text-white focus:outline-none focus:border-orange-500"
-          >
-            <option value="">Select sponsor type</option>
-            {SPONSOR_TYPES.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
-          </select>
+          <div className="grid grid-cols-2 gap-2">
+            {SPONSOR_TYPES.map(t => (
+              <button key={t.value} type="button" onClick={() => setField('sponsor_type', form.sponsor_type === t.value ? '' : t.value as 'finance' | 'goods_service')}
+                className={`py-2 rounded-lg text-xs font-medium border transition-colors
+                  ${form.sponsor_type === t.value ? 'bg-orange-500 border-orange-500 text-white' : 'bg-gray-900 border-gray-700 text-gray-400'}`}>
+                {t.label}
+              </button>
+            ))}
+          </div>
+
+          <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mt-1">Sponsor Package (optional)</p>
+          <div className="grid grid-cols-3 gap-2">
+            {PACKAGES.map(p => (
+              <button key={p.value} type="button" onClick={() => setField('package', form.package === p.value ? '' : p.value)}
+                className={`py-2 rounded-lg text-xs font-medium border transition-colors
+                  ${form.package === p.value ? 'bg-orange-500 border-orange-500 text-white' : 'bg-gray-900 border-gray-700 text-gray-400'}`}>
+                {p.label}
+              </button>
+            ))}
+          </div>
 
           {/* Finance-only fields */}
           {form.sponsor_type === 'finance' && (
             <>
               <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mt-1">Finance Details</p>
               <div className="grid grid-cols-2 gap-2">
-                <input value={form.committed_amount} onChange={e => setField('committed_amount', onlyDigits9(e.target.value))}
-                  type="text" inputMode="numeric" maxLength={9} placeholder="Committed Amount (₹)"
+                <input value={form.committed_amount} onChange={e => setField('committed_amount', e.target.value)} type="number" min="0" step="0.01"
+                  placeholder="Committed Amount (₹)"
                   className="bg-gray-900 border border-gray-700 rounded-lg px-3 py-2.5 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-orange-500" />
                 <input value={form.contribution_date} onChange={e => setField('contribution_date', e.target.value)} type="date" placeholder="Date"
                   className="bg-gray-900 border border-gray-700 rounded-lg px-3 py-2.5 text-sm text-white focus:outline-none focus:border-orange-500" style={{ colorScheme: 'dark' }} />
               </div>
+              <div>
+                <label className="text-xs text-gray-400 mb-1 block">Payment Method</label>
+                <div className="grid grid-cols-3 gap-2">
+                  {FINANCE_PAYMENT_METHODS.map(m => (
+                    <button key={m.value} type="button" onClick={() => setField('payment_method', form.payment_method === m.value ? '' : m.value)}
+                      className={`py-2 rounded-lg text-xs font-medium border transition-colors
+                        ${form.payment_method === m.value ? 'bg-orange-500 border-orange-500 text-white' : 'bg-gray-900 border-gray-700 text-gray-400'}`}>
+                      {m.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <input value={form.transaction_id} onChange={e => setField('transaction_id', e.target.value)}
+                placeholder={form.payment_method === 'cheque' ? 'Cheque No.' : 'Transaction ID'}
+                className="bg-gray-900 border border-gray-700 rounded-lg px-3 py-2.5 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-orange-500" />
             </>
           )}
 
@@ -539,44 +487,19 @@ export default function SponsorshipSection({ mandalId, events, showToast }: Prop
           {form.sponsor_type === 'goods_service' && (
             <>
               <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mt-1">Goods / Service Details</p>
-              <input value={form.goods_service_description} onChange={e => setField('goods_service_description', e.target.value.slice(0, 75))} placeholder="Goods/Service Name"
+              <input value={form.goods_service_description} onChange={e => setField('goods_service_description', e.target.value)} placeholder="Goods/Service Name"
                 className="bg-gray-900 border border-gray-700 rounded-lg px-3 py-2.5 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-orange-500" />
               <div className="grid grid-cols-2 gap-2">
-                <input value={form.weight} onChange={e => setField('weight', e.target.value.slice(0, 10))} placeholder="Weight"
+                <input value={form.quantity} onChange={e => setField('quantity', e.target.value)} type="number" min="0" step="1" placeholder="Quantity"
                   className="bg-gray-900 border border-gray-700 rounded-lg px-3 py-2.5 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-orange-500" />
-                <input value={form.quantity} onChange={e => setField('quantity', onlyDigits9(e.target.value))} type="text" inputMode="numeric" maxLength={9} placeholder="Quantity"
+                <input value={form.estimated_value} onChange={e => setField('estimated_value', e.target.value)} type="number" min="0" step="0.01" placeholder="Estimated Value (₹)"
                   className="bg-gray-900 border border-gray-700 rounded-lg px-3 py-2.5 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-orange-500" />
-              </div>
-              <input value={form.estimated_value} onChange={e => setField('estimated_value', onlyDigits9(e.target.value))} type="text" inputMode="numeric" maxLength={9} placeholder="Estimated Value (₹) (optional)"
-                className="bg-gray-900 border border-gray-700 rounded-lg px-3 py-2.5 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-orange-500" />
-            </>
-          )}
-
-          {/* Ads Package-only fields */}
-          {form.sponsor_type === 'ads_package' && (
-            <>
-              <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mt-1">Ads Package Details</p>
-              <select value={form.package} onChange={e => setField('package', e.target.value)}
-                className="w-full bg-gray-900 border border-gray-700 rounded-lg px-3 py-2.5 text-sm text-white focus:outline-none focus:border-orange-500">
-                <option value="">Select package type</option>
-                {PACKAGES.map(p => <option key={p.value} value={p.value}>{p.label}</option>)}
-              </select>
-              {form.package === 'others' && (
-                <input value={form.package_name} onChange={e => setField('package_name', e.target.value.slice(0, 75))} placeholder="Package Name"
-                  className="bg-gray-900 border border-gray-700 rounded-lg px-3 py-2.5 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-orange-500" />
-              )}
-              <div className="grid grid-cols-2 gap-2">
-                <input value={form.committed_amount} onChange={e => setField('committed_amount', onlyDigits9(e.target.value))}
-                  type="text" inputMode="numeric" maxLength={9} placeholder="Committed Amount (₹)"
-                  className="bg-gray-900 border border-gray-700 rounded-lg px-3 py-2.5 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-orange-500" />
-                <input value={form.contribution_date} onChange={e => setField('contribution_date', e.target.value)} type="date" placeholder="Date"
-                  className="bg-gray-900 border border-gray-700 rounded-lg px-3 py-2.5 text-sm text-white focus:outline-none focus:border-orange-500" style={{ colorScheme: 'dark' }} />
               </div>
             </>
           )}
 
           {form.sponsor_type && (
-            <textarea value={form.notes} onChange={e => setField('notes', e.target.value.slice(0, 100))} placeholder="Note (optional)" rows={2}
+            <textarea value={form.notes} onChange={e => setField('notes', e.target.value)} placeholder="Notes (optional)" rows={2}
               className="bg-gray-900 border border-gray-700 rounded-lg px-3 py-2.5 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-orange-500 resize-none" />
           )}
 
@@ -596,11 +519,8 @@ export default function SponsorshipSection({ mandalId, events, showToast }: Prop
         <p className="text-gray-500 text-sm text-center py-8">No sponsors added yet.</p>
       ) : (
         <div className="flex flex-col gap-3">
-          {sponsors.map(s => {
-            const isExpanded = expandedId === s.id
-            const displayPackage = s.package === 'others' ? (s.package_name || 'Others') : s.package
-            return (
-            <div key={s.id} ref={isExpanded ? expandedCardRef : undefined} className="bg-gray-800 border border-gray-700 rounded-xl p-4">
+          {sponsors.map(s => (
+            <div key={s.id} className="bg-gray-800 border border-gray-700 rounded-xl p-4">
               <div className="flex items-start justify-between gap-3">
                 <div className="flex-1">
                   <div className="flex items-center gap-2 flex-wrap">
@@ -608,9 +528,9 @@ export default function SponsorshipSection({ mandalId, events, showToast }: Prop
                     <span className={`text-[10px] px-2 py-0.5 rounded-full font-semibold ${STATUS_STYLES[s.payment_status]}`}>
                       {STATUS_LABELS[s.payment_status]}
                     </span>
-                    {displayPackage && (
+                    {s.package && (
                       <span className="text-[10px] px-2 py-0.5 rounded-full font-semibold bg-purple-900/50 text-purple-300 capitalize">
-                        {displayPackage}
+                        {s.package}
                       </span>
                     )}
                     {s.sponsor_type && (
@@ -639,23 +559,23 @@ export default function SponsorshipSection({ mandalId, events, showToast }: Prop
 
               <div className="flex items-center gap-3 mt-3 flex-wrap">
                 <button onClick={() => toggleExpand(s, 'payments')} className="text-xs text-orange-400 hover:text-orange-300 font-medium">
-                  {isExpanded && expandedPanel === 'payments' ? 'Hide payments' : `Payments (${s.payments.length})`}
+                  {expandedId === s.id && expandedPanel === 'payments' ? 'Hide payments' : `Payments (${s.payments.length})`}
                 </button>
                 <button onClick={() => toggleExpand(s, 'benefits')} className="text-xs text-purple-400 hover:text-purple-300 font-medium">
-                  {isExpanded && expandedPanel === 'benefits' ? 'Hide promises' : `Promises (${s.benefits.length})`}
+                  {expandedId === s.id && expandedPanel === 'benefits' ? 'Hide promises' : `Promises (${s.benefits.length})`}
                 </button>
                 <button onClick={() => startEdit(s)} className="text-xs text-gray-400 hover:text-white font-medium ml-auto">Edit</button>
               </div>
 
               {/* Payments panel */}
-              {isExpanded && expandedPanel === 'payments' && (
+              {expandedId === s.id && expandedPanel === 'payments' && (
                 <div className="mt-3 pt-3 border-t border-gray-700 flex flex-col gap-2">
                   {s.payments.length === 0 && <p className="text-xs text-gray-500">No payments recorded yet.</p>}
                   {s.payments.map(p => (
                     <div key={p.id} className="flex items-center justify-between bg-gray-900 border border-gray-800 rounded-lg px-3 py-2">
                       <div>
                         <p className="text-xs text-white font-medium">
-                          {formatMoney(p.amount)} <span className="text-gray-500 font-normal">· {paymentMethodLabel(p.payment_method)}</span>
+                          {formatMoney(p.amount)} <span className="text-gray-500 font-normal">· {p.payment_method || 'unspecified'}</span>
                         </p>
                         <p className="text-[11px] text-gray-500">
                           {new Date(p.received_at).toLocaleString('en-IN', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
@@ -663,24 +583,20 @@ export default function SponsorshipSection({ mandalId, events, showToast }: Prop
                           {p.notes ? ` · ${p.notes}` : ''}
                         </p>
                       </div>
-                      {canEditPayment(p) && (
-                        <button onClick={() => startEditPayment(p)} className="text-[11px] text-orange-400/80 hover:text-orange-400">Edit</button>
-                      )}
+                      <button onClick={() => deletePayment(p.id)} className="text-[11px] text-red-400/70 hover:text-red-400">Remove</button>
                     </div>
                   ))}
 
-                  {(s.committed_amount === 0 || s.amount_pending > 0 || editingPaymentId) && (
+                  {(s.committed_amount === 0 || s.amount_pending > 0) && (
                     <div className="bg-gray-900 border border-gray-800 rounded-lg p-3 mt-1 flex flex-col gap-2">
-                      <p className="text-xs font-medium text-gray-300">
-                        {editingPaymentId ? 'Edit payment' : 'Record a payment (installment)'}
-                      </p>
+                      <p className="text-xs font-medium text-gray-300">Record a payment (installment)</p>
                       <div className="grid grid-cols-2 gap-2">
                         <input value={payAmount} onChange={e => setPayAmount(e.target.value)} type="number" min="0" step="0.01"
                           placeholder={s.committed_amount > 0 ? `Amount (up to ${formatMoney(s.amount_pending)})` : 'Amount'}
                           className="bg-gray-950 border border-gray-800 rounded-lg px-3 py-2 text-xs text-white placeholder-gray-600 focus:outline-none focus:border-orange-500" />
                         <select value={payMethod} onChange={e => setPayMethod(e.target.value)}
                           className="bg-gray-950 border border-gray-800 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-orange-500">
-                          {SPONSOR_PAYMENT_METHODS.map(m => <option key={m.value} value={m.value}>{m.label}</option>)}
+                          {PAYMENT_METHODS.map(m => <option key={m} value={m}>{m.replace('_', ' ')}</option>)}
                         </select>
                       </div>
                       <input value={payDate} onChange={e => setPayDate(e.target.value)} type="datetime-local"
@@ -689,22 +605,17 @@ export default function SponsorshipSection({ mandalId, events, showToast }: Prop
                         className="bg-gray-950 border border-gray-800 rounded-lg px-3 py-2 text-xs text-white placeholder-gray-600 focus:outline-none focus:border-orange-500" />
                       <input value={payNotes} onChange={e => setPayNotes(e.target.value)} placeholder="Notes (optional)"
                         className="bg-gray-950 border border-gray-800 rounded-lg px-3 py-2 text-xs text-white placeholder-gray-600 focus:outline-none focus:border-orange-500" />
-                      <div className="flex gap-2">
-                        <button onClick={() => submitPayment(s)} disabled={paySubmitting}
-                          className="flex-1 bg-orange-500 hover:bg-orange-600 disabled:opacity-50 text-white text-xs font-medium py-2 rounded-lg">
-                          {paySubmitting ? 'Saving...' : editingPaymentId ? 'Save Changes' : 'Record Payment'}
-                        </button>
-                        {editingPaymentId && (
-                          <button onClick={resetPaymentForm} className="px-3 bg-gray-800 text-gray-300 text-xs rounded-lg">Cancel</button>
-                        )}
-                      </div>
+                      <button onClick={() => submitPayment(s)} disabled={paySubmitting}
+                        className="bg-orange-500 hover:bg-orange-600 disabled:opacity-50 text-white text-xs font-medium py-2 rounded-lg">
+                        {paySubmitting ? 'Recording...' : 'Record Payment'}
+                      </button>
                     </div>
                   )}
                 </div>
               )}
 
               {/* Promises panel */}
-              {isExpanded && expandedPanel === 'benefits' && (
+              {expandedId === s.id && expandedPanel === 'benefits' && (
                 <div className="mt-3 pt-3 border-t border-gray-700 flex flex-col gap-2">
                   {s.benefits.length === 0 && <p className="text-xs text-gray-500">No promised benefits added yet.</p>}
                   {s.benefits.map(b => (
@@ -752,8 +663,7 @@ export default function SponsorshipSection({ mandalId, events, showToast }: Prop
                 </div>
               )}
             </div>
-            )
-          })}
+          ))}
         </div>
       )}
     </div>

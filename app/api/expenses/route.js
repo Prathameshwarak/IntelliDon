@@ -1,6 +1,5 @@
 import { createClient } from '@supabase/supabase-js'
 import { NextResponse } from 'next/server'
-import { EXPENSE_PAYMENT_MODE_VALUES } from '@/lib/expensePaymentModes'
 
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL,
@@ -46,7 +45,7 @@ async function verifyCaller(request, mandalIdToCheck) {
 //    is the primary line of defense; the DB constraints are the backstop) ──
 const MAX_AMOUNT = 999999999 // 9 digits
 
-function validateExpenseFields({ expense_date, vendor_name, vendor_phone, title, description, amount, transaction_id, payment_mode }) {
+function validateExpenseFields({ expense_date, vendor_name, vendor_phone, title, description, amount, transaction_id }) {
   if (!expense_date || isNaN(new Date(expense_date).getTime())) {
     return 'A valid expense date is required'
   }
@@ -77,9 +76,6 @@ function validateExpenseFields({ expense_date, vendor_name, vendor_phone, title,
   if (transaction_id && transaction_id.trim()) {
     if (transaction_id.trim().length > 25) return 'Transaction ID must be 25 characters or fewer'
     if (!/^[A-Za-z0-9]+$/.test(transaction_id.trim())) return 'Transaction ID must be alphanumeric'
-  }
-  if (payment_mode && !EXPENSE_PAYMENT_MODE_VALUES.includes(payment_mode)) {
-    return 'Invalid payment mode'
   }
   return null
 }
@@ -128,29 +124,10 @@ export async function GET(request) {
     namesById = Object.fromEntries((creators || []).map(u => [u.id, u.full_name]))
   }
 
-  // Each flat expense entry has (at most) a single matching expense_payments
-  // row — created alongside it to capture "how it was paid" (payment mode).
-  // Resolve those in one batch query and attach to each expense.
-  const expenseIds = expenses.map(e => e.id)
-  const { data: payments } = await supabaseAdmin
-    .from('expense_payments')
-    .select('id, expense_id, payment_mode')
-    .in('expense_id', expenseIds)
-
-  const paymentByExpenseId = {}
-  for (const p of payments || []) {
-    // If multiple payment rows ever exist for one expense, prefer the most
-    // recently seen one (query has no explicit order, but this keeps the
-    // lookup defensive rather than throwing away data).
-    paymentByExpenseId[p.expense_id] = p
-  }
-
   const fullExpenses = expenses.map(e => ({
     ...e,
     created_by_name: e.created_by ? (namesById[e.created_by] || 'Unknown') : null,
-    updated_by_name: e.updated_by ? (namesById[e.updated_by] || 'Unknown') : null,
-    payment_mode: paymentByExpenseId[e.id]?.payment_mode || null,
-    payment_id: paymentByExpenseId[e.id]?.id || null
+    updated_by_name: e.updated_by ? (namesById[e.updated_by] || 'Unknown') : null
   }))
 
   const summary = {
@@ -165,13 +142,13 @@ export async function GET(request) {
 export async function POST(request) {
   try {
     const body = await request.json()
-    const { mandal_id, event_id, expense_date, vendor_name, vendor_phone, title, description, amount, transaction_id, payment_mode } = body
+    const { mandal_id, event_id, expense_date, vendor_name, vendor_phone, title, description, amount, transaction_id } = body
 
     if (!mandal_id || !event_id) {
       return NextResponse.json({ error: 'mandal_id and event_id are required' }, { status: 400 })
     }
 
-    const validationError = validateExpenseFields({ expense_date, vendor_name, vendor_phone, title, description, amount, transaction_id, payment_mode })
+    const validationError = validateExpenseFields({ expense_date, vendor_name, vendor_phone, title, description, amount, transaction_id })
     if (validationError) {
       return NextResponse.json({ error: validationError }, { status: 400 })
     }
@@ -216,27 +193,7 @@ export async function POST(request) {
       return NextResponse.json({ error: 'Could not create expense' }, { status: 500 })
     }
 
-    // Record how this expense was paid as a single, fully-paid entry in the
-    // existing expense_payments table (amount === expense.amount). This
-    // reuses the installment-payment infrastructure already backing
-    // /api/expenses/[id]/payments instead of adding a new column.
-    let paymentId = null
-    if (payment_mode) {
-      const { data: payment } = await supabaseAdmin
-        .from('expense_payments')
-        .insert({
-          expense_id: expense.id,
-          amount: Number(amount),
-          paid_at: new Date(expense_date).toISOString(),
-          payment_mode,
-          recorded_by: authCheck.callerId
-        })
-        .select('id')
-        .single()
-      paymentId = payment?.id || null
-    }
-
-    return NextResponse.json({ success: true, expense: { ...expense, payment_mode: payment_mode || null, payment_id: paymentId } })
+    return NextResponse.json({ success: true, expense })
   } catch (err) {
     return NextResponse.json({ error: 'Something went wrong' }, { status: 500 })
   }
