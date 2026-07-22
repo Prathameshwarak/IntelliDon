@@ -764,10 +764,9 @@ export default function DashboardPage() {
       return
     }
     
-    const activeEvent = events.find(e => e.is_active)
     const targetEventId = (summaryEventFilter && summaryEventFilter !== 'all')
       ? summaryEventFilter
-      : (activeEvent ? activeEvent.id : undefined)
+      : undefined
 
     const modeLabel = paymentMode ? (paymentMode === 'cash' ? 'Cash' : 'UPI') : 'all'
     if (!confirm(`Are you sure you want to verify ${modeLabel} received and settle collections for this collector?`)) return
@@ -1265,12 +1264,16 @@ export default function DashboardPage() {
       const amount = Number(d.amount)
       if (d.payment_mode === 'cash') {
         groups[collectorId].totalCash += amount
-        if (d.status === 'verified' && !d.settlement_id) {
+        // Support Fund: only transactions with payment status "pending" AND
+        // not yet settled count towards the unsettled Cash amount.
+        if (d.status === 'pending' && !d.settlement_id) {
           groups[collectorId].pendingCash += amount
         }
       } else {
         groups[collectorId].totalUpi += amount
-        if (d.status === 'verified' && d.payment_mode === 'upi_collector' && !d.settlement_id) {
+        // Support Fund: only transactions with payment status "pending" AND
+        // not yet settled count towards the unsettled UPI amount.
+        if (d.status === 'pending' && d.payment_mode === 'upi_collector' && !d.settlement_id) {
           groups[collectorId].pendingUpi += amount
         }
       }
@@ -1328,9 +1331,13 @@ export default function DashboardPage() {
     return Object.values(donorGroupsMap).sort((a, b) => b.totalAmount - a.totalAmount)
   } //End
 
-  // ── Support Fund / Verify Self-Donations — always ALL events ──
-  const selfDonations = donations.filter(d => d.payment_mode === 'upi_self')
-  const nonSelfDonations = donations.filter(d => d.payment_mode !== 'upi_self')
+  // ── Donations Summary & Support Fund — scoped to the selected event ("All Events" by default) ──
+  const summaryDonations = filterDonationsByEvent(donations, summaryEventFilter)
+  const summarySelfDonations = summaryDonations.filter(d => d.payment_mode === 'upi_self')
+  const summaryNonSelfDonations = summaryDonations.filter(d => d.payment_mode !== 'upi_self')
+
+  const selfDonations = summarySelfDonations
+  const nonSelfDonations = summaryNonSelfDonations
 
   // Calculate stats for non-self (collector) donations
   const collectorTotalCount = nonSelfDonations.length
@@ -1347,11 +1354,6 @@ export default function DashboardPage() {
   const visibleCollectorList = collectorList.filter(c => c.pendingCash > 0 || c.pendingUpi > 0)
   const pendingSelfCount = selfDonations.filter(d => d.status === 'pending').length
 
-  // ── Donations Summary — scoped to the selected event ("All Events" by default) ──
-  const summaryDonations = filterDonationsByEvent(donations, summaryEventFilter)
-  const summarySelfDonations = summaryDonations.filter(d => d.payment_mode === 'upi_self')
-  const summaryNonSelfDonations = summaryDonations.filter(d => d.payment_mode !== 'upi_self')
-
   const totalVerifiedCount = summaryDonations.filter(d => d.status === 'verified').length
   const selfVerifiedAmount = summarySelfDonations
     .filter(d => d.status === 'verified')
@@ -1359,14 +1361,15 @@ export default function DashboardPage() {
   const collectorVerifiedAmount = summaryNonSelfDonations
     .filter(d => d.status === 'verified')
     .reduce((sum, d) => sum + Number(d.amount), 0)
-  // Pending amount to verify = unsettled/unverified collector collections (upi+cash+other) + unsettled/unverified self donations (upi+cash+other)
+  // Pending Amount = (unsettled UPI, status = pending) + (unsettled Cash, status = pending) + (upi-self, status = pending)
   const totalPendingAmount = summaryDonations.reduce((sum, d) => {
     const amt = Number(d.amount)
     if (d.payment_mode === 'upi_self') {
+      // Self donations: only those still pending verification
       return d.status === 'pending' ? sum + amt : sum
     }
-    // Collector donations: unsettled (no settlement_id) and not rejected
-    if (d.status !== 'rejected' && !d.settlement_id) {
+    // Collector donations (cash / upi_collector): must be pending status AND unsettled (no settlement_id)
+    if (d.status === 'pending' && !d.settlement_id) {
       return sum + amt
     }
     return sum
@@ -1875,7 +1878,7 @@ export default function DashboardPage() {
                           <div className="flex items-center gap-2 flex-wrap">
                             <span className="text-base font-semibold text-white">{c.name}</span>
                             <span className="text-xs bg-gray-800 text-gray-400 px-2 py-0.5 rounded-full font-medium">
-                              {c.donations.filter(d => d.status === 'verified' && !d.settlement_id).length} unsettled collection{c.donations.filter(d => d.status === 'verified' && !d.settlement_id).length !== 1 ? 's' : ''}
+                              {c.donations.filter(d => d.status === 'pending' && !d.settlement_id).length} unsettled collection{c.donations.filter(d => d.status === 'pending' && !d.settlement_id).length !== 1 ? 's' : ''}
                             </span>
                           </div>
                           
