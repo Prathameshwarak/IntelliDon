@@ -133,7 +133,10 @@ export default function PublicDonatePage() {
         body: formData
       })
       const data = await res.json()
-      return data.url || null
+      // Persist the storage path, not the signed URL — signed URLs expire,
+      // and a fresh one is minted server-side whenever the screenshot needs
+      // to be displayed (verification review, etc).
+      return data.path || null
     } catch {
       return null
     }

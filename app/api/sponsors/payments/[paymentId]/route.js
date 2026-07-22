@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js'
 import { NextResponse } from 'next/server'
+import { SPONSOR_PAYMENT_METHOD_VALUES, PAYMENT_EDIT_WINDOW_MS } from '@/lib/sponsorPaymentMethods'
 
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL,
@@ -65,8 +66,20 @@ export async function PATCH(request, { params }) {
       return NextResponse.json({ error: authCheck.error }, { status: authCheck.status })
     }
 
+    const ageMs = Date.now() - new Date(payment.created_at).getTime()
+    if (ageMs > PAYMENT_EDIT_WINDOW_MS) {
+      return NextResponse.json(
+        { error: 'This payment can no longer be edited — the 3-hour edit window has passed' },
+        { status: 403 }
+      )
+    }
+
     if (amount !== undefined && (isNaN(amount) || Number(amount) <= 0)) {
       return NextResponse.json({ error: 'Amount must be a positive number' }, { status: 400 })
+    }
+
+    if (payment_method !== undefined && payment_method && !SPONSOR_PAYMENT_METHOD_VALUES.includes(payment_method)) {
+      return NextResponse.json({ error: 'Invalid payment method' }, { status: 400 })
     }
 
     if (amount !== undefined && Number(sponsor.committed_amount) > 0) {
@@ -106,26 +119,12 @@ export async function PATCH(request, { params }) {
   }
 }
 
-// DELETE — remove a sponsor payment entry
-export async function DELETE(request, { params }) {
-  try {
-    const { paymentId } = await params
-
-    const payment = await loadPaymentWithSponsor(paymentId)
-    if (!payment) return NextResponse.json({ error: 'Payment not found' }, { status: 404 })
-
-    const authCheck = await verifyCaller(request, payment.sponsors.mandal_id)
-    if (authCheck.error) {
-      return NextResponse.json({ error: authCheck.error }, { status: authCheck.status })
-    }
-
-    const { error: deleteError } = await supabaseAdmin.from('sponsor_payments').delete().eq('id', paymentId)
-    if (deleteError) {
-      return NextResponse.json({ error: 'Could not delete payment' }, { status: 500 })
-    }
-
-    return NextResponse.json({ success: true })
-  } catch (err) {
-    return NextResponse.json({ error: 'Something went wrong' }, { status: 500 })
-  }
+// DELETE — intentionally disabled. Sponsor payments can be corrected via
+// PATCH (within the 3-hour edit window) but never deleted, to preserve an
+// audit trail of what was actually recorded.
+export async function DELETE() {
+  return NextResponse.json(
+    { error: 'Deleting a sponsor payment is not permitted. Use Edit to correct it instead.' },
+    { status: 405 }
+  )
 }

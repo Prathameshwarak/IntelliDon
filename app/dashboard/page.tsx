@@ -7,8 +7,8 @@ import { isSubscriptionExpired } from '@/lib/subscription'
 import { useSubscription } from '@/lib/useSubscription'
 import UpgradeBanner from '@/components/UpgradeBanner'
 import KycVerificationPanel from '@/components/dashboard/KycVerificationPanel'
-import ExpenseManager from '@/components/dashboard/ExpenseManager'
 import SponsorshipSection from '@/components/dashboard/SponsorshipSection'
+import ExpenseManagerPanel from '@/components/dashboard/ExpenseManagerPanel'
 import { downloadReceipt, shareReceipt, type ReceiptData } from '@/lib/downloadReceipt'
 
 // ── TESTING / MIGRATION CONFIGURATION ──────────────────────────
@@ -101,6 +101,7 @@ export default function DashboardPage() {
 
   // Default tab — manager only sees donations, admin sees all
   const [tab, setTab] = useState<Tab>('donations')
+  const [expenseManagerEvent, setExpenseManagerEvent] = useState<Event | null>(null)
   const [loading, setLoading] = useState(true)
   const [toast, setToast] = useState<{ msg: string; type: 'success' | 'error' } | null>(null)
 
@@ -122,8 +123,14 @@ export default function DashboardPage() {
   const [historySearch, setHistorySearch] = useState('')
   const [historyCollectorFilter, setHistoryCollectorFilter] = useState('all')
   const [historyTypeFilter, setHistoryTypeFilter] = useState('all')
+  const [historyEventFilter, setHistoryEventFilter] = useState('all')
+  const [historyFilterOpen, setHistoryFilterOpen] = useState(false)
   const [historyRecordType, setHistoryRecordType] = useState<'donations' | 'sponsors'>('donations')
   const [historySponsorEventFilter, setHistorySponsorEventFilter] = useState('all')
+  // Donations Summary — event scope selector (all events, or one specific event)
+  const [summaryEventFilter, setSummaryEventFilter] = useState('all')
+  // Ranking tab — event scope selector shared across collectors/donors/sponsors sub-tabs
+  const [rankingEventFilter, setRankingEventFilter] = useState('all')
   //line added by pratham:
   const [rankingSubTab, setRankingSubTab] = useState<'collectors' | 'donors' | 'sponsors'>('collectors')
   const [sponsorRankingList, setSponsorRankingList] = useState<Array<{
@@ -149,7 +156,6 @@ export default function DashboardPage() {
   const [eventEndDate, setEventEndDate] = useState('')
   const [dateError, setDateError] = useState('')
   const [editingEventId, setEditingEventId] = useState<string | null>(null)
-  const [expenseManagerEvent, setExpenseManagerEvent] = useState<Event | null>(null)
 
   // CSV Export handler
   const handleExportCSV = (donationsToExport: Donation[], filename = 'collection_history.csv') => {
@@ -1224,92 +1230,76 @@ export default function DashboardPage() {
   }
 
   // ── Categorize & Group Donations ─────────────────────────────
-  const activeEvent = events.find(e => e.is_active)
-  const activeEventDonations = activeEvent
-    ? donations.filter(d => d.event_id === activeEvent.id)
-    : []
+  // NOTE: previously this section scoped everything to a single "active"
+  // event (events.find(e => e.is_active)), which meant donations belonging
+  // to any other event (past events, or events not currently flagged
+  // active) silently disappeared from Support Fund, Verify Self-Donations,
+  // and the Ranking tab. Support Fund / self-donation verification now
+  // always looks across ALL events, while the Donations Summary and
+  // Ranking tab are scoped by their own event-picker (defaulting to "All
+  // Events") so nothing is hidden by default and users can still drill
+  // into a single event.
+  function filterDonationsByEvent(list: Donation[], eventFilter: string) {
+    return eventFilter === 'all' ? list : list.filter(d => d.event_id === eventFilter)
+  }
 
-  const selfDonations = activeEventDonations.filter(d => d.payment_mode === 'upi_self')
-  const nonSelfDonations = activeEventDonations.filter(d => d.payment_mode !== 'upi_self')
+  function groupByCollector(list: Donation[]) {
+    const groups: Record<string, CollectorGroup> = {}
+    list.forEach(d => {
+      const collectorId = d.collected_by || 'direct_or_unknown'
+      const collectorName = d.users?.full_name || 'Direct / Unknown'
 
-  // Calculate stats for non-self (collector) donations
-  const collectorTotalCount = nonSelfDonations.length
-  const collectorTotalAmount = nonSelfDonations.reduce((sum, d) => sum + Number(d.amount), 0)
-  const collectorVerifiedAmount = nonSelfDonations
-    .filter(d => d.status === 'verified')
-    .reduce((sum, d) => sum + Number(d.amount), 0)
-  const collectorPendingCount = nonSelfDonations.filter(d => d.status === 'pending').length
-
-  // Calculate stats for self donations
-  const selfTotalCount = selfDonations.length
-  const selfTotalAmount = selfDonations.reduce((sum, d) => sum + Number(d.amount), 0)
-  const selfVerifiedAmount = selfDonations
-    .filter(d => d.status === 'verified')
-    .reduce((sum, d) => sum + Number(d.amount), 0)
-  const selfPendingCount = selfDonations.filter(d => d.status === 'pending').length
-
-  // Unified summary calculations
-  const totalVerifiedCount = activeEventDonations.filter(d => d.status === 'verified').length
-  const totalAmount = activeEventDonations.filter(d => d.status === 'verified').reduce((sum, d) => sum + Number(d.amount), 0)
-  const totalPendingAmount = activeEventDonations.filter(d => d.status === 'pending').reduce((sum, d) => sum + Number(d.amount), 0)
-
-
-  const collectorGroups: Record<string, CollectorGroup> = {}
-
-  nonSelfDonations.forEach(d => {
-    const collectorId = d.collected_by || 'direct_or_unknown'
-    const collectorName = d.users?.full_name || 'Direct / Unknown'
-
-    if (!collectorGroups[collectorId]) {
-      collectorGroups[collectorId] = {
-        id: collectorId,
-        name: collectorName,
-        donations: [],
-        totalCash: 0,
-        pendingCash: 0,
-        totalUpi: 0,
-        pendingUpi: 0
+      if (!groups[collectorId]) {
+        groups[collectorId] = {
+          id: collectorId,
+          name: collectorName,
+          donations: [],
+          totalCash: 0,
+          pendingCash: 0,
+          totalUpi: 0,
+          pendingUpi: 0
+        }
       }
-    }
 
-    collectorGroups[collectorId].donations.push(d)
-    const amount = Number(d.amount)
-    if (d.payment_mode === 'cash') {
-      collectorGroups[collectorId].totalCash += amount
-      if (d.status === 'verified' && !d.settlement_id) {
-        collectorGroups[collectorId].pendingCash += amount
-      }
-    } else {
-      collectorGroups[collectorId].totalUpi += amount
-      if (d.status === 'verified' && d.payment_mode === 'upi_collector' && !d.settlement_id) {
-        collectorGroups[collectorId].pendingUpi += amount
-      }
-    }
-  })
-
-  const collectorList = Object.values(collectorGroups).sort((a, b) => a.name.localeCompare(b.name))
-
-//new Line added by pratham
-// Ranking: collectors sorted by total verified amount collected (cash + UPI), descending
-  const rankingList = [...Object.values(collectorGroups)]
-    .map(c => {
-      const verifiedCash = c.donations
-        .filter(d => d.status === 'verified' && d.payment_mode === 'cash')
-        .reduce((sum, d) => sum + Number(d.amount), 0)
-      const verifiedUpi = c.donations
-        .filter(d => d.status === 'verified' && d.payment_mode !== 'cash')
-        .reduce((sum, d) => sum + Number(d.amount), 0)
-      const verifiedCount = c.donations.filter(d => d.status === 'verified').length
-      return {
-        ...c,
-        totalCash: verifiedCash,
-        totalUpi: verifiedUpi,
-        totalAmount: verifiedCash + verifiedUpi,
-        donationsCount: verifiedCount
+      groups[collectorId].donations.push(d)
+      const amount = Number(d.amount)
+      if (d.payment_mode === 'cash') {
+        groups[collectorId].totalCash += amount
+        if (d.status === 'verified' && !d.settlement_id) {
+          groups[collectorId].pendingCash += amount
+        }
+      } else {
+        groups[collectorId].totalUpi += amount
+        if (d.status === 'verified' && d.payment_mode === 'upi_collector' && !d.settlement_id) {
+          groups[collectorId].pendingUpi += amount
+        }
       }
     })
-    .sort((a, b) => b.totalAmount - a.totalAmount)
-  const topRankingAmount = rankingList.length > 0 ? rankingList[0].totalAmount : 0
+    return groups
+  }
+
+  //line added by pratham
+  // Ranking: collectors sorted by total verified amount collected (cash + UPI), descending
+  function buildRankingFromGroups(groups: Record<string, CollectorGroup>) {
+    return Object.values(groups)
+      .map(c => {
+        const verifiedCash = c.donations
+          .filter(d => d.status === 'verified' && d.payment_mode === 'cash')
+          .reduce((sum, d) => sum + Number(d.amount), 0)
+        const verifiedUpi = c.donations
+          .filter(d => d.status === 'verified' && d.payment_mode !== 'cash')
+          .reduce((sum, d) => sum + Number(d.amount), 0)
+        const verifiedCount = c.donations.filter(d => d.status === 'verified').length
+        return {
+          ...c,
+          totalCash: verifiedCash,
+          totalUpi: verifiedUpi,
+          totalAmount: verifiedCash + verifiedUpi,
+          donationsCount: verifiedCount
+        }
+      })
+      .sort((a, b) => b.totalAmount - a.totalAmount)
+  }
 
   //line added by pratham  start line
   // Donor Ranking: group verified donations by donor phone, sorted by total donated descending
@@ -1320,26 +1310,73 @@ export default function DashboardPage() {
     donationCount: number
   }
 
-  const donorGroupsMap: Record<string, DonorGroup> = {}
-
-  activeEventDonations.filter(d => d.status === 'verified').forEach(d => {
-    const key = d.donor_phone || d.donor_name || 'unknown'
-    if (!donorGroupsMap[key]) {
-      donorGroupsMap[key] = {
-        phone: d.donor_phone,
-        name: d.donor_name,
-        totalAmount: 0,
-        donationCount: 0
+  function buildDonorRanking(list: Donation[]) {
+    const donorGroupsMap: Record<string, DonorGroup> = {}
+    list.filter(d => d.status === 'verified').forEach(d => {
+      const key = d.donor_phone || d.donor_name || 'unknown'
+      if (!donorGroupsMap[key]) {
+        donorGroupsMap[key] = {
+          phone: d.donor_phone,
+          name: d.donor_name,
+          totalAmount: 0,
+          donationCount: 0
+        }
       }
-    }
-    donorGroupsMap[key].totalAmount += Number(d.amount)
-    donorGroupsMap[key].donationCount += 1
-  })
+      donorGroupsMap[key].totalAmount += Number(d.amount)
+      donorGroupsMap[key].donationCount += 1
+    })
+    return Object.values(donorGroupsMap).sort((a, b) => b.totalAmount - a.totalAmount)
+  } //End
 
-  const donorRankingList = Object.values(donorGroupsMap).sort((a, b) => b.totalAmount - a.totalAmount) //End
+  // ── Support Fund / Verify Self-Donations — always ALL events ──
+  const selfDonations = donations.filter(d => d.payment_mode === 'upi_self')
+  const nonSelfDonations = donations.filter(d => d.payment_mode !== 'upi_self')
 
+  // Calculate stats for non-self (collector) donations
+  const collectorTotalCount = nonSelfDonations.length
+  const collectorTotalAmount = nonSelfDonations.reduce((sum, d) => sum + Number(d.amount), 0)
+  const collectorPendingCount = nonSelfDonations.filter(d => d.status === 'pending').length
+
+  // Calculate stats for self donations
+  const selfTotalCount = selfDonations.length
+  const selfTotalAmount = selfDonations.reduce((sum, d) => sum + Number(d.amount), 0)
+  const selfPendingCount = selfDonations.filter(d => d.status === 'pending').length
+
+  const collectorGroups = groupByCollector(nonSelfDonations)
+  const collectorList = Object.values(collectorGroups).sort((a, b) => a.name.localeCompare(b.name))
   const visibleCollectorList = collectorList.filter(c => c.pendingCash > 0 || c.pendingUpi > 0)
   const pendingSelfCount = selfDonations.filter(d => d.status === 'pending').length
+
+  // ── Donations Summary — scoped to the selected event ("All Events" by default) ──
+  const summaryDonations = filterDonationsByEvent(donations, summaryEventFilter)
+  const summarySelfDonations = summaryDonations.filter(d => d.payment_mode === 'upi_self')
+  const summaryNonSelfDonations = summaryDonations.filter(d => d.payment_mode !== 'upi_self')
+
+  const totalVerifiedCount = summaryDonations.filter(d => d.status === 'verified').length
+  const selfVerifiedAmount = summarySelfDonations
+    .filter(d => d.status === 'verified')
+    .reduce((sum, d) => sum + Number(d.amount), 0)
+  const collectorVerifiedAmount = summaryNonSelfDonations
+    .filter(d => d.status === 'verified')
+    .reduce((sum, d) => sum + Number(d.amount), 0)
+  // Pending amount to verify = collector pending + self donation pending
+  const totalPendingAmount = summaryDonations.filter(d => d.status === 'pending').reduce((sum, d) => sum + Number(d.amount), 0)
+
+  const summarySponsors = sponsorRankingList.filter(s => summaryEventFilter === 'all' || s.event_id === summaryEventFilter)
+  const summarySponsorsCount = summarySponsors.length
+  const summarySponsorsEstimatedAmount = summarySponsors.reduce((sum, s) => {
+    const value = s.sponsor_type === 'goods_service' ? (s.estimated_value || 0) : s.committed_amount
+    return sum + Number(value || 0)
+  }, 0)
+
+  // ── Ranking tab — scoped to the selected event ("All Events" by default) ──
+  const rankingDonations = filterDonationsByEvent(donations, rankingEventFilter)
+  const rankingNonSelfDonations = rankingDonations.filter(d => d.payment_mode !== 'upi_self')
+  const rankingCollectorGroups = groupByCollector(rankingNonSelfDonations)
+  const rankingList = buildRankingFromGroups(rankingCollectorGroups)
+  const topRankingAmount = rankingList.length > 0 ? rankingList[0].totalAmount : 0
+  const donorRankingList = buildDonorRanking(rankingDonations)
+  const rankingSponsorList = sponsorRankingList.filter(s => rankingEventFilter === 'all' || s.event_id === rankingEventFilter)
 
   // Filter donations for the history tab
   const filteredHistoryDonations = donations.filter(d => {
@@ -1362,8 +1399,14 @@ export default function DashboardPage() {
       matchesType = d.payment_mode === historyTypeFilter
     }
 
-    return matchesSearch && matchesCollector && matchesType
+    const matchesEvent = historyEventFilter === 'all' || d.event_id === historyEventFilter
+
+    return matchesSearch && matchesCollector && matchesType && matchesEvent
   })
+
+  // Number of non-default filters currently applied — shown as a badge on the Filter button
+  const historyActiveFilterCount = [historyEventFilter, historyCollectorFilter, historyTypeFilter]
+    .filter(v => v !== 'all').length
 
   const filteredHistorySponsors = sponsorRankingList.filter(s => {
     const query = historySearch.toLowerCase().trim()
@@ -1702,19 +1745,32 @@ export default function DashboardPage() {
           <div className="flex flex-col gap-6 mb-6">
             {/* Unified Donations Summary */}
             <div>
-              <div className="flex items-center gap-2 mb-2 px-1">
-                <span className="text-sm">📊</span>
-                <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wider">
-                  Donations Summary
-                </h3>
+              <div className="flex items-center justify-between gap-2 mb-2 px-1 flex-wrap">
+                <div className="flex items-center gap-2">
+                  <span className="text-sm">📊</span>
+                  <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wider">
+                    Donations Summary
+                  </h3>
+                </div>
+                <select
+                  value={summaryEventFilter}
+                  onChange={e => setSummaryEventFilter(e.target.value)}
+                  className="bg-gray-950 border border-gray-800 rounded-lg px-3 py-1.5 text-xs text-gray-300 focus:outline-none focus:border-orange-500 transition-colors"
+                >
+                  <option value="all" className="bg-gray-900 text-white">All Events</option>
+                  {events.map(ev => (
+                    <option key={ev.id} value={ev.id} className="bg-gray-900 text-white">{ev.name} {ev.year}</option>
+                  ))}
+                </select>
               </div>
-              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
                 {[
-                  { label: 'Total verified donations', value: totalVerifiedCount },
-                  { label: 'Self-donations (Verified)', value: formatAmount(selfVerifiedAmount) },
+                  { label: 'Total verified donation', value: totalVerifiedCount },
+                  { label: 'Self-donation (Verified)', value: formatAmount(selfVerifiedAmount) },
                   { label: 'Collected by Collectors (Verified)', value: formatAmount(collectorVerifiedAmount) },
-                  { label: 'Total amount (Verified)', value: formatAmount(totalAmount) },
-                  { label: 'Pending amount', value: formatAmount(totalPendingAmount) },
+                  { label: 'Pending Amount', value: formatAmount(totalPendingAmount) },
+                  { label: 'Sponsors', value: summarySponsorsCount },
+                  { label: 'Estimated Sponsors Amount', value: formatAmount(summarySponsorsEstimatedAmount) },
                 ].map(card => (
                   <div key={card.label} className="bg-gray-800 rounded-xl p-4 flex flex-col h-full">
                     <p className="text-xs text-gray-400 mb-2">{card.label}</p>
@@ -1947,18 +2003,30 @@ export default function DashboardPage() {
         {tab === 'ranking' && (
           <div className="flex flex-col gap-4">
 
-            {/* Sub-tab toggle */}
-            <div className="flex gap-1 bg-gray-900 rounded-xl p-1 border border-gray-800 w-full sm:w-fit">
-              {(['collectors', 'donors', 'sponsors'] as const).map(st => (
-                <button
-                  key={st}
-                  onClick={() => setRankingSubTab(st)}
-                  className={`flex-1 sm:flex-none px-3 sm:px-5 py-2 rounded-lg text-xs sm:text-sm font-medium capitalize transition-colors whitespace-nowrap
-                    ${rankingSubTab === st ? 'bg-orange-500 text-white' : 'text-gray-400 hover:text-white'}`}
-                >
-                  {st === 'collectors' ? '👥 Collectors' : st === 'donors' ? '🎗️ Donors' : '🤝 Sponsors'}
-                </button>
-              ))}
+            {/* Sub-tab toggle + event scope selector (applies to whichever sub-tab is active) */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+              <div className="flex gap-1 bg-gray-900 rounded-xl p-1 border border-gray-800 w-full sm:w-fit">
+                {(['collectors', 'donors', 'sponsors'] as const).map(st => (
+                  <button
+                    key={st}
+                    onClick={() => setRankingSubTab(st)}
+                    className={`flex-1 sm:flex-none px-3 sm:px-5 py-2 rounded-lg text-xs sm:text-sm font-medium capitalize transition-colors whitespace-nowrap
+                      ${rankingSubTab === st ? 'bg-orange-500 text-white' : 'text-gray-400 hover:text-white'}`}
+                  >
+                    {st === 'collectors' ? '👥 Collectors' : st === 'donors' ? '🎗️ Donors' : '🤝 Sponsors'}
+                  </button>
+                ))}
+              </div>
+              <select
+                value={rankingEventFilter}
+                onChange={e => setRankingEventFilter(e.target.value)}
+                className="bg-gray-950 border border-gray-800 rounded-lg px-3 py-2 text-xs text-gray-300 focus:outline-none focus:border-orange-500 transition-colors w-full sm:w-auto"
+              >
+                <option value="all" className="bg-gray-900 text-white">All Events</option>
+                {events.map(ev => (
+                  <option key={ev.id} value={ev.id} className="bg-gray-900 text-white">{ev.name} {ev.year}</option>
+                ))}
+              </select>
             </div>
 
             {/* ── Collector Ranking ── */}
@@ -2052,7 +2120,7 @@ export default function DashboardPage() {
             {rankingSubTab === 'sponsors' && (
               sponsorRankingLoading ? (
                 <p className="text-gray-400 text-sm text-center py-12">Loading ranking...</p>
-              ) : sponsorRankingList.length === 0 ? (
+              ) : rankingSponsorList.length === 0 ? (
                 <div className="text-center py-12 bg-gray-900/30 border border-gray-800 rounded-xl">
                   <p className="text-gray-500 text-sm">No sponsors added yet.</p>
                 </div>
@@ -2061,7 +2129,7 @@ export default function DashboardPage() {
                   <p className="text-xs text-gray-400 font-medium px-1 uppercase tracking-wider">
                     Sponsors — by contribution value
                   </p>
-                  {[...sponsorRankingList]
+                  {[...rankingSponsorList]
                     .sort((a, b) => {
                       const valueOf = (s: typeof a) => s.sponsor_type === 'goods_service' ? (s.estimated_value || 0) : s.committed_amount
                       return valueOf(b) - valueOf(a)
@@ -2136,34 +2204,86 @@ export default function DashboardPage() {
                 </span>
               </div>
 
-              {/* Filters (Collector & Type) */}
-              <div className="flex flex-col sm:flex-row gap-2 w-full md:w-auto">
-                
-                {/* Collector filter dropdown */}
-                <select
-                  value={historyCollectorFilter}
-                  onChange={e => setHistoryCollectorFilter(e.target.value)}
-                  className="flex-1 bg-gray-950 border border-gray-800 rounded-lg px-3 py-2 text-xs text-gray-300 focus:outline-none focus:border-orange-500 transition-colors"
+              {/* Single combined Filter button — Event / Donation Type / Payment Mode */}
+              <div className="relative w-full md:w-auto">
+                <button
+                  type="button"
+                  onClick={() => setHistoryFilterOpen(o => !o)}
+                  className="w-full md:w-auto flex items-center justify-center gap-1.5 bg-gray-950 border border-gray-800 rounded-lg px-4 py-2 text-xs text-gray-300 hover:border-orange-500 transition-colors"
                 >
-                  <option value="all" className="bg-gray-900 text-white">All Collectors</option>
-                  <option value="self" className="bg-gray-900 text-white">Self-Donations (Online)</option>
-                  {distinctCollectors.map(c => (
-                    <option key={c.id} value={c.id} className="bg-gray-900 text-white">{c.name}</option>
-                  ))}
-                </select>
+                  ⚙️ Filter
+                  {historyActiveFilterCount > 0 && (
+                    <span className="bg-orange-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full">
+                      {historyActiveFilterCount}
+                    </span>
+                  )}
+                </button>
 
-                {/* Donation Type filter dropdown */}
-                <select
-                  value={historyTypeFilter}
-                  onChange={e => setHistoryTypeFilter(e.target.value)}
-                  className="flex-1 bg-gray-950 border border-gray-800 rounded-lg px-3 py-2 text-xs text-gray-300 focus:outline-none focus:border-orange-500 transition-colors"
-                >
-                  <option value="all" className="bg-gray-900 text-white">All Modes</option>
-                  <option value="cash" className="bg-gray-900 text-white">💵 Cash</option>
-                  <option value="upi_collector" className="bg-gray-900 text-white">📱 UPI (collector)</option>
-                  <option value="upi_self" className="bg-gray-900 text-white">📱 UPI (self)</option>
-                </select>
+                {historyFilterOpen && (
+                  <>
+                    {/* Click-outside backdrop to close the panel */}
+                    <div className="fixed inset-0 z-10" onClick={() => setHistoryFilterOpen(false)} />
+                    <div className="absolute right-0 z-20 mt-2 w-full sm:w-72 bg-gray-900 border border-gray-800 rounded-xl shadow-2xl p-4 flex flex-col gap-3">
+                      {/* Event filter */}
+                      <div>
+                        <label className="text-[11px] text-gray-500 mb-1 block">Event</label>
+                        <select
+                          value={historyEventFilter}
+                          onChange={e => setHistoryEventFilter(e.target.value)}
+                          className="w-full bg-gray-950 border border-gray-800 rounded-lg px-3 py-2 text-xs text-gray-300 focus:outline-none focus:border-orange-500 transition-colors"
+                        >
+                          <option value="all" className="bg-gray-900 text-white">All Events</option>
+                          {events.map(ev => (
+                            <option key={ev.id} value={ev.id} className="bg-gray-900 text-white">{ev.name} {ev.year}</option>
+                          ))}
+                        </select>
+                      </div>
 
+                      {/* Donation Type filter (collectors / self-donation / individual collector) */}
+                      <div>
+                        <label className="text-[11px] text-gray-500 mb-1 block">Donation Type</label>
+                        <select
+                          value={historyCollectorFilter}
+                          onChange={e => setHistoryCollectorFilter(e.target.value)}
+                          className="w-full bg-gray-950 border border-gray-800 rounded-lg px-3 py-2 text-xs text-gray-300 focus:outline-none focus:border-orange-500 transition-colors"
+                        >
+                          <option value="all" className="bg-gray-900 text-white">All Collectors</option>
+                          <option value="self" className="bg-gray-900 text-white">Self-Donations (Online)</option>
+                          {distinctCollectors.map(c => (
+                            <option key={c.id} value={c.id} className="bg-gray-900 text-white">{c.name}</option>
+                          ))}
+                        </select>
+                      </div>
+
+                      {/* Payment Mode filter */}
+                      <div>
+                        <label className="text-[11px] text-gray-500 mb-1 block">Payment Mode</label>
+                        <select
+                          value={historyTypeFilter}
+                          onChange={e => setHistoryTypeFilter(e.target.value)}
+                          className="w-full bg-gray-950 border border-gray-800 rounded-lg px-3 py-2 text-xs text-gray-300 focus:outline-none focus:border-orange-500 transition-colors"
+                        >
+                          <option value="all" className="bg-gray-900 text-white">All Modes</option>
+                          <option value="cash" className="bg-gray-900 text-white">💵 Cash</option>
+                          <option value="upi_collector" className="bg-gray-900 text-white">📱 UPI (collector)</option>
+                          <option value="upi_self" className="bg-gray-900 text-white">📱 UPI (self)</option>
+                        </select>
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setHistoryEventFilter('all')
+                          setHistoryCollectorFilter('all')
+                          setHistoryTypeFilter('all')
+                        }}
+                        className="text-[11px] text-gray-500 hover:text-orange-400 underline self-center pt-1 transition-colors"
+                      >
+                        Reset Filters
+                      </button>
+                    </div>
+                  </>
+                )}
               </div>
             </div>
 
@@ -2358,6 +2478,15 @@ export default function DashboardPage() {
 
         {/* ── TAB: Events (admin + manager can VIEW, only admin can edit) ── */}
         {tab === 'events' && CAN.seeEventsTab(userRole) && (
+          expenseManagerEvent && mandalId ? (
+            <ExpenseManagerPanel
+              mandalId={mandalId}
+              eventId={expenseManagerEvent.id}
+              eventLabel={`${expenseManagerEvent.name} ${expenseManagerEvent.year}`}
+              showToast={showToast}
+              onBack={() => setExpenseManagerEvent(null)}
+            />
+          ) : (
           <div className="flex flex-col gap-4">
             <div className="flex items-center justify-between">
               <p className="text-sm text-gray-400">{events.length} event{events.length !== 1 ? 's' : ''}</p>
@@ -2563,6 +2692,7 @@ export default function DashboardPage() {
               })
             )}
           </div>
+          )
         )}
 
         {/* ── TAB: Team (admin only) ── */}
@@ -3134,17 +3264,6 @@ export default function DashboardPage() {
               </button>
             </div>
           </div>
-        )}
-
-        {/* ── Expense Management Modal (#8, #11) ── */}
-        {expenseManagerEvent && mandalId && (
-          <ExpenseManager
-            mandalId={mandalId}
-            eventId={expenseManagerEvent.id}
-            eventLabel={`${expenseManagerEvent.name} ${expenseManagerEvent.year}`}
-            showToast={showToast}
-            onClose={() => setExpenseManagerEvent(null)}
-          />
         )}
 
         {/* ── Edit Member Modal Popup ── */}
