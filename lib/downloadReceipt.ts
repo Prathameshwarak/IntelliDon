@@ -40,24 +40,66 @@ export async function downloadReceipt(receiptData: ReceiptData) {
   triggerDownload(blob, `Receipt-${receiptData.receiptNumber}.pdf`)
 }
 
+let activeSharePromise: Promise<void> | null = null
+
 export async function shareReceipt(receiptData: ReceiptData) {
-  const blob = await buildPdfBlob(receiptData)
-  const fileName = `Receipt-${receiptData.receiptNumber}.pdf`
-  const file = new File([blob], fileName, { type: 'application/pdf' })
-
-  const nav = navigator as Navigator & {
-    canShare?: (data?: ShareData) => boolean
-    share?: (data?: ShareData) => Promise<void>
+  if (activeSharePromise) {
+    return
   }
 
-  if (nav.canShare && nav.share && nav.canShare({ files: [file] })) {
+  activeSharePromise = (async () => {
+    const fileName = `Receipt-${receiptData.receiptNumber}.pdf`
+
+    const formattedAmount = `₹${Number(receiptData.amount || 0).toLocaleString('en-IN')}`
+    const shareText = `*Donation Receipt — ${receiptData.mandalName}*\n\n` +
+      `Receipt No: ${receiptData.receiptNumber}\n` +
+      `Donor: ${receiptData.donorName}\n` +
+      `Amount: ${formattedAmount}\n` +
+      `Event: ${receiptData.eventName}\n\n` +
+      `Thank you for your generous contribution!`
+
     try {
-      await nav.share({ files: [file], title: fileName })
-      return
-    } catch (err) {
-      if ((err as DOMException)?.name === 'AbortError') return
-    }
-  }
+      const blob = await buildPdfBlob(receiptData)
+      const file = new File([blob], fileName, { type: 'application/pdf' })
 
-  triggerDownload(blob, fileName)
+      const shareData: ShareData = {
+        files: [file],
+        title: `Donation Receipt ${receiptData.receiptNumber}`,
+        text: shareText
+      }
+
+      const canUseNativeShare =
+        typeof navigator !== 'undefined' &&
+        typeof navigator.share === 'function' &&
+        typeof navigator.canShare === 'function' &&
+        navigator.canShare(shareData)
+
+      if (canUseNativeShare) {
+        await navigator.share(shareData)
+        return
+      }
+    } catch (err: any) {
+      if (err?.name === 'AbortError' || err?.name === 'InvalidStateError') {
+        return
+      }
+      console.warn('Native file share failed:', err)
+    }
+
+    try {
+      const cleanPhone = (receiptData.donorPhone || '').replace(/\D/g, '')
+      const waUrl = cleanPhone && cleanPhone.length === 10
+        ? `https://api.whatsapp.com/send?phone=91${cleanPhone}&text=${encodeURIComponent(shareText)}`
+        : `https://api.whatsapp.com/send?text=${encodeURIComponent(shareText)}`
+
+      window.open(waUrl, '_blank')
+    } catch (e) {
+      console.error('WhatsApp share fallback error:', e)
+    }
+  })()
+
+  try {
+    await activeSharePromise
+  } finally {
+    activeSharePromise = null
+  }
 }

@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js'
 import { NextResponse } from 'next/server'
+import { EXPENSE_PAYMENT_MODE_VALUES } from '@/lib/expensePaymentModes'
 
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL,
@@ -41,7 +42,7 @@ async function verifyCaller(request, mandalIdToCheck) {
 
 const MAX_AMOUNT = 999999999 // 9 digits
 
-function validateExpenseFields({ expense_date, vendor_name, vendor_phone, title, description, amount, transaction_id }) {
+function validateExpenseFields({ expense_date, vendor_name, vendor_phone, title, description, amount, transaction_id, payment_mode }) {
   if (!expense_date || isNaN(new Date(expense_date).getTime())) {
     return 'A valid expense date is required'
   }
@@ -73,6 +74,9 @@ function validateExpenseFields({ expense_date, vendor_name, vendor_phone, title,
     if (transaction_id.trim().length > 25) return 'Transaction ID must be 25 characters or fewer'
     if (!/^[A-Za-z0-9]+$/.test(transaction_id.trim())) return 'Transaction ID must be alphanumeric'
   }
+  if (payment_mode && !EXPENSE_PAYMENT_MODE_VALUES.includes(payment_mode)) {
+    return 'Invalid payment mode'
+  }
   return null
 }
 
@@ -81,7 +85,7 @@ export async function PATCH(request, { params }) {
   try {
     const { id } = await params
     const body = await request.json()
-    const { expense_date, vendor_name, vendor_phone, title, description, amount, transaction_id } = body
+    const { expense_date, vendor_name, vendor_phone, title, description, amount, transaction_id, payment_mode } = body
 
     const { data: existing, error: fetchError } = await supabaseAdmin
       .from('event_expenses')
@@ -98,7 +102,7 @@ export async function PATCH(request, { params }) {
       return NextResponse.json({ error: authCheck.error }, { status: authCheck.status })
     }
 
-    const validationError = validateExpenseFields({ expense_date, vendor_name, vendor_phone, title, description, amount, transaction_id })
+    const validationError = validateExpenseFields({ expense_date, vendor_name, vendor_phone, title, description, amount, transaction_id, payment_mode })
     if (validationError) {
       return NextResponse.json({ error: validationError }, { status: 400 })
     }
@@ -124,7 +128,49 @@ export async function PATCH(request, { params }) {
       return NextResponse.json({ error: 'Could not update expense' }, { status: 500 })
     }
 
-    return NextResponse.json({ success: true, expense: updated })
+    // Keep the linked expense_payments row (this flat expense's "how it was
+    // paid" record) in sync with the edited amount/date/mode. There should
+    // be at most one such row for a flat expense entry; if one doesn't
+    // exist yet (e.g. an expense created before this feature shipped),
+    // create it now instead.
+    let paymentId = null
+    const { data: existingPayments } = await supabaseAdmin
+      .from('expense_payments')
+      .select('id')
+      .eq('expense_id', id)
+      .order('created_at', { ascending: true })
+      .limit(1)
+
+    const existingPayment = existingPayments?.[0] || null
+
+    if (existingPayment) {
+      const { data: syncedPayment } = await supabaseAdmin
+        .from('expense_payments')
+        .update({
+          amount: Number(amount),
+          paid_at: new Date(expense_date).toISOString(),
+          payment_mode: payment_mode || null
+        })
+        .eq('id', existingPayment.id)
+        .select('id')
+        .single()
+      paymentId = syncedPayment?.id || existingPayment.id
+    } else if (payment_mode) {
+      const { data: newPayment } = await supabaseAdmin
+        .from('expense_payments')
+        .insert({
+          expense_id: id,
+          amount: Number(amount),
+          paid_at: new Date(expense_date).toISOString(),
+          payment_mode,
+          recorded_by: authCheck.callerId
+        })
+        .select('id')
+        .single()
+      paymentId = newPayment?.id || null
+    }
+
+    return NextResponse.json({ success: true, expense: { ...updated, payment_mode: payment_mode || null, payment_id: paymentId } })
   } catch (err) {
     return NextResponse.json({ error: 'Something went wrong' }, { status: 500 })
   }
