@@ -84,7 +84,7 @@ export async function POST(request: Request) {
     const body = await request.json()
     const { collector_id, event_id, verified_by, notes, payment_mode } = body
 
-    if (!collector_id || !verified_by) {
+    if (!collector_id || !event_id || !verified_by) {
       return NextResponse.json({ error: 'Missing required parameters' }, { status: 400 })
     }
 
@@ -119,14 +119,11 @@ export async function POST(request: Request) {
     // Query pending unsettled donations for this collector
     let query = supabaseAdmin
       .from('donations')
-      .select('id, amount, payment_mode, event_id')
+      .select('id, amount, payment_mode')
       .eq('collected_by', collector_id)
+      .eq('event_id', event_id)
       .eq('status', 'verified')
       .is('settlement_id', null)
-
-    if (event_id && event_id !== 'all') {
-      query = query.eq('event_id', event_id)
-    }
 
     if (payment_mode === 'cash') {
       query = query.eq('payment_mode', 'cash')
@@ -160,7 +157,6 @@ export async function POST(request: Request) {
     const total_amount = cash_amount + online_amount
     const total_donations = pendingDonations.length
     const verified_at = new Date().toISOString()
-    const targetEventId = (event_id && event_id !== 'all') ? event_id : pendingDonations[0].event_id
 
     // Insert collector_settlements row
     const { data: settlement, error: insertErr } = await supabaseAdmin
@@ -168,7 +164,7 @@ export async function POST(request: Request) {
       .insert({
         collector_id,
         mandal_id: verifier.mandal_id,
-        event_id: targetEventId,
+        event_id,
         cash_amount,
         online_amount,
         total_amount,
