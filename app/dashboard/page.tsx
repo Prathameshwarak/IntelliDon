@@ -632,7 +632,7 @@ export default function DashboardPage() {
   // ── Load data on tab change ───────────────────────────────────
   useEffect(() => {
     if (!mandalId) return
-    if (tab === 'donations') { fetchDonations(); fetchEvents() }
+    if (tab === 'donations') { fetchDonations(); fetchEvents(); fetchSponsorRanking() }
     if (tab === 'events') fetchEvents()
     if (tab === 'team') { fetchTeam(); fetchEvents() }
     if (tab === 'ranking') { fetchDonations(); fetchSponsorRanking() }
@@ -759,16 +759,16 @@ export default function DashboardPage() {
 
   async function settleCollector(collectorId: string, paymentMode?: 'cash' | 'upi') {
     if (!CAN.verifyDonation(userRole)) return
-    const activeEvent = events.find(e => e.is_active)
-    if (!activeEvent) {
-      showToast('No active event found to settle collections', 'error')
-      return
-    }
     if (sub.isExpired) {
       showToast('Subscription expired. Please renew plan.', 'error')
       return
     }
     
+    const activeEvent = events.find(e => e.is_active)
+    const targetEventId = (summaryEventFilter && summaryEventFilter !== 'all')
+      ? summaryEventFilter
+      : (activeEvent ? activeEvent.id : undefined)
+
     const modeLabel = paymentMode ? (paymentMode === 'cash' ? 'Cash' : 'UPI') : 'all'
     if (!confirm(`Are you sure you want to verify ${modeLabel} received and settle collections for this collector?`)) return
 
@@ -782,7 +782,7 @@ export default function DashboardPage() {
         headers,
         body: JSON.stringify({
           collector_id: collectorId,
-          event_id: activeEvent.id,
+          ...(targetEventId ? { event_id: targetEventId } : {}),
           verified_by: userId,
           payment_mode: paymentMode,
           notes: `Settled from admin dashboard: ${modeLabel} only`
@@ -1359,8 +1359,18 @@ export default function DashboardPage() {
   const collectorVerifiedAmount = summaryNonSelfDonations
     .filter(d => d.status === 'verified')
     .reduce((sum, d) => sum + Number(d.amount), 0)
-  // Pending amount to verify = collector pending + self donation pending
-  const totalPendingAmount = summaryDonations.filter(d => d.status === 'pending').reduce((sum, d) => sum + Number(d.amount), 0)
+  // Pending amount to verify = unsettled/unverified collector collections (upi+cash+other) + unsettled/unverified self donations (upi+cash+other)
+  const totalPendingAmount = summaryDonations.reduce((sum, d) => {
+    const amt = Number(d.amount)
+    if (d.payment_mode === 'upi_self') {
+      return d.status === 'pending' ? sum + amt : sum
+    }
+    // Collector donations: unsettled (no settlement_id) and not rejected
+    if (d.status !== 'rejected' && !d.settlement_id) {
+      return sum + amt
+    }
+    return sum
+  }, 0)
 
   const summarySponsors = sponsorRankingList.filter(s => summaryEventFilter === 'all' || s.event_id === summaryEventFilter)
   const summarySponsorsCount = summarySponsors.length

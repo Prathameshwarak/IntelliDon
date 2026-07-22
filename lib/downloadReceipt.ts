@@ -40,44 +40,66 @@ export async function downloadReceipt(receiptData: ReceiptData) {
   triggerDownload(blob, `Receipt-${receiptData.receiptNumber}.pdf`)
 }
 
-export async function shareReceipt(receiptData: ReceiptData) {
-  const fileName = `Receipt-${receiptData.receiptNumber}.pdf`
+let activeSharePromise: Promise<void> | null = null
 
-  let blob: Blob
-  try {
-    blob = await buildPdfBlob(receiptData)
-  } catch (err) {
-    console.error('Failed to generate receipt PDF:', err)
+export async function shareReceipt(receiptData: ReceiptData) {
+  if (activeSharePromise) {
     return
   }
 
-  // Everything below (including the canShare capability check) is wrapped
-  // in try/catch — some browsers throw rather than return false when the
-  // ShareData shape isn't supported, which previously crashed the click
-  // handler silently and made "Share" look like it did nothing.
+  activeSharePromise = (async () => {
+    const fileName = `Receipt-${receiptData.receiptNumber}.pdf`
+
+    const formattedAmount = `₹${Number(receiptData.amount || 0).toLocaleString('en-IN')}`
+    const shareText = `*Donation Receipt — ${receiptData.mandalName}*\n\n` +
+      `Receipt No: ${receiptData.receiptNumber}\n` +
+      `Donor: ${receiptData.donorName}\n` +
+      `Amount: ${formattedAmount}\n` +
+      `Event: ${receiptData.eventName}\n\n` +
+      `Thank you for your generous contribution!`
+
+    try {
+      const blob = await buildPdfBlob(receiptData)
+      const file = new File([blob], fileName, { type: 'application/pdf' })
+
+      const shareData: ShareData = {
+        files: [file],
+        title: `Donation Receipt ${receiptData.receiptNumber}`,
+        text: shareText
+      }
+
+      const canUseNativeShare =
+        typeof navigator !== 'undefined' &&
+        typeof navigator.share === 'function' &&
+        typeof navigator.canShare === 'function' &&
+        navigator.canShare(shareData)
+
+      if (canUseNativeShare) {
+        await navigator.share(shareData)
+        return
+      }
+    } catch (err: any) {
+      if (err?.name === 'AbortError' || err?.name === 'InvalidStateError') {
+        return
+      }
+      console.warn('Native file share failed:', err)
+    }
+
+    try {
+      const cleanPhone = (receiptData.donorPhone || '').replace(/\D/g, '')
+      const waUrl = cleanPhone && cleanPhone.length === 10
+        ? `https://api.whatsapp.com/send?phone=91${cleanPhone}&text=${encodeURIComponent(shareText)}`
+        : `https://api.whatsapp.com/send?text=${encodeURIComponent(shareText)}`
+
+      window.open(waUrl, '_blank')
+    } catch (e) {
+      console.error('WhatsApp share fallback error:', e)
+    }
+  })()
+
   try {
-    const file = new File([blob], fileName, { type: 'application/pdf' })
-
-    const shareData: ShareData = {
-      files: [file],
-      title: `Donation Receipt ${receiptData.receiptNumber}`,
-      text: `Donation receipt for ${receiptData.donorName} — ${receiptData.receiptNumber}`
-    }
-
-    const canUseNativeShare =
-      typeof navigator.share === 'function' &&
-      typeof navigator.canShare === 'function' &&
-      navigator.canShare(shareData)
-
-    if (canUseNativeShare) {
-      await navigator.share(shareData)
-      return
-    }
-  } catch (err) {
-    // User cancelled the native share sheet — do nothing.
-    if ((err as DOMException)?.name === 'AbortError') return
-    console.error('Native share failed, falling back to download:', err)
+    await activeSharePromise
+  } finally {
+    activeSharePromise = null
   }
-
-  triggerDownload(blob, fileName)
 }
