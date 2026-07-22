@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js'
 import { NextResponse } from 'next/server'
+import { validateSponsorPayload, buildSponsorColumns } from '@/lib/sponsorValidation'
 
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL,
@@ -39,10 +40,6 @@ async function verifyCaller(request, mandalIdToCheck) {
   return { caller: profile, callerId: user.id }
 }
 
-const SPONSOR_TYPES = ['finance', 'goods_service']
-const PACKAGES = ['title', 'platinum', 'gold', 'silver', 'supporting']
-const PAYMENT_METHODS = ['cash', 'upi', 'cheque']
-
 // PATCH — edit a sponsor's details
 export async function PATCH(request, { params }) {
   try {
@@ -64,38 +61,20 @@ export async function PATCH(request, { params }) {
       return NextResponse.json({ error: authCheck.error }, { status: authCheck.status })
     }
 
-    const {
-      company_name, reference_name, contact_person_name, contact_person_phone, email, address, gst_no,
-      sponsor_type, package: pkg,
-      committed_amount, contribution_date,
-      payment_method, transaction_id, estimated_value, quantity, goods_service_description,
-      notes
-    } = body
+    const { company_name, sponsor_type, committed_amount } = body
 
     if (!company_name || !company_name.trim()) {
       return NextResponse.json({ error: 'company_name is required' }, { status: 400 })
     }
-    if (sponsor_type && !SPONSOR_TYPES.includes(sponsor_type)) {
-      return NextResponse.json({ error: 'Invalid sponsor type' }, { status: 400 })
-    }
-    if (pkg && !PACKAGES.includes(pkg)) {
-      return NextResponse.json({ error: 'Invalid sponsor package' }, { status: 400 })
-    }
-    if (committed_amount !== undefined && committed_amount !== null && (isNaN(committed_amount) || Number(committed_amount) < 0)) {
-      return NextResponse.json({ error: 'Committed amount must be zero or a positive number' }, { status: 400 })
-    }
-    if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-      return NextResponse.json({ error: 'Enter a valid email address' }, { status: 400 })
-    }
-    if (sponsor_type === 'finance' && payment_method && !PAYMENT_METHODS.includes(payment_method)) {
-      return NextResponse.json({ error: 'Payment method must be Cash, UPI, or Cheque' }, { status: 400 })
-    }
 
-    const contribution_type = sponsor_type === 'goods_service' ? 'goods' : 'cash'
+    const validationError = validateSponsorPayload(body)
+    if (validationError) {
+      return NextResponse.json({ error: validationError }, { status: 400 })
+    }
 
     // If lowering committed_amount below what's already been received, block it —
     // otherwise amount_pending would go negative and confuse the installment UI.
-    if (committed_amount !== undefined && committed_amount !== null) {
+    if ((sponsor_type === 'finance' || sponsor_type === 'ads_package') && committed_amount !== undefined && committed_amount !== null) {
       const { data: payments } = await supabaseAdmin.from('sponsor_payments').select('amount').eq('sponsor_id', id)
       const alreadyReceived = (payments || []).reduce((sum, p) => sum + Number(p.amount), 0)
       if (Number(committed_amount) < alreadyReceived) {
@@ -109,24 +88,7 @@ export async function PATCH(request, { params }) {
     const { data: updated, error: updateError } = await supabaseAdmin
       .from('sponsors')
       .update({
-        company_name: company_name.trim(),
-        reference_name: reference_name?.trim() || null,
-        contact_person_name: contact_person_name?.trim() || null,
-        contact_person_phone: contact_person_phone?.trim() || null,
-        email: email?.trim().toLowerCase() || null,
-        address: address?.trim() || null,
-        gst_no: gst_no?.trim() || null,
-        sponsor_type: sponsor_type || null,
-        package: pkg || null,
-        contribution_type,
-        committed_amount: sponsor_type === 'finance' && committed_amount ? Number(committed_amount) : 0,
-        contribution_date: sponsor_type === 'finance' ? (contribution_date || null) : null,
-        payment_method: sponsor_type === 'finance' ? (payment_method?.trim() || null) : null,
-        transaction_id: sponsor_type === 'finance' ? (transaction_id?.trim() || null) : null,
-        estimated_value: sponsor_type === 'goods_service' && estimated_value ? Number(estimated_value) : null,
-        quantity: sponsor_type === 'goods_service' && quantity ? Number(quantity) : null,
-        goods_service_description: sponsor_type === 'goods_service' ? (goods_service_description?.trim() || null) : null,
-        notes: notes?.trim() || null,
+        ...buildSponsorColumns(body),
         updated_by: authCheck.callerId,
         updated_at: new Date().toISOString()
       })
@@ -135,6 +97,7 @@ export async function PATCH(request, { params }) {
       .single()
 
     if (updateError) {
+      console.error('Sponsor update error:', updateError)
       return NextResponse.json({ error: 'Could not update sponsor' }, { status: 500 })
     }
 

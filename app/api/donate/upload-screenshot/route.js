@@ -63,10 +63,15 @@ export async function POST(request) {
       )
     }
 
-    // Return signed URL — valid for 7 days (admin will verify within this window)
+    // Return a short-lived signed URL for the donor's own immediate preview,
+    // plus the storage path. The path (not the URL) is what gets persisted on
+    // the donation record — signed URLs expire (previously stored permanently,
+    // which broke screenshot rendering once the link went stale). Any screen
+    // that needs to display the screenshot later re-signs a fresh URL from the
+    // path on the server, right before sending it to the browser.
     const { data: signedUrlData, error: signedUrlError } = await supabaseAdmin.storage
       .from('payment-screenshots')
-      .createSignedUrl(filePath, 60 * 60 * 24 * 7) // 7 days
+      .createSignedUrl(filePath, 60 * 60) // 1 hour, just for immediate preview
 
     if (signedUrlError || !signedUrlData) {
       console.error('Signed URL error:', signedUrlError)
@@ -76,7 +81,7 @@ export async function POST(request) {
       )
     }
 
-    return NextResponse.json({ url: signedUrlData.signedUrl })
+    return NextResponse.json({ url: signedUrlData.signedUrl, path: filePath })
 
   } catch (err) {
     console.error('Screenshot upload unexpected error:', err)

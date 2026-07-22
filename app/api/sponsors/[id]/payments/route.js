@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js'
 import { NextResponse } from 'next/server'
+import { SPONSOR_PAYMENT_METHOD_VALUES } from '@/lib/sponsorPaymentMethods'
 
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL,
@@ -48,6 +49,10 @@ export async function POST(request, { params }) {
 
     if (!amount || isNaN(amount) || Number(amount) <= 0) {
       return NextResponse.json({ error: 'Amount must be a positive number' }, { status: 400 })
+    }
+
+    if (payment_method && !SPONSOR_PAYMENT_METHOD_VALUES.includes(payment_method)) {
+      return NextResponse.json({ error: 'Invalid payment method' }, { status: 400 })
     }
 
     const { data: sponsor, error: sponsorError } = await supabaseAdmin
