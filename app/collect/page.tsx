@@ -108,8 +108,14 @@ export default function CollectPage() {
         .eq('id', user.id)
         .single()
 
-      if (!userRow || !['collector', 'admin', 'manager'].includes(userRow.role)) {
-        router.push('/')
+      if (!userRow || userRow.role !== 'collector') {
+        if (userRow?.role === 'admin' || userRow?.role === 'manager') {
+          router.push('/dashboard')
+        } else if (userRow?.role === 'super_admin') {
+          router.push('/super-admin')
+        } else {
+          router.push('/')
+        }
         return
       }
 
