@@ -1264,16 +1264,16 @@ export default function DashboardPage() {
       const amount = Number(d.amount)
       if (d.payment_mode === 'cash') {
         groups[collectorId].totalCash += amount
-        // Support Fund: only transactions with payment status "pending" AND
+        // Support Fund: transactions with payment status "verified" or "pending" AND
         // not yet settled count towards the unsettled Cash amount.
-        if (d.status === 'pending' && !d.settlement_id) {
+        if ((d.status === 'verified' || d.status === 'pending') && !d.settlement_id) {
           groups[collectorId].pendingCash += amount
         }
       } else {
         groups[collectorId].totalUpi += amount
-        // Support Fund: only transactions with payment status "pending" AND
+        // Support Fund: transactions with payment status "verified" or "pending" AND
         // not yet settled count towards the unsettled UPI amount.
-        if (d.status === 'pending' && d.payment_mode === 'upi_collector' && !d.settlement_id) {
+        if ((d.status === 'verified' || d.status === 'pending') && d.payment_mode === 'upi_collector' && !d.settlement_id) {
           groups[collectorId].pendingUpi += amount
         }
       }
@@ -1362,14 +1362,15 @@ export default function DashboardPage() {
     .filter(d => d.status === 'verified')
     .reduce((sum, d) => sum + Number(d.amount), 0)
   // Pending Amount = (unsettled UPI, status = pending) + (unsettled Cash, status = pending) + (upi-self, status = pending)
+  // Pending Amount = (unsettled UPI, status = pending/verified) + (unsettled Cash, status = pending/verified) + (upi-self, status = pending)
   const totalPendingAmount = summaryDonations.reduce((sum, d) => {
     const amt = Number(d.amount)
     if (d.payment_mode === 'upi_self') {
       // Self donations: only those still pending verification
       return d.status === 'pending' ? sum + amt : sum
     }
-    // Collector donations (cash / upi_collector): must be pending status AND unsettled (no settlement_id)
-    if (d.status === 'pending' && !d.settlement_id) {
+    // Collector donations (cash / upi_collector): must be verified or pending status AND unsettled (no settlement_id)
+    if ((d.status === 'verified' || d.status === 'pending') && !d.settlement_id) {
       return sum + amt
     }
     return sum
@@ -1878,7 +1879,7 @@ export default function DashboardPage() {
                           <div className="flex items-center gap-2 flex-wrap">
                             <span className="text-base font-semibold text-white">{c.name}</span>
                             <span className="text-xs bg-gray-800 text-gray-400 px-2 py-0.5 rounded-full font-medium">
-                              {c.donations.filter(d => d.status === 'pending' && !d.settlement_id).length} unsettled collection{c.donations.filter(d => d.status === 'pending' && !d.settlement_id).length !== 1 ? 's' : ''}
+                              {c.donations.filter(d => (d.status === 'verified' || d.status === 'pending') && !d.settlement_id).length} unsettled collection{c.donations.filter(d => (d.status === 'verified' || d.status === 'pending') && !d.settlement_id).length !== 1 ? 's' : ''}
                             </span>
                           </div>
                           
