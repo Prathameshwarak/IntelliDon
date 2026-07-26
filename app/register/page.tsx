@@ -49,11 +49,11 @@ export default function RegisterPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
-  // Step 3 — extra org fields
   const [pincode, setPincode] = useState('');
   const [state, setState] = useState('Maharashtra');
   const [adminPhone, setAdminPhone] = useState('');
   const [upiId, setUpiId] = useState('');
+  const [acceptedTerms, setAcceptedTerms] = useState(false);
 
   // Step 3 — document files
   const [docs, setDocs] = useState<Record<string, File | null>>({
@@ -190,6 +190,13 @@ export default function RegisterPage() {
     try {
       if (!pincode.trim() || pincode.length < 6) {
         setErrorMsg('Please enter a valid 6-digit pincode.');
+        setLoading(false);
+        return;
+      }
+
+      if (!acceptedTerms) {
+        setErrorMsg('You must read and agree to the Terms and Conditions to complete registration.');
+        setErrors((prev) => ({ ...prev, terms: 'You must accept the Terms and Conditions to complete registration.' }));
         setLoading(false);
         return;
       }
@@ -1081,6 +1088,45 @@ export default function RegisterPage() {
                       </div>
                     </div>
                   ))}
+                </div>
+
+                {/* Terms and Conditions Acceptance Checkbox */}
+                <div className={`p-4 rounded-xl border transition-colors ${errors.terms ? "bg-rose-500/10 border-rose-500/30" : "bg-[#F5EDE2] dark:bg-slate-900/60 border-[#1A1208]/10 dark:border-slate-800"}`}>
+                  <label htmlFor="agree-terms" className="flex items-start space-x-3 cursor-pointer select-none">
+                    <input
+                      type="checkbox"
+                      id="agree-terms"
+                      name="agreeTerms"
+                      checked={acceptedTerms}
+                      onChange={(e) => {
+                        setAcceptedTerms(e.target.checked);
+                        if (e.target.checked) {
+                          setErrors((prev) => ({ ...prev, terms: "" }));
+                          if (errorMsg.includes("Terms and Conditions")) setErrorMsg("");
+                        }
+                      }}
+                      className="mt-0.5 h-4 w-4 rounded border-[#1A1208]/20 dark:border-slate-700 text-[#E8650A] focus:ring-[#E8650A] cursor-pointer flex-shrink-0"
+                    />
+                    <span className="text-xs text-[#3A2E1E] dark:text-slate-300 leading-relaxed font-medium">
+                      I have read and agree to the{" "}
+                      <Link href="/terms" target="_blank" className="text-[#E8650A] font-bold hover:underline">
+                        Terms and Conditions
+                      </Link>{" "}
+                      and{" "}
+                      <Link href="/privacy" target="_blank" className="text-[#E8650A] font-bold hover:underline">
+                        Privacy Policy
+                      </Link>{" "}
+                      and acknowledge the Beta / Testing phase disclaimer. *
+                    </span>
+                  </label>
+                  {errors.terms && (
+                    <p className="text-xs text-rose-600 dark:text-rose-400 mt-2 font-medium flex items-center space-x-1">
+                      <svg className="w-3.5 h-3.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                        <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                      </svg>
+                      <span>{errors.terms}</span>
+                    </p>
+                  )}
                 </div>
 
                 {/* Navigation Buttons */}
