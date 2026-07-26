@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
 import UpiQR from '@/components/UpiQR'
+import ThemeToggle from '@/components/ThemeToggle'
 import { downloadReceipt, shareReceipt, type ReceiptData } from '@/lib/downloadReceipt'
 
 type Event = {
@@ -156,7 +157,7 @@ export default function CollectPage() {
       const token = session?.access_token
       const res = await fetch('/api/donations', {
         method: 'POST',
-        headers: { 
+        headers: {
           'Content-Type': 'application/json',
           ...(token ? { 'Authorization': `Bearer ${token}` } : {})
         },
@@ -307,7 +308,7 @@ export default function CollectPage() {
       d.status,
       new Date(d.created_at).toLocaleString('en-IN')
     ])
-    
+
     const csvContent = [
       headers.join(','),
       ...rows.map(row => row.map(val => {
@@ -465,7 +466,7 @@ export default function CollectPage() {
   // Daily
   const todayDonations = donations.filter(d => new Date(d.created_at) >= todayStart)
   const todayTotal = todayDonations.reduce((sum, d) => sum + Number(d.amount), 0)
-  
+
   const todayCashDonations = todayDonations.filter(d => d.payment_mode === 'cash')
   const todayCash = todayCashDonations.reduce((sum, d) => sum + Number(d.amount), 0)
   const todayCashCount = todayCashDonations.length
@@ -506,10 +507,10 @@ export default function CollectPage() {
   // Consistent loader panel
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-955 flex items-center justify-center">
+      <div className="min-h-screen bg-[#FDF8F3] dark:bg-gray-950 flex items-center justify-center transition-colors duration-300">
         <div className="flex flex-col items-center gap-3">
-          <div className="w-8 h-8 rounded-full border-2 border-t-orange-500 border-r-transparent border-b-orange-500 border-l-transparent animate-spin" />
-          <p className="text-gray-550 text-xs font-mono animate-pulse">Loading collector portal...</p>
+          <div className="w-8 h-8 rounded-full border-2 border-t-[#E8650A] border-r-transparent border-b-[#E8650A] border-l-transparent animate-spin" />
+          <p className="text-[#7a6a55] dark:text-gray-400 text-xs font-mono animate-pulse">Loading collector portal...</p>
         </div>
       </div>
     )
@@ -517,33 +518,34 @@ export default function CollectPage() {
 
   if (error && !mandal) {
     return (
-      <div className="min-h-screen bg-gray-950 flex items-center justify-center px-4">
-        <p className="text-red-400 text-sm text-center">{error}</p>
+      <div className="min-h-screen bg-[#FDF8F3] dark:bg-gray-950 flex items-center justify-center px-4 transition-colors duration-300">
+        <p className="text-rose-600 dark:text-red-400 text-sm text-center font-bold">{error}</p>
       </div>
     )
   }
 
   return (
-    <div className="min-h-screen bg-gray-950 text-white pb-12">
+    <div className="min-h-screen bg-[#FDF8F3] dark:bg-gray-950 text-[#1A1208] dark:text-white pb-12 transition-colors duration-300">
       {/* Top Header (Matches Admin/Manager Dashboard style exactly) */}
-      <div className="bg-gray-900 border-b border-gray-800 px-3 sm:px-6 py-3 sm:py-4 flex flex-wrap items-center justify-between gap-2">
+      <div className="bg-[#F5EDE2] dark:bg-gray-900 border-b border-[#1A1208]/10 dark:border-gray-800 px-3 sm:px-6 py-3 sm:py-4 flex flex-wrap items-center justify-between gap-2">
         <div className="min-w-0">
-          <p className="text-xs text-gray-400">Intellidon</p>
-          <p className="text-sm sm:text-base font-semibold truncate max-w-[160px] sm:max-w-none">{mandal?.name}</p>
+          <p className="text-xs text-[#7a6a55] dark:text-gray-400 font-bold">Intellidon</p>
+          <p className="text-sm sm:text-base font-bold truncate max-w-[160px] sm:max-w-none text-[#1A1208] dark:text-white">{mandal?.name}</p>
         </div>
         <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
-          <span className="text-[10px] sm:text-xs font-medium px-2 sm:px-2.5 py-1 rounded-full bg-orange-900/50 text-orange-400 capitalize">
+          <span className="text-[10px] sm:text-xs font-bold px-2.5 py-1 rounded-full bg-[#E8650A]/10 text-[#E8650A] dark:bg-orange-950/60 dark:text-orange-400 border border-[#E8650A]/20 capitalize">
             Collector ({collectorName})
           </span>
           <button
             onClick={() => router.push('/share')}
-            className="text-[10px] sm:text-xs bg-gray-700 hover:bg-gray-600 text-white px-2 sm:px-3 py-1.5 rounded-lg transition-colors whitespace-nowrap"
+            className="text-[10px] sm:text-xs bg-white dark:bg-gray-800 hover:bg-[#ebdcc9] dark:hover:bg-gray-700 text-[#1A1208] dark:text-white border border-[#1A1208]/10 dark:border-gray-700 font-bold px-2.5 sm:px-3 py-1.5 rounded-lg transition-colors cursor-pointer whitespace-nowrap shadow-xs"
           >
             🔗 <span className="hidden sm:inline">Share Link</span>
           </button>
+          <ThemeToggle />
           <button
             onClick={() => supabase.auth.signOut().then(() => router.push('/login'))}
-            className="text-[10px] sm:text-xs text-red-400 hover:text-red-300 transition-colors whitespace-nowrap"
+            className="text-[10px] sm:text-xs text-rose-600 hover:text-rose-700 dark:text-red-400 dark:hover:text-red-300 font-bold transition-colors cursor-pointer whitespace-nowrap"
           >
             Sign out
           </button>
@@ -554,13 +556,15 @@ export default function CollectPage() {
       <div className="max-w-md mx-auto px-4 py-6">
 
         {/* Tab Navigation (Consistent styling with primary dashboard tab bar) */}
-        <div className="flex gap-1 bg-gray-900 rounded-xl p-1 border border-gray-800 mb-6 w-full overflow-x-auto">
+        <div className="flex gap-1 bg-[#F5EDE2] dark:bg-gray-900 rounded-xl p-1 border border-[#1A1208]/10 dark:border-gray-800 mb-6 w-full overflow-x-auto shadow-xs">
           {(['dashboard', 'collect', 'history'] as Tab[]).map(t => (
             <button
               key={t}
               onClick={() => setActiveTab(t)}
-              className={`px-3 py-2 rounded-lg text-xs font-semibold capitalize transition-all whitespace-nowrap flex-shrink-0 flex-1
-                ${activeTab === t ? 'bg-orange-500 text-white shadow' : 'text-gray-450 hover:text-white'}`}
+              className={`px-3 py-2 rounded-lg text-xs font-bold capitalize transition-all whitespace-nowrap flex-shrink-0 flex-1 cursor-pointer
+                ${activeTab === t
+                  ? 'bg-gradient-to-r from-[#E8650A] to-[#f97316] text-white shadow-md'
+                  : 'text-[#7a6a55] dark:text-gray-400 hover:text-[#1A1208] dark:hover:text-white'}`}
             >
               {t === 'collect' ? '➕ Collect' : t === 'dashboard' ? '📊 Dashboard' : '📜 History'}
             </button>
@@ -573,123 +577,122 @@ export default function CollectPage() {
         {activeTab === 'dashboard' && (
           <div className="flex flex-col gap-6 animate-fade-in">
             <div>
-              <h1 className="text-xl font-bold text-white">Collector Dashboard</h1>
-              <p className="text-xs text-gray-400 mt-1">Real-time overview of your collections</p>
+              <h1 className="text-xl font-bold text-[#1A1208] dark:text-white">Collector Dashboard</h1>
+              <p className="text-xs text-[#7a6a55] dark:text-gray-400 mt-1 font-medium">Real-time overview of your collections</p>
             </div>
 
             {/* KPI Cards Grid (Matches Dashboard summary cards) */}
             <div className="grid grid-cols-2 gap-3">
-              <div className="bg-gray-800 rounded-xl p-4 flex flex-col justify-between shadow-sm h-28">
-                <span className="text-[10px] text-gray-400 uppercase tracking-wider font-semibold">Total Collected</span>
+              <div className="bg-[#F5EDE2] dark:bg-gray-900 border border-[#1A1208]/10 dark:border-gray-800 rounded-xl p-4 flex flex-col justify-between shadow-sm h-28">
+                <span className="text-[10px] text-[#7a6a55] dark:text-gray-400 uppercase tracking-wider font-bold">Total Collected</span>
                 <div className="mt-auto">
-                  <span className="text-2xl font-bold text-white">₹{totalCollected.toLocaleString('en-IN')}</span>
-                  <span className="text-[10px] text-gray-400 block mt-0.5">{totalDonors} donations</span>
+                  <span className="text-2xl font-extrabold text-[#1A1208] dark:text-white">₹{totalCollected.toLocaleString('en-IN')}</span>
+                  <span className="text-[10px] text-[#7a6a55] dark:text-gray-400 block mt-0.5 font-medium">{totalDonors} donations</span>
                 </div>
               </div>
 
-              <div className="bg-gray-800 rounded-xl p-4 flex flex-col justify-between shadow-sm h-28">
-                <span className="text-[10px] text-green-400 uppercase tracking-wider font-semibold">Verified</span>
+              <div className="bg-[#F5EDE2] dark:bg-gray-900 border border-[#1A1208]/10 dark:border-gray-800 rounded-xl p-4 flex flex-col justify-between shadow-sm h-28">
+                <span className="text-[10px] text-emerald-700 dark:text-green-400 uppercase tracking-wider font-bold">Verified</span>
                 <div className="mt-auto">
-                  <span className="text-2xl font-bold text-green-400 font-sans">₹{verifiedAmount.toLocaleString('en-IN')}</span>
-                  <span className="text-[10px] text-gray-400 block mt-0.5">Approved by admin</span>
+                  <span className="text-2xl font-extrabold text-emerald-700 dark:text-green-400 font-sans">₹{verifiedAmount.toLocaleString('en-IN')}</span>
+                  <span className="text-[10px] text-[#7a6a55] dark:text-gray-400 block mt-0.5 font-medium">Approved by admin</span>
                 </div>
               </div>
 
-              <div className="bg-gray-800 rounded-xl p-4 flex flex-col justify-between shadow-sm h-28">
-                <span className="text-[10px] text-orange-400 uppercase tracking-wider font-semibold">Today's Cash</span>
+              <div className="bg-[#F5EDE2] dark:bg-gray-900 border border-[#1A1208]/10 dark:border-gray-800 rounded-xl p-4 flex flex-col justify-between shadow-sm h-28">
+                <span className="text-[10px] text-[#E8650A] dark:text-orange-400 uppercase tracking-wider font-bold">Today's Cash</span>
                 <div className="mt-auto">
-                  <span className="text-2xl font-bold text-white">{todayCashCount}</span>
-                  <span className="text-[10px] text-gray-400 block mt-0.5">₹{todayCash.toLocaleString('en-IN')} collected</span>
+                  <span className="text-2xl font-extrabold text-[#1A1208] dark:text-white">{todayCashCount}</span>
+                  <span className="text-[10px] text-[#7a6a55] dark:text-gray-400 block mt-0.5 font-medium">₹{todayCash.toLocaleString('en-IN')} collected</span>
                 </div>
               </div>
 
-              <div className="bg-gray-800 rounded-xl p-4 flex flex-col justify-between shadow-sm h-28">
-                <span className="text-[10px] text-indigo-400 uppercase tracking-wider font-semibold">Today's UPI</span>
+              <div className="bg-[#F5EDE2] dark:bg-gray-900 border border-[#1A1208]/10 dark:border-gray-800 rounded-xl p-4 flex flex-col justify-between shadow-sm h-28">
+                <span className="text-[10px] text-indigo-700 dark:text-indigo-400 uppercase tracking-wider font-bold">Today's UPI</span>
                 <div className="mt-auto">
-                  <span className="text-2xl font-bold text-white">{todayUpiCount}</span>
-                  <span className="text-[10px] text-gray-400 block mt-0.5">₹{todayUpi.toLocaleString('en-IN')} collected</span>
+                  <span className="text-2xl font-extrabold text-[#1A1208] dark:text-white">{todayUpiCount}</span>
+                  <span className="text-[10px] text-[#7a6a55] dark:text-gray-400 block mt-0.5 font-medium">₹{todayUpi.toLocaleString('en-IN')} collected</span>
                 </div>
               </div>
             </div>
 
             {/* Daily, Weekly, Monthly Collections Card */}
-            <div className="bg-gray-900 border border-gray-800 rounded-xl p-4 shadow-sm animate-fade-in">
-              <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-4">Period Overview</h3>
+            <div className="bg-[#F5EDE2] dark:bg-gray-900 border border-[#1A1208]/10 dark:border-gray-800 rounded-xl p-4 shadow-sm animate-fade-in">
+              <h3 className="text-xs font-bold text-[#7a6a55] dark:text-gray-400 uppercase tracking-wider mb-4">Period Overview</h3>
               <div className="flex flex-col gap-3.5">
                 {/* Daily */}
                 <div>
                   <div className="flex justify-between items-center text-xs">
-                    <span className="text-gray-400 font-medium">📅 Today's Collection</span>
-                    <span className="font-extrabold text-white text-sm">₹{todayTotal.toLocaleString('en-IN')}</span>
+                    <span className="text-[#7a6a55] dark:text-gray-300 font-bold">📅 Today's Collection</span>
+                    <span className="font-extrabold text-[#1A1208] dark:text-white text-sm">₹{todayTotal.toLocaleString('en-IN')}</span>
                   </div>
-                  <div className="flex gap-4 text-[10px] text-gray-500 mt-1">
-                    <span className="flex items-center gap-1">💵 Cash: <strong className="text-gray-300 font-semibold">₹{todayCash.toLocaleString('en-IN')}</strong></span>
-                    <span className="flex items-center gap-1">📱 UPI: <strong className="text-gray-300 font-semibold">₹{todayUpi.toLocaleString('en-IN')}</strong></span>
+                  <div className="flex gap-4 text-[10px] text-[#7a6a55] dark:text-gray-400 mt-1 font-medium">
+                    <span className="flex items-center gap-1">💵 Cash: <strong className="text-[#1A1208] dark:text-gray-200 font-bold">₹{todayCash.toLocaleString('en-IN')}</strong></span>
+                    <span className="flex items-center gap-1">📱 UPI: <strong className="text-[#1A1208] dark:text-gray-200 font-bold">₹{todayUpi.toLocaleString('en-IN')}</strong></span>
                   </div>
                 </div>
 
-                <div className="h-px bg-gray-800/60"></div>
+                <div className="h-px bg-[#1A1208]/10 dark:bg-gray-800"></div>
 
                 {/* Weekly */}
                 <div>
                   <div className="flex justify-between items-center text-xs">
-                    <span className="text-gray-400 font-medium">📅 Weekly Collection <span className="text-[9px] text-gray-500 font-normal font-sans">(Last 7 days)</span></span>
-                    <span className="font-extrabold text-white text-sm">₹{weeklyTotal.toLocaleString('en-IN')}</span>
+                    <span className="text-[#7a6a55] dark:text-gray-300 font-bold">📅 Weekly Collection <span className="text-[9px] text-[#9e8c76] dark:text-gray-500 font-normal font-sans">(Last 7 days)</span></span>
+                    <span className="font-extrabold text-[#1A1208] dark:text-white text-sm">₹{weeklyTotal.toLocaleString('en-IN')}</span>
                   </div>
                 </div>
 
-                <div className="h-px bg-gray-800/60"></div>
+                <div className="h-px bg-[#1A1208]/10 dark:bg-gray-800"></div>
 
                 {/* Monthly */}
                 <div>
                   <div className="flex justify-between items-center text-xs">
-                    <span className="text-gray-400 font-medium">📅 Monthly Collection <span className="text-[9px] text-gray-500 font-normal font-sans">(Last 30 days)</span></span>
-                    <span className="font-extrabold text-white text-sm">₹{monthlyTotal.toLocaleString('en-IN')}</span>
+                    <span className="text-[#7a6a55] dark:text-gray-300 font-bold">📅 Monthly Collection <span className="text-[9px] text-[#9e8c76] dark:text-gray-500 font-normal font-sans">(Last 30 days)</span></span>
+                    <span className="font-extrabold text-[#1A1208] dark:text-white text-sm">₹{monthlyTotal.toLocaleString('en-IN')}</span>
                   </div>
                 </div>
               </div>
             </div>
 
             {/* Handover & Settlement Summary Card */}
-            <div className="bg-gray-900 border border-gray-800 rounded-xl p-4 shadow-sm">
+            <div className="bg-[#F5EDE2] dark:bg-gray-900 border border-[#1A1208]/10 dark:border-gray-800 rounded-xl p-4 shadow-sm">
               <div className="flex justify-between items-center mb-3">
-                <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Handovers & Settlements</h3>
-                <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wide border ${
-                  totalUnsettled > 0 
-                    ? 'bg-yellow-950/60 text-yellow-400 border-yellow-900/20' 
-                    : 'bg-green-950/60 text-green-400 border-green-900/20'
-                }`}>
+                <h3 className="text-xs font-bold text-[#7a6a55] dark:text-gray-400 uppercase tracking-wider">Handovers & Settlements</h3>
+                <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wide border ${totalUnsettled > 0
+                    ? 'bg-amber-500/10 text-amber-700 dark:text-yellow-400 border-amber-500/20'
+                    : 'bg-emerald-500/10 text-emerald-700 dark:text-green-400 border-emerald-500/20'
+                  }`}>
                   {totalUnsettled > 0 ? 'Pending Settlement' : '✓ Settled'}
                 </span>
               </div>
               <div className="grid grid-cols-3 gap-2.5 text-center mt-2">
-                <div className="bg-gray-950/60 rounded-lg p-2.5 border border-gray-850">
-                  <span className="text-[10px] text-gray-500 block font-medium">Pending Cash</span>
-                  <span className="text-sm font-bold text-white">₹{unsettledCash.toLocaleString('en-IN')}</span>
+                <div className="bg-white dark:bg-gray-950/60 rounded-lg p-2.5 border border-[#1A1208]/10 dark:border-gray-800 shadow-xs">
+                  <span className="text-[10px] text-[#7a6a55] dark:text-gray-400 block font-bold">Pending Cash</span>
+                  <span className="text-sm font-extrabold text-[#1A1208] dark:text-white">₹{unsettledCash.toLocaleString('en-IN')}</span>
                 </div>
-                <div className="bg-gray-950/60 rounded-lg p-2.5 border border-gray-850">
-                  <span className="text-[10px] text-gray-500 block font-medium">Pending UPI</span>
-                  <span className="text-sm font-bold text-white">₹{unsettledUpi.toLocaleString('en-IN')}</span>
+                <div className="bg-white dark:bg-gray-950/60 rounded-lg p-2.5 border border-[#1A1208]/10 dark:border-gray-800 shadow-xs">
+                  <span className="text-[10px] text-[#7a6a55] dark:text-gray-400 block font-bold">Pending UPI</span>
+                  <span className="text-sm font-extrabold text-[#1A1208] dark:text-white">₹{unsettledUpi.toLocaleString('en-IN')}</span>
                 </div>
-                <div className="bg-gray-950/60 rounded-lg p-2.5 border border-gray-850">
-                  <span className="text-[10px] text-gray-500 block font-medium font-sans">Unsettled Total</span>
-                  <span className="text-sm font-bold text-orange-400">₹{totalUnsettled.toLocaleString('en-IN')}</span>
+                <div className="bg-white dark:bg-gray-950/60 rounded-lg p-2.5 border border-[#1A1208]/10 dark:border-gray-800 shadow-xs">
+                  <span className="text-[10px] text-[#7a6a55] dark:text-gray-400 block font-bold font-sans">Unsettled Total</span>
+                  <span className="text-sm font-extrabold text-[#E8650A] dark:text-orange-400">₹{totalUnsettled.toLocaleString('en-IN')}</span>
                 </div>
               </div>
             </div>
 
             {/* Payment Mode Breakdown */}
-            <div className="bg-gray-900 border border-gray-800 rounded-xl p-4 shadow-sm">
-              <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-4">Collection Modes</h3>
+            <div className="bg-[#F5EDE2] dark:bg-gray-900 border border-[#1A1208]/10 dark:border-gray-800 rounded-xl p-4 shadow-sm">
+              <h3 className="text-xs font-bold text-[#7a6a55] dark:text-gray-400 uppercase tracking-wider mb-4">Collection Modes</h3>
               <div className="flex flex-col gap-4">
                 <div>
                   <div className="flex justify-between items-center text-xs mb-1.5">
-                    <span className="text-gray-450">💵 Cash Collections</span>
-                    <span className="font-semibold text-white">₹{cashAmount.toLocaleString('en-IN')}</span>
+                    <span className="text-[#7a6a55] dark:text-gray-300 font-bold">💵 Cash Collections</span>
+                    <span className="font-extrabold text-[#1A1208] dark:text-white">₹{cashAmount.toLocaleString('en-IN')}</span>
                   </div>
-                  <div className="w-full bg-gray-950 h-2.5 rounded-full overflow-hidden border border-gray-850">
+                  <div className="w-full bg-white dark:bg-gray-950 h-2.5 rounded-full overflow-hidden border border-[#1A1208]/10 dark:border-gray-800">
                     <div
-                      className="bg-orange-500 h-full rounded-full transition-all duration-500"
+                      className="bg-gradient-to-r from-[#E8650A] to-[#f97316] h-full rounded-full transition-all duration-500"
                       style={{ width: `${totalCollected > 0 ? (cashAmount / totalCollected) * 100 : 0}%` }}
                     ></div>
                   </div>
@@ -697,12 +700,12 @@ export default function CollectPage() {
 
                 <div>
                   <div className="flex justify-between items-center text-xs mb-1.5">
-                    <span className="text-gray-455">📱 UPI QR Collections</span>
-                    <span className="font-semibold text-white">₹{upiAmount.toLocaleString('en-IN')}</span>
+                    <span className="text-[#7a6a55] dark:text-gray-300 font-bold">📱 UPI QR Collections</span>
+                    <span className="font-extrabold text-[#1A1208] dark:text-white">₹{upiAmount.toLocaleString('en-IN')}</span>
                   </div>
-                  <div className="w-full bg-gray-950 h-2.5 rounded-full overflow-hidden border border-gray-850">
+                  <div className="w-full bg-white dark:bg-gray-950 h-2.5 rounded-full overflow-hidden border border-[#1A1208]/10 dark:border-gray-800">
                     <div
-                      className="bg-indigo-500 h-full rounded-full transition-all duration-500"
+                      className="bg-indigo-600 h-full rounded-full transition-all duration-500"
                       style={{ width: `${totalCollected > 0 ? (upiAmount / totalCollected) * 100 : 0}%` }}
                     ></div>
                   </div>
@@ -711,12 +714,12 @@ export default function CollectPage() {
             </div>
 
             {/* Recent Collections */}
-            <div className="bg-gray-900 border border-gray-800 rounded-xl p-4 shadow-sm">
+            <div className="bg-[#F5EDE2] dark:bg-gray-900 border border-[#1A1208]/10 dark:border-gray-800 rounded-xl p-4 shadow-sm">
               <div className="flex justify-between items-center mb-3">
-                <h3 className="text-xs font-semibold text-gray-450 uppercase tracking-wider">Recent Activity</h3>
+                <h3 className="text-xs font-bold text-[#7a6a55] dark:text-gray-400 uppercase tracking-wider">Recent Activity</h3>
                 <button
                   onClick={() => setActiveTab('history')}
-                  className="text-xs text-orange-400 hover:text-orange-300 font-medium transition-colors"
+                  className="text-xs text-[#E8650A] dark:text-orange-400 hover:underline font-bold transition-colors cursor-pointer"
                 >
                   View All →
                 </button>
@@ -724,14 +727,14 @@ export default function CollectPage() {
 
               {donationsLoading ? (
                 <div className="text-center py-6">
-                  <p className="text-xs text-gray-550">Loading activity...</p>
+                  <p className="text-xs text-[#7a6a55] dark:text-gray-400 font-medium">Loading activity...</p>
                 </div>
               ) : donations.length === 0 ? (
                 <div className="text-center py-6">
-                  <p className="text-xs text-gray-500">No collections recorded yet</p>
+                  <p className="text-xs text-[#7a6a55] dark:text-gray-400 font-medium">No collections recorded yet</p>
                   <button
                     onClick={() => setActiveTab('collect')}
-                    className="mt-3 bg-orange-500 hover:bg-orange-600 text-white text-xs font-semibold px-4 py-2 rounded-lg transition-colors"
+                    className="mt-3 bg-gradient-to-r from-[#E8650A] to-[#f97316] text-white text-xs font-bold px-4 py-2 rounded-lg transition-all shadow-sm cursor-pointer"
                   >
                     Record First Donation
                   </button>
@@ -741,30 +744,29 @@ export default function CollectPage() {
                   {donations.slice(0, 3).map((d, index) => (
                     <div
                       key={d.id}
-                      className={`py-3 flex justify-between items-center ${
-                        index !== 2 && index !== donations.length - 1 ? 'border-b border-gray-800/60' : ''
-                      }`}
+                      className={`py-3 flex justify-between items-center ${index !== 2 && index !== donations.length - 1 ? 'border-b border-[#1A1208]/10 dark:border-gray-800' : ''
+                        }`}
                     >
                       <div>
-                        <p className="text-sm font-semibold text-white">{d.donor_name}</p>
+                        <p className="text-sm font-bold text-[#1A1208] dark:text-white">{d.donor_name}</p>
                         <div className="flex items-center gap-2 mt-0.5">
-                          <span className="text-[10px] text-gray-500 font-mono">{d.receipt_number}</span>
-                          <span className="text-[10px] text-gray-600">•</span>
-                          <span className="text-[10px] text-gray-500">
+                          <span className="text-[10px] text-[#9e8c76] dark:text-gray-400 font-mono">{d.receipt_number}</span>
+                          <span className="text-[10px] text-[#7a6a55] dark:text-gray-500">•</span>
+                          <span className="text-[10px] text-[#7a6a55] dark:text-gray-400 font-medium">
                             {d.payment_mode === 'cash' ? '💵 Cash' : '📱 UPI'}
                           </span>
                         </div>
                       </div>
                       <div className="text-right flex flex-col items-end gap-1">
-                        <p className="text-sm font-bold text-white">₹{Number(d.amount).toLocaleString('en-IN')}</p>
+                        <p className="text-sm font-extrabold text-[#1A1208] dark:text-white">₹{Number(d.amount).toLocaleString('en-IN')}</p>
                         <div className="flex gap-1 items-center">
                           <span
                             className={`inline-block text-[9px] font-bold px-2 py-0.5 rounded-full border uppercase tracking-wide
                               ${d.status === 'verified'
-                                ? 'bg-green-950 text-green-400 border-green-900/20'
+                                ? 'bg-emerald-500/10 text-emerald-700 dark:text-green-400 border-emerald-500/20'
                                 : d.status === 'pending'
-                                ? 'bg-yellow-950 text-yellow-400 border-yellow-900/20'
-                                : 'bg-red-950 text-red-400 border-red-900/20'
+                                  ? 'bg-amber-500/10 text-amber-700 dark:text-yellow-400 border-amber-500/20'
+                                  : 'bg-rose-500/10 text-rose-700 dark:text-red-400 border-rose-500/20'
                               }`}
                           >
                             {d.status}
@@ -773,8 +775,8 @@ export default function CollectPage() {
                             <span
                               className={`inline-block text-[8px] font-bold px-1.5 py-0.5 rounded-full border uppercase tracking-wide
                                 ${d.settlement_id
-                                  ? 'bg-green-950/60 text-green-400 border-green-900/10'
-                                  : 'bg-yellow-950/60 text-yellow-450 border-yellow-900/10'
+                                  ? 'bg-emerald-500/10 text-emerald-700 dark:text-green-400 border-emerald-500/20'
+                                  : 'bg-amber-500/10 text-amber-700 dark:text-yellow-400 border-amber-500/20'
                                 }`}
                             >
                               {d.settlement_id ? '✓ Settled' : 'Pending'}
@@ -799,47 +801,47 @@ export default function CollectPage() {
             {step === 'form' && (
               <div className="flex flex-col gap-4">
                 <div>
-                  <h1 className="text-lg font-semibold">New Donation</h1>
-                  <p className="text-xs text-gray-400 mt-0.5">Enter donor details below</p>
+                  <h1 className="text-lg font-bold text-[#1A1208] dark:text-white">New Donation</h1>
+                  <p className="text-xs text-[#7a6a55] dark:text-gray-400 mt-0.5 font-medium">Enter donor details below</p>
                 </div>
 
                 {events.length > 1 && (
                   <div>
-                    <label className="text-xs text-gray-400 mb-1 block">Event</label>
+                    <label className="text-xs text-[#7a6a55] dark:text-gray-400 mb-1 block font-bold">Event</label>
                     <select
                       value={selectedEvent?.id || ''}
                       onChange={e => setSelectedEvent(events.find(ev => ev.id === e.target.value) || null)}
-                      className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-3 text-sm text-white focus:outline-none focus:border-orange-500"
+                      className="w-full bg-white dark:bg-gray-900 border border-[#1A1208]/15 dark:border-gray-700 rounded-lg px-3 py-3 text-sm text-[#1A1208] dark:text-white font-medium focus:outline-none focus:border-[#E8650A]"
                     >
-                      <option value="" className="bg-gray-900 text-white">Select event</option>
+                      <option value="" className="bg-white dark:bg-gray-900 text-[#1A1208] dark:text-white">Select event</option>
                       {events.map(ev => (
-                        <option key={ev.id} value={ev.id} className="bg-gray-900 text-white">{ev.name} {ev.year}</option>
+                        <option key={ev.id} value={ev.id} className="bg-white dark:bg-gray-900 text-[#1A1208] dark:text-white">{ev.name} {ev.year}</option>
                       ))}
                     </select>
                   </div>
                 )}
 
                 {selectedEvent && events.length === 1 && (
-                  <div className="bg-gray-800 rounded-lg px-3 py-2">
-                    <p className="text-xs text-gray-400">Event</p>
-                    <p className="text-sm font-medium">{selectedEvent.name} {selectedEvent.year}</p>
+                  <div className="bg-[#F5EDE2] dark:bg-gray-900 border border-[#1A1208]/10 dark:border-gray-800 rounded-lg px-3 py-2">
+                    <p className="text-xs text-[#7a6a55] dark:text-gray-400 font-medium">Event</p>
+                    <p className="text-sm font-bold text-[#1A1208] dark:text-white">{selectedEvent.name} {selectedEvent.year}</p>
                   </div>
                 )}
 
                 <div>
-                  <label className="text-xs text-gray-400 mb-1 block">Donor Name *</label>
+                  <label className="text-xs text-[#7a6a55] dark:text-gray-400 mb-1 block font-bold">Donor Name *</label>
                   <input
                     type="text"
                     value={donorName}
                     onChange={e => setDonorName(e.target.value)}
                     placeholder="Full name"
-                    className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-3 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-orange-500"
+                    className="w-full bg-white dark:bg-gray-900 border border-[#1A1208]/15 dark:border-gray-700 rounded-lg px-3 py-3 text-sm text-[#1A1208] dark:text-white placeholder-[#9e8c76] dark:placeholder-gray-500 focus:outline-none focus:border-[#E8650A] font-medium"
                   />
                 </div>
 
                 <div>
-                  <label className="text-xs text-gray-405 mb-1 block">
-                    Phone Number <span className="text-gray-550 font-normal">(optional)</span>
+                  <label className="text-xs text-[#7a6a55] dark:text-gray-400 mb-1 block font-bold">
+                    Phone Number <span className="text-[#9e8c76] dark:text-gray-500 font-normal">(optional)</span>
                   </label>
                   <input
                     type="tel"
@@ -847,51 +849,51 @@ export default function CollectPage() {
                     onChange={e => setDonorPhone(e.target.value.replace(/[^0-9]/g, ''))}
                     placeholder="10-digit mobile number"
                     maxLength={10}
-                    className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-3 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-orange-500"
+                    className="w-full bg-white dark:bg-gray-900 border border-[#1A1208]/15 dark:border-gray-700 rounded-lg px-3 py-3 text-sm text-[#1A1208] dark:text-white placeholder-[#9e8c76] dark:placeholder-gray-500 focus:outline-none focus:border-[#E8650A] font-medium"
                   />
                 </div>
 
                 <div>
-                  <label className="text-xs text-gray-400 mb-1 block">Address <span className="text-gray-600">(optional)</span></label>
+                  <label className="text-xs text-[#7a6a55] dark:text-gray-400 mb-1 block font-bold">Address <span className="text-[#9e8c76] dark:text-gray-500 font-normal">(optional)</span></label>
                   <input
                     type="text"
                     value={donorAddress}
                     onChange={e => setDonorAddress(e.target.value)}
                     placeholder="Flat / Building / Area"
-                    className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-3 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-orange-500"
+                    className="w-full bg-white dark:bg-gray-900 border border-[#1A1208]/15 dark:border-gray-700 rounded-lg px-3 py-3 text-sm text-[#1A1208] dark:text-white placeholder-[#9e8c76] dark:placeholder-gray-500 focus:outline-none focus:border-[#E8650A] font-medium"
                   />
                 </div>
 
                 <div>
-                  <label className="text-xs text-gray-400 mb-1 block">Amount (₹) *</label>
+                  <label className="text-xs text-[#7a6a55] dark:text-gray-400 mb-1 block font-bold">Amount (₹) *</label>
                   <input
                     type="text"
                     inputMode="numeric"
                     value={amount}
                     onChange={e => setAmount(e.target.value.replace(/[^0-9]/g, ''))}
                     placeholder="0"
-                    className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-3 text-2xl font-semibold text-white placeholder-gray-600 focus:outline-none focus:border-orange-500"
+                    className="w-full bg-white dark:bg-gray-900 border border-[#1A1208]/15 dark:border-gray-700 rounded-lg px-3 py-3 text-2xl font-extrabold text-[#1A1208] dark:text-white placeholder-[#9e8c76] dark:placeholder-gray-600 focus:outline-none focus:border-[#E8650A]"
                   />
                 </div>
 
                 <div>
-                  <label className="text-xs text-gray-400 mb-2 block">Payment Mode *</label>
+                  <label className="text-xs text-[#7a6a55] dark:text-gray-400 mb-2 block font-bold">Payment Mode *</label>
                   <div className="grid grid-cols-2 gap-2">
                     <button
                       onClick={() => setPaymentMode('cash')}
-                      className={`py-3 rounded-lg text-sm font-medium border transition-colors
+                      className={`py-3 rounded-lg text-sm font-bold border transition-colors cursor-pointer
                         ${paymentMode === 'cash'
-                          ? 'bg-orange-500 border-orange-500 text-white shadow'
-                          : 'bg-gray-800 border-gray-700 text-gray-400'}`}
+                          ? 'bg-gradient-to-r from-[#E8650A] to-[#f97316] border-[#E8650A] text-white shadow-md'
+                          : 'bg-white dark:bg-gray-900 border-[#1A1208]/15 dark:border-gray-700 text-[#7a6a55] dark:text-gray-400'}`}
                     >
                       💵 Cash
                     </button>
                     <button
                       onClick={() => setPaymentMode('upi_collector')}
-                      className={`py-3 rounded-lg text-sm font-medium border transition-colors
+                      className={`py-3 rounded-lg text-sm font-bold border transition-colors cursor-pointer
                         ${paymentMode === 'upi_collector'
-                          ? 'bg-orange-500 border-orange-500 text-white shadow'
-                          : 'bg-gray-800 border-gray-700 text-gray-400'}`}
+                          ? 'bg-gradient-to-r from-[#E8650A] to-[#f97316] border-[#E8650A] text-white shadow-md'
+                          : 'bg-white dark:bg-gray-900 border-[#1A1208]/15 dark:border-gray-700 text-[#7a6a55] dark:text-gray-400'}`}
                     >
                       📱 UPI / QR
                     </button>
@@ -899,15 +901,15 @@ export default function CollectPage() {
                 </div>
 
                 {error && (
-                  <div className="bg-red-900/40 border border-red-700 rounded-lg px-3 py-2">
-                    <p className="text-red-400 text-sm">{error}</p>
+                  <div className="bg-rose-500/10 border border-rose-500/20 rounded-lg px-3 py-2">
+                    <p className="text-rose-700 dark:text-red-400 text-sm font-bold">{error}</p>
                   </div>
                 )}
 
                 <button
                   onClick={handleFormSubmit}
                   disabled={submitting || checkingPhone}
-                  className="w-full bg-orange-500 hover:bg-orange-600 disabled:bg-orange-300 disabled:opacity-50 disabled:cursor-not-allowed text-white font-semibold py-4 rounded-xl text-base transition-colors mt-2 cursor-pointer shadow-md"
+                  className="w-full bg-gradient-to-r from-[#E8650A] to-[#f97316] hover:from-[#d05807] hover:to-[#ea580c] disabled:opacity-50 text-white font-bold py-4 rounded-xl text-base transition-all mt-2 cursor-pointer shadow-md"
                 >
                   {checkingPhone ? 'Checking details...' : 'Continue →'}
                 </button>
@@ -917,33 +919,33 @@ export default function CollectPage() {
             {/* STEP: Cash Confirm */}
             {step === 'cash_confirm' && (
               <div className="flex flex-col gap-4">
-                <div className="bg-gray-800 rounded-xl p-5 text-center shadow-md">
+                <div className="bg-[#F5EDE2] dark:bg-gray-900 border border-[#1A1208]/10 dark:border-gray-800 rounded-xl p-5 text-center shadow-sm">
                   <p className="text-4xl mb-3">💵</p>
-                  <p className="text-gray-400 text-sm mb-1">Confirm cash collected from</p>
-                  <p className="text-white font-semibold text-xl">{donorName}</p>
-                  <p className="text-gray-400 text-sm">{donorPhone}</p>
-                  {donorAddress && <p className="text-gray-550 text-xs mt-1">{donorAddress}</p>}
-                  <div className="mt-5 bg-gray-900 rounded-lg py-4 border border-gray-850">
-                    <p className="text-gray-450 text-xs mb-1">Amount</p>
-                    <p className="text-4xl font-bold text-white">₹{Number(amount).toLocaleString('en-IN')}</p>
+                  <p className="text-[#7a6a55] dark:text-gray-400 text-xs mb-1 font-bold">Confirm cash collected from</p>
+                  <p className="text-[#1A1208] dark:text-white font-bold text-xl">{donorName}</p>
+                  <p className="text-[#7a6a55] dark:text-gray-400 text-xs font-medium">{donorPhone}</p>
+                  {donorAddress && <p className="text-[#9e8c76] dark:text-gray-500 text-xs mt-1">{donorAddress}</p>}
+                  <div className="mt-5 bg-white dark:bg-gray-950 rounded-lg py-4 border border-[#1A1208]/10 dark:border-gray-800 shadow-xs">
+                    <p className="text-[#7a6a55] dark:text-gray-400 text-xs mb-1 font-bold">Amount</p>
+                    <p className="text-4xl font-extrabold text-[#1A1208] dark:text-white">₹{Number(amount).toLocaleString('en-IN')}</p>
                   </div>
                 </div>
 
                 {error && (
-                  <div className="bg-red-900/40 border border-red-700 rounded-lg px-3 py-2">
-                    <p className="text-red-400 text-sm">{error}</p>
+                  <div className="bg-rose-500/10 border border-rose-500/20 rounded-lg px-3 py-2">
+                    <p className="text-rose-700 dark:text-red-400 text-sm font-bold">{error}</p>
                   </div>
                 )}
 
                 <button
                   onClick={() => submitDonation(pendingPayload)}
                   disabled={submitting}
-                  className="w-full bg-green-600 hover:bg-green-700 disabled:opacity-50 text-white font-semibold py-4 rounded-xl text-base transition-colors shadow-md"
+                  className="w-full bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white font-bold py-4 rounded-xl text-base transition-colors shadow-md cursor-pointer"
                 >
                   {submitting ? 'Recording...' : '✓ Confirm Collection & Record Donation'}
                 </button>
 
-                <button onClick={() => setStep('form')} className="w-full bg-gray-800 hover:bg-gray-750 text-gray-400 font-medium py-3 rounded-xl text-sm transition-colors">
+                <button onClick={() => setStep('form')} className="w-full bg-white dark:bg-gray-800 hover:bg-[#ebdcc9] dark:hover:bg-gray-700 text-[#1A1208] dark:text-gray-300 font-bold py-3 rounded-xl text-sm transition-colors border border-[#1A1208]/10 dark:border-gray-700 cursor-pointer">
                   ← Go Back
                 </button>
               </div>
@@ -952,46 +954,48 @@ export default function CollectPage() {
             {/* STEP: UPI QR */}
             {step === 'upi_qr' && selectedEvent && (
               <div className="flex flex-col gap-4">
-                <div className="bg-gray-800 rounded-xl p-5 flex flex-col items-center gap-4 shadow-md">
-                  <p className="text-gray-405 text-sm">Show this QR to the donor</p>
+                <div className="bg-[#F5EDE2] dark:bg-gray-900 border border-[#1A1208]/10 dark:border-gray-800 rounded-xl p-5 flex flex-col items-center gap-4 shadow-sm">
+                  <p className="text-[#7a6a55] dark:text-gray-300 text-xs font-bold">Show this QR to the donor</p>
 
                   {selectedEvent.upi_id ? (
-                    <UpiQR
-                      upiId={selectedEvent.upi_id}
-                      name={mandal?.name || ''}
-                      amount={Number(amount)}
-                      note={`${selectedEvent.name} ${selectedEvent.year} Donation`}
-                      size={220}
-                    />
+                    <div className="p-2 bg-white rounded-xl shadow-sm">
+                      <UpiQR
+                        upiId={selectedEvent.upi_id}
+                        name={mandal?.name || ''}
+                        amount={Number(amount)}
+                        note={`${selectedEvent.name} ${selectedEvent.year} Donation`}
+                        size={220}
+                      />
+                    </div>
                   ) : (
-                    <div className="w-52 h-52 bg-gray-900 rounded-xl flex items-center justify-center border border-gray-700">
+                    <div className="w-52 h-52 bg-white dark:bg-gray-950 rounded-xl flex items-center justify-center border border-[#1A1208]/10 dark:border-gray-800">
                       <div className="text-center px-4">
-                        <p className="text-gray-550 text-xs mb-2">No UPI ID set</p>
-                        <p className="text-gray-400 text-xs">Ask admin to add UPI ID in Events settings</p>
+                        <p className="text-[#7a6a55] dark:text-gray-400 text-xs mb-2 font-bold">No UPI ID set</p>
+                        <p className="text-[#9e8c76] dark:text-gray-500 text-xs font-medium">Ask admin to add UPI ID in Events settings</p>
                       </div>
                     </div>
                   )}
 
-                  <p className="text-gray-505 text-xs text-center max-w-xs leading-relaxed">
+                  <p className="text-[#7a6a55] dark:text-gray-400 text-xs text-center max-w-xs leading-relaxed font-medium">
                     Once the donor scans and pays, tap the button below to record the donation
                   </p>
                 </div>
 
                 {error && (
-                  <div className="bg-red-900/40 border border-red-700 rounded-lg px-3 py-2">
-                    <p className="text-red-400 text-sm">{error}</p>
+                  <div className="bg-rose-500/10 border border-rose-500/20 rounded-lg px-3 py-2">
+                    <p className="text-rose-700 dark:text-red-400 text-sm font-bold">{error}</p>
                   </div>
                 )}
 
                 <button
                   onClick={() => submitDonation(pendingPayload)}
                   disabled={submitting}
-                  className="w-full bg-green-600 hover:bg-green-700 disabled:opacity-50 text-white font-semibold py-4 rounded-xl text-base shadow-md"
+                  className="w-full bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white font-bold py-4 rounded-xl text-base shadow-md cursor-pointer"
                 >
                   {submitting ? 'Recording...' : '✓ Payment Done — Record Donation'}
                 </button>
 
-                <button onClick={() => setStep('form')} className="w-full bg-gray-800 hover:bg-gray-750 text-gray-400 font-medium py-3 rounded-xl text-sm transition-colors">
+                <button onClick={() => setStep('form')} className="w-full bg-white dark:bg-gray-800 hover:bg-[#ebdcc9] dark:hover:bg-gray-700 text-[#1A1208] dark:text-gray-300 font-bold py-3 rounded-xl text-sm transition-colors border border-[#1A1208]/10 dark:border-gray-700 cursor-pointer">
                   ← Go Back
                 </button>
               </div>
@@ -1000,17 +1004,17 @@ export default function CollectPage() {
             {/* STEP: Duplicate Warning */}
             {step === 'duplicate_warning' && duplicateWarning && successData && (
               <div className="flex flex-col gap-4">
-                <div className="bg-yellow-900/30 border border-yellow-750 rounded-xl p-4">
-                  <p className="text-yellow-400 font-semibold text-sm mb-1">⚠ Already donated this event</p>
-                  <p className="text-yellow-300/80 text-xs leading-relaxed">{duplicateWarning.message}</p>
-                  <p className="text-yellow-300/60 text-xs mt-2">Previous receipt: <span className="font-mono font-medium">{duplicateWarning.previous_receipt}</span></p>
+                <div className="bg-amber-500/10 border border-amber-500/20 rounded-xl p-4">
+                  <p className="text-amber-800 dark:text-yellow-400 font-bold text-sm mb-1">⚠ Already donated this event</p>
+                  <p className="text-amber-900/80 dark:text-yellow-300/80 text-xs leading-relaxed font-medium">{duplicateWarning.message}</p>
+                  <p className="text-amber-900/70 dark:text-yellow-300/60 text-xs mt-2 font-medium">Previous receipt: <span className="font-mono font-bold">{duplicateWarning.previous_receipt}</span></p>
                 </div>
-                <div className="bg-green-900/30 border border-green-750 rounded-xl p-4">
-                  <p className="text-green-400 font-semibold text-sm mb-2">New donation recorded</p>
-                  <p className="text-xs text-gray-300">Receipt: <span className="font-mono font-semibold">{successData.receipt_number}</span></p>
-                  <p className="text-xs text-gray-300 mt-1">Amount: ₹{Number(successData.amount).toLocaleString('en-IN')}</p>
+                <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-xl p-4">
+                  <p className="text-emerald-800 dark:text-green-400 font-bold text-sm mb-2">New donation recorded</p>
+                  <p className="text-xs text-[#1A1208] dark:text-gray-300 font-medium">Receipt: <span className="font-mono font-bold">{successData.receipt_number}</span></p>
+                  <p className="text-xs text-[#1A1208] dark:text-gray-300 mt-1 font-medium">Amount: ₹{Number(successData.amount).toLocaleString('en-IN')}</p>
                 </div>
-                <button onClick={resetForm} className="w-full bg-orange-500 hover:bg-orange-600 text-white font-semibold py-4 rounded-xl shadow-md">
+                <button onClick={resetForm} className="w-full bg-gradient-to-r from-[#E8650A] to-[#f97316] text-white font-bold py-4 rounded-xl shadow-md cursor-pointer">
                   + Next Donation
                 </button>
               </div>
@@ -1019,41 +1023,41 @@ export default function CollectPage() {
             {/* STEP: Success */}
             {step === 'success' && successData && (
               <div className="flex flex-col gap-4 text-center">
-                <div className="bg-gray-800 rounded-xl p-6 shadow-md">
+                <div className="bg-[#F5EDE2] dark:bg-gray-900 border border-[#1A1208]/10 dark:border-gray-800 rounded-xl p-6 shadow-sm">
 
                   {/* Success icon */}
-                  <div className="w-16 h-16 bg-green-900/40 border border-green-700 rounded-full flex items-center justify-center mx-auto mb-4 shadow-sm">
-                    <span className="text-green-400 text-2xl font-bold">✓</span>
+                  <div className="w-16 h-16 bg-emerald-500/10 border border-emerald-500/30 rounded-full flex items-center justify-center mx-auto mb-4 shadow-xs">
+                    <span className="text-emerald-700 dark:text-green-400 text-2xl font-bold">✓</span>
                   </div>
 
                   {successData.status === 'verified' && (
-                    <div className="mb-3 inline-block bg-green-950/40 border border-green-500/30 text-green-400 text-xs font-semibold px-3 py-1 rounded-full">
+                    <div className="mb-3 inline-block bg-emerald-500/10 border border-emerald-500/30 text-emerald-700 dark:text-green-400 text-xs font-bold px-3 py-1 rounded-full">
                       🟢 VERIFIED &bull; Verified by Collector
                     </div>
                   )}
 
-                  <p className="text-green-400 font-semibold text-xl mb-1">Donation Recorded!</p>
-                  <p className="text-gray-400 text-sm">{successData.donor_name}</p>
+                  <p className="text-emerald-700 dark:text-green-400 font-extrabold text-xl mb-1">Donation Recorded!</p>
+                  <p className="text-[#7a6a55] dark:text-gray-300 text-sm font-bold">{successData.donor_name}</p>
 
                   {/* Receipt number */}
-                  <div className="mt-5 bg-gray-900 rounded-lg py-3 px-4 border border-gray-850">
-                    <p className="text-gray-500 text-xs mb-1">Receipt Number</p>
-                    <p className="text-white font-mono font-bold text-xl tracking-wide">
+                  <div className="mt-5 bg-white dark:bg-gray-950 rounded-lg py-3 px-4 border border-[#1A1208]/10 dark:border-gray-800 shadow-xs">
+                    <p className="text-[#7a6a55] dark:text-gray-400 text-xs mb-1 font-bold">Receipt Number</p>
+                    <p className="text-[#1A1208] dark:text-white font-mono font-extrabold text-xl tracking-wide">
                       {successData.receipt_number}
                     </p>
                   </div>
 
                   {/* Amount */}
-                  <div className="mt-2 bg-gray-900 rounded-lg py-3 px-4 border border-gray-850">
-                    <p className="text-gray-550 text-xs mb-1">Amount</p>
-                    <p className="text-white font-bold text-3xl">
+                  <div className="mt-2 bg-white dark:bg-gray-950 rounded-lg py-3 px-4 border border-[#1A1208]/10 dark:border-gray-800 shadow-xs">
+                    <p className="text-[#7a6a55] dark:text-gray-400 text-xs mb-1 font-bold">Amount</p>
+                    <p className="text-[#1A1208] dark:text-white font-extrabold text-3xl">
                       ₹{Number(successData.amount).toLocaleString('en-IN')}
                     </p>
                   </div>
 
                   {/* Payment mode */}
-                  <div className="mt-2 bg-gray-900 rounded-lg py-2 px-4 border border-gray-850">
-                    <p className="text-gray-400 text-xs">
+                  <div className="mt-2 bg-white dark:bg-gray-950 rounded-lg py-2 px-4 border border-[#1A1208]/10 dark:border-gray-800 shadow-xs">
+                    <p className="text-[#7a6a55] dark:text-gray-300 text-xs font-bold">
                       {successData.payment_mode === 'cash' ? '💵 Cash' : '📱 UPI'}
                     </p>
                   </div>
@@ -1064,40 +1068,40 @@ export default function CollectPage() {
                   <div className="flex flex-col gap-2">
                     <button
                       onClick={() => downloadReceipt(successData.receipt_data || buildProvisionalReceiptData()!)}
-                      className="w-full flex items-center justify-center gap-2 bg-white text-gray-900
-                        font-semibold py-4 rounded-xl text-base transition-colors hover:bg-gray-100 shadow-md cursor-pointer"
+                      className="w-full flex items-center justify-center gap-2 bg-[#E8650A] hover:bg-[#d05807] text-white
+                        font-bold py-4 rounded-xl text-base transition-colors shadow-md cursor-pointer"
                     >
                       <span>↓</span>
                       <span>Download Receipt</span>
                     </button>
                     <button
                       onClick={() => shareReceipt(successData.receipt_data || buildProvisionalReceiptData()!)}
-                      className="w-full py-4 text-base font-semibold rounded-xl transition-all shadow-md border bg-gray-800 text-white border-gray-700 hover:bg-gray-750 cursor-pointer"
+                      className="w-full py-4 text-base font-bold rounded-xl transition-all shadow-sm border bg-white dark:bg-gray-800 text-[#1A1208] dark:text-white border-[#1A1208]/10 dark:border-gray-700 hover:bg-[#ebdcc9] dark:hover:bg-gray-700 cursor-pointer"
                     >
                       Share Receipt
                     </button>
                     {successData.status === 'verified' ? (
-                      <p className="text-xs text-green-500 font-medium">🟢 VERIFIED - Verified by Collector</p>
+                      <p className="text-xs text-emerald-700 dark:text-green-500 font-bold">🟢 VERIFIED - Verified by Collector</p>
                     ) : (
-                      <p className="text-xs text-yellow-500 font-medium">Pending verification</p>
+                      <p className="text-xs text-amber-700 dark:text-yellow-500 font-bold">Pending verification</p>
                     )}
                   </div>
                 ) : (
-                  <div className="bg-gray-800 border border-gray-700 rounded-xl px-4 py-3 text-center">
-                    <p className="text-gray-400 text-xs">Receipt PDF unavailable right now.</p>
-                    <p className="text-gray-550 text-xs mt-1">
-                      Share receipt number <span className="font-mono text-white">{successData.receipt_number}</span> with the donor.
+                  <div className="bg-[#F5EDE2] dark:bg-gray-800 border border-[#1A1208]/10 dark:border-gray-700 rounded-xl px-4 py-3 text-center">
+                    <p className="text-[#7a6a55] dark:text-gray-400 text-xs font-medium">Receipt PDF unavailable right now.</p>
+                    <p className="text-[#9e8c76] dark:text-gray-500 text-xs mt-1 font-medium">
+                      Share receipt number <span className="font-mono text-[#1A1208] dark:text-white font-bold">{successData.receipt_number}</span> with the donor.
                     </p>
                   </div>
                 )}
 
-                <p className="text-gray-600 text-xs px-4 leading-relaxed">
+                <p className="text-[#7a6a55] dark:text-gray-500 text-xs px-4 leading-relaxed font-medium">
                   Share the receipt download link directly on WhatsApp or copy it to send manually.
                 </p>
 
                 <button
                   onClick={resetForm}
-                  className="w-full bg-orange-500 hover:bg-orange-600 text-white font-semibold py-4 rounded-xl text-base transition-colors shadow-md"
+                  className="w-full bg-gradient-to-r from-[#E8650A] to-[#f97316] hover:from-[#d05807] hover:to-[#ea580c] text-white font-bold py-4 rounded-xl text-base transition-colors shadow-md cursor-pointer"
                 >
                   + Next Donation
                 </button>
@@ -1112,26 +1116,26 @@ export default function CollectPage() {
         {activeTab === 'history' && (
           <div className="flex flex-col gap-4 animate-fade-in">
             <div>
-              <h1 className="text-xl font-bold text-white">Collection History</h1>
-              <p className="text-xs text-gray-400 mt-1">Search, filter, and share receipt links</p>
+              <h1 className="text-xl font-bold text-[#1A1208] dark:text-white">Collection History</h1>
+              <p className="text-xs text-[#7a6a55] dark:text-gray-400 mt-1 font-medium">Search, filter, and share receipt links</p>
             </div>
 
             {/* Search & Filters block (Matches dashboard input layouts) */}
-            <div className="flex flex-col gap-2.5 bg-gray-900 border border-gray-800 rounded-xl p-3.5 shadow-sm">
+            <div className="flex flex-col gap-2.5 bg-[#F5EDE2] dark:bg-gray-900 border border-[#1A1208]/10 dark:border-gray-800 rounded-xl p-3.5 shadow-sm">
               {/* Search */}
               <div className="relative">
-                <span className="absolute left-3 top-2.5 text-gray-550 text-xs">🔍</span>
+                <span className="absolute left-3 top-2.5 text-[#7a6a55] dark:text-gray-500 text-xs">🔍</span>
                 <input
                   type="text"
                   value={historySearch}
                   onChange={e => setHistorySearch(e.target.value)}
                   placeholder="Search by donor name, phone, amount, or receipt..."
-                  className="w-full bg-gray-950 border border-gray-800 rounded-lg pl-8 pr-8 py-2 text-xs text-white placeholder-gray-500 focus:outline-none focus:border-orange-500 transition-colors"
+                  className="w-full bg-white dark:bg-gray-950 border border-[#1A1208]/15 dark:border-gray-800 rounded-lg pl-8 pr-8 py-2 text-xs text-[#1A1208] dark:text-white placeholder-[#9e8c76] dark:placeholder-gray-500 focus:outline-none focus:border-[#E8650A] transition-colors font-medium"
                 />
                 {historySearch && (
                   <button
                     onClick={() => setHistorySearch('')}
-                    className="absolute right-3 top-2 text-gray-500 hover:text-white text-xs"
+                    className="absolute right-3 top-2 text-[#7a6a55] dark:text-gray-500 hover:text-[#1A1208] dark:hover:text-white text-xs font-bold cursor-pointer"
                   >
                     ✕
                   </button>
@@ -1141,29 +1145,29 @@ export default function CollectPage() {
               {/* Filters grid */}
               <div className="grid grid-cols-2 gap-2">
                 <div>
-                  <label className="text-[10px] text-gray-500 block mb-1 uppercase font-semibold tracking-wider">Status</label>
+                  <label className="text-[10px] text-[#7a6a55] dark:text-gray-400 block mb-1 uppercase font-bold tracking-wider">Status</label>
                   <select
                     value={historyStatusFilter}
                     onChange={e => setHistoryStatusFilter(e.target.value)}
-                    className="w-full bg-gray-955 border border-gray-800 rounded-lg px-2.5 py-2 text-xs text-gray-305 focus:outline-none focus:border-orange-500 transition-colors"
+                    className="w-full bg-white dark:bg-gray-955 border border-[#1A1208]/15 dark:border-gray-800 rounded-lg px-2.5 py-2 text-xs text-[#1A1208] dark:text-gray-200 focus:outline-none focus:border-[#E8650A] transition-colors font-medium"
                   >
-                    <option value="all" className="bg-gray-900 text-white">All Statuses</option>
-                    <option value="pending" className="bg-gray-900 text-white">⏳ Pending</option>
-                    <option value="verified" className="bg-gray-900 text-white">✅ Verified</option>
-                    <option value="rejected" className="bg-gray-900 text-white">❌ Rejected</option>
+                    <option value="all" className="bg-white dark:bg-gray-900 text-[#1A1208] dark:text-white">All Statuses</option>
+                    <option value="pending" className="bg-white dark:bg-gray-900 text-[#1A1208] dark:text-white">⏳ Pending</option>
+                    <option value="verified" className="bg-white dark:bg-gray-900 text-[#1A1208] dark:text-white">✅ Verified</option>
+                    <option value="rejected" className="bg-white dark:bg-gray-900 text-[#1A1208] dark:text-white">❌ Rejected</option>
                   </select>
                 </div>
 
                 <div>
-                  <label className="text-[10px] text-gray-500 block mb-1 uppercase font-semibold tracking-wider">Payment Mode</label>
+                  <label className="text-[10px] text-[#7a6a55] dark:text-gray-400 block mb-1 uppercase font-bold tracking-wider">Payment Mode</label>
                   <select
                     value={historyModeFilter}
                     onChange={e => setHistoryModeFilter(e.target.value)}
-                    className="w-full bg-gray-955 border border-gray-800 rounded-lg px-2.5 py-2 text-xs text-gray-305 focus:outline-none focus:border-orange-500 transition-colors"
+                    className="w-full bg-white dark:bg-gray-955 border border-[#1A1208]/15 dark:border-gray-800 rounded-lg px-2.5 py-2 text-xs text-[#1A1208] dark:text-gray-200 focus:outline-none focus:border-[#E8650A] transition-colors font-medium"
                   >
-                    <option value="all" className="bg-gray-900 text-white">All Modes</option>
-                    <option value="cash" className="bg-gray-900 text-white">💵 Cash</option>
-                    <option value="upi" className="bg-gray-900 text-white">📱 UPI QR</option>
+                    <option value="all" className="bg-white dark:bg-gray-900 text-[#1A1208] dark:text-white">All Modes</option>
+                    <option value="cash" className="bg-white dark:bg-gray-900 text-[#1A1208] dark:text-white">💵 Cash</option>
+                    <option value="upi" className="bg-white dark:bg-gray-900 text-[#1A1208] dark:text-white">📱 UPI QR</option>
                   </select>
                 </div>
               </div>
@@ -1174,14 +1178,14 @@ export default function CollectPage() {
               <button
                 onClick={() => handleExportCSV(filteredDonations, `my_history_${new Date().toISOString().slice(0, 10)}.csv`)}
                 disabled={filteredDonations.length === 0}
-                className="flex-1 py-2 bg-gray-900 border border-gray-800 text-gray-300 font-semibold rounded-lg text-xs hover:bg-gray-850 hover:text-white transition-colors disabled:opacity-50"
+                className="flex-1 py-2 bg-white dark:bg-gray-900 border border-[#1A1208]/10 dark:border-gray-800 text-[#1A1208] dark:text-gray-300 font-bold rounded-lg text-xs hover:bg-[#ebdcc9] dark:hover:bg-gray-800 transition-colors disabled:opacity-50 cursor-pointer shadow-xs"
               >
                 📥 Export CSV
               </button>
               <button
                 onClick={() => handleExportPDF(filteredDonations, 'My Collections History Report')}
                 disabled={filteredDonations.length === 0}
-                className="flex-1 py-2 bg-gray-900 border border-gray-800 text-gray-300 font-semibold rounded-lg text-xs hover:bg-gray-850 hover:text-white transition-colors disabled:opacity-50"
+                className="flex-1 py-2 bg-white dark:bg-gray-900 border border-[#1A1208]/10 dark:border-gray-800 text-[#1A1208] dark:text-gray-300 font-bold rounded-lg text-xs hover:bg-[#ebdcc9] dark:hover:bg-gray-800 transition-colors disabled:opacity-50 cursor-pointer shadow-xs"
               >
                 📄 Export PDF
               </button>
@@ -1190,48 +1194,48 @@ export default function CollectPage() {
             {/* List */}
             {donationsLoading ? (
               <div className="text-center py-10">
-                <p className="text-xs text-gray-500">Loading collections history...</p>
+                <p className="text-xs text-[#7a6a55] dark:text-gray-500 font-medium">Loading collections history...</p>
               </div>
             ) : donationsError ? (
-              <div className="bg-red-900/20 border border-red-750/30 rounded-xl p-4 text-center shadow-sm">
-                <p className="text-red-400 text-xs">{donationsError}</p>
+              <div className="bg-rose-500/10 border border-rose-500/20 rounded-xl p-4 text-center shadow-sm">
+                <p className="text-rose-700 dark:text-red-400 text-xs font-bold">{donationsError}</p>
                 <button
                   onClick={() => mandal && userId && loadDonations(mandal.id, userId)}
-                  className="mt-2 text-xs text-orange-400 hover:text-orange-300 font-medium transition-colors"
+                  className="mt-2 text-xs text-[#E8650A] dark:text-orange-400 hover:underline font-bold transition-colors cursor-pointer"
                 >
                   Tap to retry
                 </button>
               </div>
             ) : filteredDonations.length === 0 ? (
-              <div className="text-center py-12 bg-gray-900/30 border border-dashed border-gray-800 rounded-xl">
-                <p className="text-xs text-gray-550">No collections found matching filters</p>
+              <div className="text-center py-12 bg-white/60 dark:bg-gray-900/30 border border-dashed border-[#1A1208]/15 dark:border-gray-800 rounded-xl">
+                <p className="text-xs text-[#7a6a55] dark:text-gray-500 font-medium">No collections found matching filters</p>
               </div>
             ) : (
               <div className="flex flex-col gap-3">
                 {filteredDonations.map(d => (
                   <div
                     key={d.id}
-                    className="bg-gray-900 border border-gray-800 rounded-xl p-4 flex flex-col gap-3 transition-all hover:border-gray-700 shadow-sm"
+                    className="bg-white dark:bg-gray-900 border border-[#1A1208]/10 dark:border-gray-800 rounded-xl p-4 flex flex-col gap-3 transition-all hover:border-[#E8650A] shadow-sm"
                   >
                     {/* Top Row: Donor & Amount */}
                     <div className="flex justify-between items-start">
                       <div>
-                        <h4 className="text-sm font-semibold text-white leading-snug">{d.donor_name}</h4>
-                        <p className="text-xs text-gray-400 mt-0.5">{d.donor_phone || 'No phone number'}</p>
+                        <h4 className="text-sm font-bold text-[#1A1208] dark:text-white leading-snug">{d.donor_name}</h4>
+                        <p className="text-xs text-[#7a6a55] dark:text-gray-400 mt-0.5 font-medium">{d.donor_phone || 'No phone number'}</p>
                         {d.donor_address && (
-                          <p className="text-[11px] text-gray-500 mt-1 italic leading-relaxed">{d.donor_address}</p>
+                          <p className="text-[11px] text-[#9e8c76] dark:text-gray-500 mt-1 italic leading-relaxed font-medium">{d.donor_address}</p>
                         )}
                       </div>
                       <div className="text-right flex flex-col items-end gap-1">
-                        <span className="text-base font-extrabold text-white">₹{Number(d.amount).toLocaleString('en-IN')}</span>
+                        <span className="text-base font-extrabold text-[#1A1208] dark:text-white">₹{Number(d.amount).toLocaleString('en-IN')}</span>
                         <div className="mt-1 flex flex-col items-end gap-1">
                           <span
                             className={`inline-block text-[9px] font-bold px-2 py-0.5 rounded-full border uppercase tracking-wide
                               ${d.status === 'verified'
-                                ? 'bg-green-950 text-green-400 border-green-900/20'
+                                ? 'bg-emerald-500/10 text-emerald-700 dark:text-green-400 border-emerald-500/20'
                                 : d.status === 'pending'
-                                ? 'bg-yellow-955 text-yellow-400 border-yellow-900/20'
-                                : 'bg-red-950 text-red-400 border-red-900/20'
+                                  ? 'bg-amber-500/10 text-amber-700 dark:text-yellow-400 border-amber-500/20'
+                                  : 'bg-rose-500/10 text-rose-700 dark:text-red-400 border-rose-500/20'
                               }`}
                           >
                             {d.status}
@@ -1240,8 +1244,8 @@ export default function CollectPage() {
                             <span
                               className={`inline-block text-[8px] font-bold px-1.5 py-0.5 rounded-full border uppercase tracking-wide
                                 ${d.settlement_id
-                                  ? 'bg-green-950/60 text-green-400 border-green-900/10'
-                                  : 'bg-yellow-950/60 text-yellow-450 border-yellow-900/10'
+                                  ? 'bg-emerald-500/10 text-emerald-700 dark:text-green-400 border-emerald-500/20'
+                                  : 'bg-amber-500/10 text-amber-700 dark:text-yellow-400 border-amber-500/20'
                                 }`}
                             >
                               {d.settlement_id ? '✓ Settled' : 'Pending Settlement'}
@@ -1251,16 +1255,16 @@ export default function CollectPage() {
                       </div>
                     </div>
 
-                    <div className="h-px bg-gray-800/50"></div>
+                    <div className="h-px bg-[#1A1208]/10 dark:bg-gray-800"></div>
 
                     {/* Bottom Row: Date, Mode, Receipt Number */}
                     <div className="flex justify-between items-end text-xs">
                       <div className="flex flex-col gap-0.5">
                         <div className="flex items-center gap-1.5">
-                          <span className="text-gray-500">Receipt:</span>
-                          <span className="font-mono font-bold text-gray-300">{d.receipt_number}</span>
+                          <span className="text-[#7a6a55] dark:text-gray-400 font-bold">Receipt:</span>
+                          <span className="font-mono font-bold text-[#1A1208] dark:text-gray-300">{d.receipt_number}</span>
                         </div>
-                        <div className="flex items-center gap-1.5 mt-0.5 text-gray-500 text-[10px]">
+                        <div className="flex items-center gap-1.5 mt-0.5 text-[#9e8c76] dark:text-gray-500 text-[10px] font-medium">
                           <span>
                             {new Date(d.created_at).toLocaleDateString('en-IN', {
                               day: '2-digit',
@@ -1280,25 +1284,25 @@ export default function CollectPage() {
                         <div className="flex gap-1.5">
                           <button
                             onClick={() => downloadReceipt(d.receipt_data)}
-                            className="px-2.5 py-1.5 bg-gray-850 hover:bg-gray-800 text-gray-300 font-medium rounded-lg text-[11px] transition-colors border border-gray-800 cursor-pointer"
+                            className="px-2.5 py-1.5 bg-[#F5EDE2] dark:bg-gray-800 hover:bg-[#ebdcc9] dark:hover:bg-gray-700 text-[#1A1208] dark:text-gray-300 font-bold rounded-lg text-[11px] transition-colors border border-[#1A1208]/10 dark:border-gray-700 cursor-pointer"
                           >
                             PDF
                           </button>
                           <button
                             onClick={() => shareReceipt(d.receipt_data)}
-                            className="px-2.5 py-1.5 bg-gray-850 hover:bg-gray-800 text-gray-300 font-medium rounded-lg text-[11px] transition-colors border border-gray-800 cursor-pointer"
+                            className="px-2.5 py-1.5 bg-[#F5EDE2] dark:bg-gray-800 hover:bg-[#ebdcc9] dark:hover:bg-gray-700 text-[#1A1208] dark:text-gray-300 font-bold rounded-lg text-[11px] transition-colors border border-[#1A1208]/10 dark:border-gray-700 cursor-pointer"
                           >
                             Share
                           </button>
                         </div>
                       ) : (
-                        <span className="text-[10px] text-yellow-500 font-medium italic">Pending verification</span>
+                        <span className="text-[10px] text-amber-700 dark:text-yellow-500 font-bold italic">Pending verification</span>
                       )}
                     </div>
 
                     {d.status === 'rejected' && d.rejection_reason && (
-                      <div className="bg-rose-955/20 border border-rose-900/30 rounded-lg px-2.5 py-1.5 mt-0.5">
-                        <span className="text-[10px] text-rose-400 block font-medium">Rejection Reason: {d.rejection_reason}</span>
+                      <div className="bg-rose-500/10 dark:bg-rose-950/40 border border-rose-500/20 dark:border-rose-900/40 rounded-lg px-2.5 py-1.5 mt-0.5">
+                        <span className="text-[10px] text-rose-700 dark:text-rose-400 block font-bold">Rejection Reason: {d.rejection_reason}</span>
                       </div>
                     )}
                   </div>
@@ -1312,24 +1316,24 @@ export default function CollectPage() {
         {/* DUPLICATE PHONE MODAL */}
         {/* ======================================================== */}
         {duplicateModalData && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm animate-fade-in">
-            <div className="bg-gray-900 border border-gray-800 rounded-2xl w-full max-w-sm p-6 shadow-2xl text-center">
-              <div className="w-12 h-12 bg-yellow-955/50 text-yellow-500 rounded-full flex items-center justify-center text-2xl mb-4 mx-auto border border-yellow-900/30">
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-fade-in">
+            <div className="bg-[#F5EDE2] dark:bg-gray-900 border border-[#1A1208]/15 dark:border-gray-800 rounded-2xl w-full max-w-sm p-6 shadow-2xl text-center text-[#1A1208] dark:text-white">
+              <div className="w-12 h-12 bg-amber-500/10 text-amber-600 dark:text-yellow-500 rounded-full flex items-center justify-center text-2xl mb-4 mx-auto border border-amber-500/20">
                 ⚠️
               </div>
-              <h3 className="text-lg font-bold text-white mb-2">Previous Donation Found</h3>
-              <p className="text-sm text-gray-400 leading-relaxed mb-4">
-                A donation for <strong className="text-white">{duplicateModalData.eventName}</strong> has been done previously with this phone number.
+              <h3 className="text-lg font-bold text-[#1A1208] dark:text-white mb-2">Previous Donation Found</h3>
+              <p className="text-sm text-[#7a6a55] dark:text-gray-400 leading-relaxed mb-4 font-medium">
+                A donation for <strong className="text-[#1A1208] dark:text-white font-bold">{duplicateModalData.eventName}</strong> has been done previously with this phone number.
               </p>
-              <div className="bg-gray-950 border border-gray-800 rounded-xl p-3 mb-6">
-                <span className="text-[10px] text-gray-500 block font-medium uppercase tracking-wider">Receipt ID</span>
-                <span className="text-sm font-mono font-bold text-gray-300">{duplicateModalData.receiptId}</span>
+              <div className="bg-white dark:bg-gray-950 border border-[#1A1208]/10 dark:border-gray-800 rounded-xl p-3 mb-6">
+                <span className="text-[10px] text-[#7a6a55] dark:text-gray-500 block font-bold uppercase tracking-wider">Receipt ID</span>
+                <span className="text-sm font-mono font-extrabold text-[#1A1208] dark:text-gray-300">{duplicateModalData.receiptId}</span>
               </div>
 
               <div className="flex gap-3">
                 <button
                   onClick={() => setDuplicateModalData(null)}
-                  className="flex-1 bg-gray-800 hover:bg-gray-700 text-gray-300 font-medium py-2.5 rounded-lg text-xs sm:text-sm transition-colors cursor-pointer"
+                  className="flex-1 bg-white dark:bg-gray-800 hover:bg-[#ebdcc9] dark:hover:bg-gray-700 text-[#1A1208] dark:text-gray-300 border border-[#1A1208]/10 dark:border-gray-700 font-bold py-2.5 rounded-lg text-xs sm:text-sm transition-colors cursor-pointer"
                 >
                   Go Back
                 </button>
@@ -1340,7 +1344,7 @@ export default function CollectPage() {
                       proceedToPaymentStep(pendingPayload)
                     }
                   }}
-                  className="flex-1 bg-orange-500 hover:bg-orange-600 text-white font-medium py-2.5 rounded-lg text-xs sm:text-sm transition-colors cursor-pointer"
+                  className="flex-1 bg-gradient-to-r from-[#E8650A] to-[#f97316] text-white font-bold py-2.5 rounded-lg text-xs sm:text-sm transition-colors cursor-pointer shadow-md"
                 >
                   I know, continue
                 </button>

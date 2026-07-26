@@ -26,14 +26,14 @@ type FloatingTextareaProps = BaseProps & TextareaHTMLAttributes<HTMLTextAreaElem
 type FloatingSelectProps = BaseProps & SelectHTMLAttributes<HTMLSelectElement>
 
 const labelBase =
-  'absolute left-3 top-3.5 text-sm text-gray-500 normal-case pointer-events-none transition-all duration-150 ' +
-  'peer-placeholder-shown:top-3.5 peer-placeholder-shown:text-sm peer-placeholder-shown:text-gray-500 ' +
-  'peer-focus:top-1.5 peer-focus:text-[10px] peer-focus:text-orange-400 peer-focus:uppercase peer-focus:tracking-wide ' +
-  'top-1.5 text-[10px] uppercase tracking-wide'
+  'absolute left-3 top-3.5 text-sm text-[#7a6a55] dark:text-gray-400 font-medium normal-case pointer-events-none transition-all duration-150 ' +
+  'peer-placeholder-shown:top-3.5 peer-placeholder-shown:text-sm peer-placeholder-shown:text-[#7a6a55] dark:peer-placeholder-shown:text-gray-400 ' +
+  'peer-focus:top-1.5 peer-focus:text-[10px] peer-focus:text-[#E8650A] dark:peer-focus:text-orange-400 peer-focus:uppercase peer-focus:tracking-wide peer-focus:font-bold ' +
+  'top-1.5 text-[10px] text-[#E8650A] dark:text-orange-400 font-bold uppercase tracking-wide'
 
 const fieldBase =
-  'peer w-full bg-gray-900 border border-gray-700 rounded-lg px-3 pt-5 pb-2 text-sm text-white ' +
-  'placeholder-transparent focus:outline-none focus:border-orange-500'
+  'peer w-full bg-white dark:bg-gray-900 border border-[#1A1208]/15 dark:border-gray-700 rounded-lg px-3 pt-5 pb-2 text-sm text-[#1A1208] dark:text-white font-medium ' +
+  'placeholder-transparent focus:outline-none focus:border-[#E8650A]'
 
 export function FloatingInput({ id, label, optional, className, ...rest }: FloatingInputProps) {
   return (
@@ -65,12 +65,12 @@ export function FloatingSelect({ id, label, optional, className, children, ...re
     <div className="relative">
       <select
         id={id}
-        className={`w-full bg-gray-900 border border-gray-700 rounded-lg px-3 pt-5 pb-2 text-sm text-white focus:outline-none focus:border-orange-500 ${className || ''}`}
+        className={`w-full bg-white dark:bg-gray-900 border border-[#1A1208]/15 dark:border-gray-700 rounded-lg px-3 pt-5 pb-2 text-sm text-[#1A1208] dark:text-white font-medium focus:outline-none focus:border-[#E8650A] ${className || ''}`}
         {...rest}
       >
         {children}
       </select>
-      <label htmlFor={id} className="absolute left-3 top-1.5 text-[10px] text-gray-500 uppercase tracking-wide pointer-events-none">
+      <label htmlFor={id} className="absolute left-3 top-1.5 text-[10px] text-[#E8650A] dark:text-orange-400 font-bold uppercase tracking-wide pointer-events-none">
         {label}{optional ? ' (optional)' : ''}
       </label>
     </div>

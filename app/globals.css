@@ -1,9 +1,13 @@
 @import "tailwindcss";
 
+/* Enable class-based dark mode — .dark on <html> activates all dark: utilities */
+@custom-variant dark (&:is(.dark *));
+
 :root {
-  --background: #fafafa;
-  --foreground: #171717;
+  --background: #FDF8F3;
+  --foreground: #1A1208;
 }
+
 
 @theme inline {
   --color-background: var(--background);
@@ -29,37 +33,49 @@ body {
 /* --- Premium Animations & Visual Effects --- */
 
 @keyframes float-slow {
-  0%, 100% {
+
+  0%,
+  100% {
     transform: translateY(0px) rotate(0deg);
   }
+
   50% {
     transform: translateY(-15px) rotate(3deg);
   }
 }
 
 @keyframes float-medium {
-  0%, 100% {
+
+  0%,
+  100% {
     transform: translateY(0px) rotate(0deg);
   }
+
   50% {
     transform: translateY(-25px) rotate(-5deg);
   }
 }
 
 @keyframes float-fast {
-  0%, 100% {
+
+  0%,
+  100% {
     transform: translateY(0px) rotate(0deg);
   }
+
   50% {
     transform: translateY(-10px) rotate(5deg);
   }
 }
 
 @keyframes pulse-soft {
-  0%, 100% {
+
+  0%,
+  100% {
     opacity: 0.2;
     transform: scale(1);
   }
+
   50% {
     opacity: 0.35;
     transform: scale(1.05);
@@ -70,9 +86,11 @@ body {
   0% {
     background-position: 0% 50%;
   }
+
   50% {
     background-position: 100% 50%;
   }
+
   100% {
     background-position: 0% 50%;
   }
@@ -95,6 +113,7 @@ body {
     opacity: 0;
     transform: translateY(20px);
   }
+
   to {
     opacity: 1;
     transform: translateY(0);
@@ -106,6 +125,7 @@ body {
     opacity: 0;
     transform: translateX(-30px);
   }
+
   to {
     opacity: 1;
     transform: translateX(0);
@@ -160,6 +180,7 @@ body {
     transform: translateY(-10px) rotate(0deg);
     opacity: 1;
   }
+
   100% {
     transform: translateY(100vh) rotate(720deg);
     opacity: 0;
@@ -177,4 +198,3 @@ input::-ms-reveal,
 input::-ms-clear {
   display: none;
 }
-

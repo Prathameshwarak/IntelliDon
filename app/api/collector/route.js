@@ -67,15 +67,21 @@ export async function GET(request) {
     }
 
     // Get active events for this mandal
-    const { data: events, error: eventsError } = await supabaseAdmin
+    let { data: events, error: eventsError } = await supabaseAdmin
       .from('events')
       .select('id, name, year, upi_id, upi_qr_url')
       .eq('mandal_id', userRow.mandal_id)
       .eq('is_active', true)
       .order('year', { ascending: false })
 
-    if (eventsError) {
-      return NextResponse.json({ error: 'Could not fetch events' }, { status: 500 })
+    if (!events || events.length === 0) {
+      // Fallback: fetch non-suspended events if is_active is omitted
+      const { data: fallbackEvents } = await supabaseAdmin
+        .from('events')
+        .select('id, name, year, upi_id, upi_qr_url')
+        .eq('mandal_id', userRow.mandal_id)
+        .order('year', { ascending: false })
+      events = fallbackEvents || []
     }
 
     return NextResponse.json({

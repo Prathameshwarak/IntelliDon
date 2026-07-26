@@ -41,7 +41,7 @@ export default function SharePage() {
       // Get mandal slug + name
       const { data: mandal } = await supabase
         .from('mandals')
-        .select('name, slug')
+        .select('id, name, slug')
         .eq('id', userRow.mandal_id)
         .single()
 
@@ -52,14 +52,15 @@ export default function SharePage() {
         .from('events')
         .select('name, year')
         .eq('mandal_id', userRow.mandal_id)
-        .eq('is_active', true)
+        .order('is_active', { ascending: false })
         .order('year', { ascending: false })
         .limit(1)
 
-      const link = `${window.location.origin}/donate/${mandal.slug}`
+      const targetSlug = mandal.slug || mandal.id
+      const link = `${window.location.origin}/donate/${targetSlug}`
 
       setMandalName(mandal.name)
-      setSlug(mandal.slug)
+      setSlug(targetSlug)
       setDonationLink(link)
       setEventName(events?.[0] ? `${events[0].name} ${events[0].year}` : 'Active Event')
       setLoading(false)
@@ -151,51 +152,51 @@ export default function SharePage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-950 flex items-center justify-center">
-        <p className="text-gray-400 text-sm">Loading...</p>
+      <div className="min-h-screen bg-[#FDF8F3] dark:bg-gray-950 flex items-center justify-center transition-colors duration-300">
+        <p className="text-[#7a6a55] dark:text-gray-400 text-xs font-mono animate-pulse">Loading...</p>
       </div>
     )
   }
 
   return (
-    <div className="min-h-screen bg-gray-950 text-white">
+    <div className="min-h-screen bg-[#FDF8F3] dark:bg-gray-950 text-[#1A1208] dark:text-white transition-colors duration-300">
 
       {/* Header */}
-      <div className="bg-gray-900 border-b border-gray-800 px-4 py-3 flex items-center gap-3">
+      <div className="bg-[#F5EDE2] dark:bg-gray-900 border-b border-[#1A1208]/10 dark:border-gray-800 px-4 py-3 flex items-center gap-3">
         <button
           onClick={goBack}
-          className="text-gray-400 hover:text-white transition-colors text-sm"
+          className="text-[#7a6a55] dark:text-gray-400 hover:text-[#1A1208] dark:hover:text-white transition-colors text-base font-bold cursor-pointer"
         >
           ←
         </button>
         <div>
-          <p className="text-xs text-gray-400">Intellidon</p>
-          <p className="text-sm font-medium">{mandalName}</p>
+          <p className="text-[10px] uppercase text-[#7a6a55] dark:text-gray-400 font-bold">Intellidon</p>
+          <p className="text-sm font-bold text-[#1A1208] dark:text-white">{mandalName}</p>
         </div>
       </div>
 
       <div className="max-w-sm mx-auto px-4 py-6 flex flex-col gap-5">
 
         <div>
-          <h1 className="text-lg font-semibold">Share Donation Link</h1>
-          <p className="text-xs text-gray-400 mt-1">
+          <h1 className="text-lg font-bold text-[#1A1208] dark:text-white">Share Donation Link</h1>
+          <p className="text-xs text-[#7a6a55] dark:text-gray-400 mt-1 font-medium">
             Share this link or QR with donors so they can donate online
           </p>
         </div>
 
         {/* QR Code */}
-        <div className="bg-white rounded-2xl p-5 flex flex-col items-center gap-3">
+        <div className="bg-white border border-[#1A1208]/10 dark:border-transparent rounded-2xl p-5 flex flex-col items-center gap-3 shadow-md">
           <canvas ref={canvasRef} className="rounded-lg" />
           <div className="text-center">
-            <p className="text-gray-900 font-semibold text-sm">{mandalName}</p>
-            <p className="text-orange-500 text-xs mt-0.5">{eventName}</p>
+            <p className="text-gray-900 font-bold text-sm">{mandalName}</p>
+            <p className="text-[#E8650A] text-xs font-bold mt-0.5">{eventName}</p>
           </div>
         </div>
 
         {/* Donation link display */}
-        <div className="bg-gray-800 border border-gray-700 rounded-xl px-4 py-3">
-          <p className="text-xs text-gray-400 mb-1">Donation Link</p>
-          <p className="text-xs font-mono text-gray-200 break-all leading-relaxed">
+        <div className="bg-[#F5EDE2] dark:bg-gray-800 border border-[#1A1208]/10 dark:border-gray-700 rounded-xl px-4 py-3 shadow-sm">
+          <p className="text-xs text-[#7a6a55] dark:text-gray-400 mb-1 font-bold">Donation Link</p>
+          <p className="text-xs font-mono text-[#1A1208] dark:text-gray-200 break-all leading-relaxed font-semibold">
             {donationLink}
           </p>
         </div>
@@ -206,10 +207,10 @@ export default function SharePage() {
           {/* Copy link */}
           <button
             onClick={copyLink}
-            className={`w-full flex items-center justify-center gap-2 font-semibold py-4 rounded-xl text-sm transition-colors
+            className={`w-full flex items-center justify-center gap-2 font-bold py-3.5 rounded-xl text-xs transition-all cursor-pointer shadow-md
               ${copied
-                ? 'bg-green-600 text-white'
-                : 'bg-orange-500 hover:bg-orange-600 text-white'}`}
+                ? 'bg-emerald-600 text-white'
+                : 'bg-gradient-to-r from-[#E8650A] to-[#f97316] hover:from-[#d05807] hover:to-[#ea580c] text-white shadow-[#E8650A]/20'}`}
           >
             <span>{copied ? '✓' : '⎘'}</span>
             <span>{copied ? 'Link Copied!' : 'Copy Link'}</span>
@@ -218,8 +219,8 @@ export default function SharePage() {
           {/* Share on WhatsApp */}
           <button
             onClick={shareWhatsApp}
-            className="w-full flex items-center justify-center gap-2 bg-green-600 hover:bg-green-700
-              text-white font-semibold py-4 rounded-xl text-sm transition-colors"
+            className="w-full flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-700
+              text-white font-bold py-3.5 rounded-xl text-xs transition-all cursor-pointer shadow-md shadow-emerald-600/20"
           >
             <span>📱</span>
             <span>Share on WhatsApp</span>
@@ -229,8 +230,8 @@ export default function SharePage() {
           <button
             onClick={downloadQR}
             disabled={!qrGenerated}
-            className="w-full flex items-center justify-center gap-2 bg-gray-700 hover:bg-gray-600
-              disabled:opacity-50 text-white font-semibold py-4 rounded-xl text-sm transition-colors"
+            className="w-full flex items-center justify-center gap-2 bg-[#F5EDE2] dark:bg-gray-700 hover:bg-[#ebdcc9] dark:hover:bg-gray-600 border border-[#1A1208]/10 dark:border-gray-600
+              disabled:opacity-50 text-[#1A1208] dark:text-white font-bold py-3.5 rounded-xl text-xs transition-all cursor-pointer shadow-sm"
           >
             <span>↓</span>
             <span>Download QR Image</span>
@@ -239,12 +240,12 @@ export default function SharePage() {
         </div>
 
         {/* Usage tip */}
-        <div className="bg-gray-800 border border-gray-700 rounded-xl px-4 py-3">
-          <p className="text-xs text-gray-400 font-medium mb-2">How to use</p>
-          <div className="flex flex-col gap-1.5 text-xs text-gray-500 leading-relaxed">
-            <p>• <span className="text-gray-300">Copy Link</span> — paste in WhatsApp, Instagram bio, or anywhere</p>
-            <p>• <span className="text-gray-300">Share on WhatsApp</span> — opens WhatsApp with a ready message</p>
-            <p>• <span className="text-gray-300">Download QR</span> — print on posters, banners, or pamphlets</p>
+        <div className="bg-[#F5EDE2] dark:bg-gray-800 border border-[#1A1208]/10 dark:border-gray-700 rounded-xl px-4 py-3 shadow-sm">
+          <p className="text-xs text-[#7a6a55] dark:text-gray-400 font-bold mb-2">How to use</p>
+          <div className="flex flex-col gap-1.5 text-xs text-[#7a6a55] dark:text-gray-400 leading-relaxed font-medium">
+            <p>• <span className="text-[#1A1208] dark:text-gray-300 font-bold">Copy Link</span> — paste in WhatsApp, Instagram bio, or anywhere</p>
+            <p>• <span className="text-[#1A1208] dark:text-gray-300 font-bold">Share on WhatsApp</span> — opens WhatsApp with a ready message</p>
+            <p>• <span className="text-[#1A1208] dark:text-gray-300 font-bold">Download QR</span> — print on posters, banners, or pamphlets</p>
           </div>
         </div>
 

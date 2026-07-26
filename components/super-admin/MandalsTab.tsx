@@ -382,13 +382,13 @@ export default function MandalsTab({ showToast }: MandalsTabProps) {
                   className={`flex-1 sm:flex-none px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-1.5 border
                     ${(docStatuses[previewDoc.mandalId]?.[previewDoc.key] || 'pending') === 'rejected'
                       ? 'bg-rose-600 border-rose-500 text-white shadow-lg shadow-rose-500/10'
-                      : 'bg-gray-800 border-gray-700 text-rose-400 hover:bg-rose-950/40 hover:border-rose-600'}`}
+                      : 'bg-rose-50 hover:bg-rose-100 dark:bg-gray-800 dark:hover:bg-rose-950/40 border-rose-200 dark:border-gray-700 text-rose-700 dark:text-rose-400'}`}
                 >
                   ✕ Reject
                 </button>
                 <button
                   onClick={() => setPreviewDoc(null)}
-                  className="px-4 py-2 bg-gray-750 hover:bg-gray-700 text-gray-300 rounded-xl text-xs font-semibold transition-colors cursor-pointer"
+                  className="px-4 py-2 bg-[#F5EDE2] dark:bg-gray-800 hover:bg-[#ebdcc9] dark:hover:bg-gray-700 text-[#1A1208] dark:text-gray-300 rounded-xl text-xs font-bold transition-colors cursor-pointer border border-[#1A1208]/10 dark:border-gray-700"
                 >
                   Close
                 </button>
@@ -402,27 +402,27 @@ export default function MandalsTab({ showToast }: MandalsTabProps) {
       {/* Header Title */}
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
         <div>
-          <h2 className="text-xl font-bold tracking-tight text-white">
+          <h2 className="text-xl font-extrabold tracking-tight text-[#1A1208] dark:text-white">
             Mandal Registrations
           </h2>
-          <p className="text-xs text-gray-400 mt-1">
+          <p className="text-xs text-[#7a6a55] dark:text-gray-400 mt-1">
             Review, approve, and manage registered community organization accounts.
           </p>
         </div>
       </div>
 
       {/* Tab Controls Selector */}
-      <div className="flex gap-1 bg-gray-900 border border-gray-800 rounded-xl p-1 w-fit">
+      <div className="flex gap-1 bg-[#F5EDE2] dark:bg-gray-900 border border-[#1A1208]/10 dark:border-gray-800 rounded-xl p-1 w-fit">
         {tabs.map(tab => {
           const isActive = activeTab === tab
           return (
             <button
               key={tab}
               onClick={() => setActiveTab(tab)}
-              className={`px-4 py-2 rounded-lg text-xs font-semibold capitalize transition-all cursor-pointer ${
+              className={`px-4 py-2 rounded-lg text-xs font-bold capitalize transition-all cursor-pointer ${
                 isActive
-                  ? 'bg-orange-500 text-white shadow-md'
-                  : 'text-gray-400 hover:text-white hover:bg-gray-800'
+                  ? 'bg-gradient-to-r from-[#E8650A] to-[#f97316] text-white shadow-md shadow-[#E8650A]/20'
+                  : 'text-[#7a6a55] dark:text-gray-400 hover:text-[#1A1208] dark:hover:text-white'
               }`}
             >
               {tab}
@@ -435,20 +435,20 @@ export default function MandalsTab({ showToast }: MandalsTabProps) {
       {loading ? (
         <div className="flex flex-col items-center justify-center py-20 space-y-3">
           <div className="relative w-10 h-10">
-            <div className="absolute inset-0 rounded-full border-2 border-t-orange-500 border-r-transparent border-b-orange-500 border-l-transparent animate-spin" />
+            <div className="absolute inset-0 rounded-full border-2 border-t-[#E8650A] border-r-transparent border-b-[#E8650A] border-l-transparent animate-spin" />
           </div>
-          <p className="text-[10px] text-gray-500 font-mono animate-pulse">Loading records...</p>
+          <p className="text-[10px] text-[#7a6a55] dark:text-gray-500 font-mono animate-pulse">Loading records...</p>
         </div>
       ) : mandals.length === 0 ? (
-        <div className="bg-gray-900 border border-gray-800 rounded-2xl p-12 text-center space-y-3">
-          <div className="w-12 h-12 mx-auto rounded-xl bg-gray-800 text-gray-500 flex items-center justify-center">
+        <div className="bg-white dark:bg-gray-900 border border-[#1A1208]/10 dark:border-gray-800 rounded-2xl p-12 text-center space-y-3 shadow-sm">
+          <div className="w-12 h-12 mx-auto rounded-xl bg-[#F5EDE2] dark:bg-gray-800 text-[#7a6a55] dark:text-gray-500 flex items-center justify-center">
             <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" />
             </svg>
           </div>
           <div className="space-y-1">
-            <h3 className="text-sm font-bold text-gray-200">No {activeTab} mandals found</h3>
-            <p className="text-xs text-gray-550 max-w-xs mx-auto">There are no community organizations matching this status.</p>
+            <h3 className="text-sm font-bold text-[#1A1208] dark:text-gray-200">No {activeTab} mandals found</h3>
+            <p className="text-xs text-[#7a6a55] dark:text-gray-500 max-w-xs mx-auto">There are no community organizations matching this status.</p>
           </div>
         </div>
       ) : (
@@ -461,13 +461,13 @@ export default function MandalsTab({ showToast }: MandalsTabProps) {
             return (
               <div 
                 key={mandal.id} 
-                className="bg-gray-900 border border-gray-800 rounded-2xl p-5 flex flex-col justify-between hover:border-gray-700 transition-all relative overflow-hidden"
+                className="bg-white dark:bg-gray-900 border border-[#1A1208]/10 dark:border-gray-800 rounded-2xl p-5 flex flex-col justify-between hover:border-[#E8650A]/30 dark:hover:border-gray-700 transition-all relative overflow-hidden shadow-sm"
               >
                 <div className={`absolute top-0 left-0 right-0 h-1 ${
                   mandal.kyc_status === 'rejected'
                     ? 'bg-rose-500'
                     : mandal.status === 'pending' 
-                    ? 'bg-amber-500' 
+                    ? 'bg-[#E8650A]' 
                     : mandal.status === 'active' 
                     ? 'bg-emerald-500' 
                     : 'bg-rose-500'
@@ -477,20 +477,20 @@ export default function MandalsTab({ showToast }: MandalsTabProps) {
                   {/* Header */}
                   <div className="flex justify-between items-start gap-4">
                     <div>
-                      <h3 className="text-base font-bold text-white leading-snug">{mandal.name}</h3>
-                      <p className="text-[10px] text-gray-400 mt-1 flex items-center space-x-1">
+                      <h3 className="text-base font-bold text-[#1A1208] dark:text-white leading-snug">{mandal.name}</h3>
+                      <p className="text-[10px] text-[#7a6a55] dark:text-gray-400 mt-1 flex items-center space-x-1">
                         <span>Registered {formatDate(mandal.created_at)}</span>
                       </p>
                     </div>
 
                     <span className={`text-[9px] font-bold px-2 py-0.5 rounded-full uppercase border font-mono ${
                       mandal.kyc_status === 'rejected'
-                        ? 'bg-rose-500/10 border-rose-500/20 text-rose-500'
+                        ? 'bg-rose-500/10 border-rose-500/20 text-rose-600 dark:text-rose-400'
                         : mandal.status === 'pending' 
-                        ? 'bg-amber-500/10 border-amber-500/20 text-amber-505' 
+                        ? 'bg-[#E8650A]/10 border-[#E8650A]/20 text-[#E8650A]' 
                         : mandal.status === 'active' 
-                        ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-500' 
-                        : 'bg-rose-500/10 border-rose-500/20 text-rose-500'
+                        ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-600 dark:text-emerald-400' 
+                        : 'bg-rose-500/10 border-rose-500/20 text-rose-600 dark:text-rose-400'
                     }`}>
                       {mandal.kyc_status === 'rejected' ? 'rejected' : mandal.status}
                     </span>
@@ -498,13 +498,13 @@ export default function MandalsTab({ showToast }: MandalsTabProps) {
 
                   {/* Subscription details */}
                   {subscription && (
-                    <div className="bg-gray-950 rounded-xl p-2.5 border border-gray-800 flex justify-between items-center text-[10px]">
+                    <div className="bg-[#F5EDE2] dark:bg-gray-950 rounded-xl p-2.5 border border-[#1A1208]/10 dark:border-gray-800 flex justify-between items-center text-[10px]">
                       <div className="flex items-center space-x-2">
                         <span className="w-2 h-2 rounded-full bg-emerald-500" />
-                        <span className="text-gray-400">Subscription:</span>
-                        <span className="font-semibold text-gray-200 capitalize">{subscription.plan} Plan</span>
+                        <span className="text-[#7a6a55] dark:text-gray-400">Subscription:</span>
+                        <span className="font-bold text-[#1A1208] dark:text-gray-200 capitalize">{subscription.plan} Plan</span>
                       </div>
-                      <span className="text-gray-500">
+                      <span className="text-[#7a6a55] dark:text-gray-500 font-medium">
                         Ends {formatDate(subscription.ends_at || '')}
                       </span>
                     </div>
@@ -513,48 +513,49 @@ export default function MandalsTab({ showToast }: MandalsTabProps) {
                   {/* Grid info */}
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs pt-1">
                     <div className="space-y-0.5">
-                      <span className="text-gray-500 font-medium block text-[10px]">Location Info</span>
-                      <p className="text-gray-200 font-semibold">{mandal.city || '—'}</p>
-                      <p className="text-[11px] text-gray-400 leading-tight">{mandal.address || '—'}</p>
+                      <span className="text-[#7a6a55] dark:text-gray-500 font-bold block text-[10px]">Location Info</span>
+                      <p className="text-[#1A1208] dark:text-gray-200 font-bold">{mandal.city || '—'}</p>
+                      <p className="text-[11px] text-[#7a6a55] dark:text-gray-400 leading-tight">{mandal.address || '—'}</p>
                     </div>
 
                     <div className="space-y-0.5">
-                      <span className="text-gray-500 font-medium block text-[10px]">Mandal Phone</span>
-                      <p className="text-gray-200 font-semibold">{mandal.phone || '—'}</p>
+                      <span className="text-[#7a6a55] dark:text-gray-500 font-bold block text-[10px]">Mandal Phone</span>
+                      <p className="text-[#1A1208] dark:text-gray-200 font-bold">{mandal.phone || '—'}</p>
                     </div>
 
-                    <div className="space-y-0.5 sm:col-span-2 border-t border-gray-800 pt-2.5">
-                      <span className="text-gray-500 font-medium block text-[10px]">Mandal Admin Account</span>
+                    <div className="space-y-0.5 sm:col-span-2 border-t border-[#1A1208]/10 dark:border-gray-800 pt-2.5">
+                      <span className="text-[#7a6a55] dark:text-gray-500 font-bold block text-[10px]">Mandal Admin Account</span>
                       {admin ? (
-                        <div className="flex flex-col sm:flex-row sm:justify-between text-gray-250 font-semibold mt-0.5 gap-1">
+                        <div className="flex flex-col sm:flex-row sm:justify-between text-[#1A1208] dark:text-gray-250 font-bold mt-0.5 gap-1">
                           <span>{admin.full_name}</span>
-                          <span className="text-gray-400 font-normal">Phone: {admin.phone}</span>
+                          <span className="text-[#7a6a55] dark:text-gray-400 font-normal">Phone: {admin.phone}</span>
                         </div>
                       ) : (
-                        <p className="text-gray-500 italic">No admin account linked</p>
+                        <p className="text-[#7a6a55] dark:text-gray-500 italic">No admin account linked</p>
                       )}
                     </div>
                   </div>
                 </div>
 
+
                 {/* KYC Documents Section */}
                 {activeTab === 'pending' && (
-                  <div className="border-t border-gray-850 pt-3 mt-3">
+                  <div className="border-t border-[#1A1208]/10 dark:border-gray-800 pt-3 mt-3">
                     <button
                       onClick={() => setExpandedKyc(expandedKyc === mandal.id ? null : mandal.id)}
-                      className="w-full flex items-center justify-between text-xs font-semibold text-gray-300 hover:text-orange-400 transition-colors"
+                      className="w-full flex items-center justify-between text-xs font-semibold text-[#1A1208] dark:text-gray-300 hover:text-[#E8650A] transition-colors"
                     >
-                      <span className="flex items-center gap-1.5">
+                      <span className="flex items-center gap-1.5 font-bold">
                         <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                         </svg>
                         KYC Documents
                         {mandal.kyc_status && (
                           <span className={`ml-2 px-2 py-0.5 rounded-full text-[9px] font-bold uppercase
-                            ${mandal.kyc_status === 'approved' ? 'bg-emerald-500/10 text-emerald-500'
-                            : mandal.kyc_status === 'rejected' ? 'bg-rose-500/10 text-rose-500'
-                            : mandal.kyc_status === 'in_review' ? 'bg-blue-500/10 text-blue-500'
-                            : 'bg-amber-500/10 text-amber-500'}`}>
+                            ${mandal.kyc_status === 'approved' ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400'
+                            : mandal.kyc_status === 'rejected' ? 'bg-rose-500/10 text-rose-600 dark:text-rose-400'
+                            : mandal.kyc_status === 'in_review' ? 'bg-blue-500/10 text-blue-600 dark:text-blue-400'
+                            : 'bg-amber-500/10 text-[#E8650A] dark:text-amber-400'}`}>
                             {mandal.kyc_status}
                           </span>
                         )}
@@ -563,21 +564,21 @@ export default function MandalsTab({ showToast }: MandalsTabProps) {
                     </button>
 
                     {expandedKyc === mandal.id && (
-                      <div className="mt-2.5 space-y-2.5 bg-gray-950/40 p-2.5 border border-gray-800 rounded-xl">
+                      <div className="mt-2.5 space-y-2.5 bg-[#F5EDE2]/60 dark:bg-gray-950/40 p-2.5 border border-[#1A1208]/10 dark:border-gray-800 rounded-xl">
                         {/* Submitted details */}
                         <div className="text-[10px] space-y-1">
-                          <p className="font-semibold text-gray-500 uppercase tracking-wide">Submitted details</p>
-                          <div className="grid grid-cols-2 gap-x-2 gap-y-0.5 text-gray-300">
-                            <div><span className="text-gray-500">Admin: </span>{mandal.admin_full_name || '—'}</div>
-                            <div><span className="text-gray-500">Email: </span>{mandal.admin_email || '—'}</div>
-                            <div><span className="text-gray-500">Phone: </span>{mandal.admin_phone || '—'}</div>
-                            <div><span className="text-gray-500">UPI ID: </span>{mandal.upi_id || '—'}</div>
-                            <div><span className="text-gray-500">Pincode: </span>{mandal.pincode || '—'}</div>
+                          <p className="font-extrabold text-[#7a6a55] dark:text-gray-500 uppercase tracking-wide">Submitted details</p>
+                          <div className="grid grid-cols-2 gap-x-2 gap-y-0.5 text-[#1A1208] dark:text-gray-300 font-medium">
+                            <div><span className="text-[#7a6a55] dark:text-gray-500">Admin: </span>{mandal.admin_full_name || '—'}</div>
+                            <div><span className="text-[#7a6a55] dark:text-gray-500">Email: </span>{mandal.admin_email || '—'}</div>
+                            <div><span className="text-[#7a6a55] dark:text-gray-500">Phone: </span>{mandal.admin_phone || '—'}</div>
+                            <div><span className="text-[#7a6a55] dark:text-gray-500">UPI ID: </span>{mandal.upi_id || '—'}</div>
+                            <div><span className="text-[#7a6a55] dark:text-gray-500">Pincode: </span>{mandal.pincode || '—'}</div>
                           </div>
                         </div>
 
                         {/* Document links */}
-                        <div className="space-y-1.5 border-t border-gray-800 pt-2.5">
+                        <div className="space-y-1.5 border-t border-[#1A1208]/10 dark:border-gray-800 pt-2.5">
                           {[
                             { key: 'doc_admin_aadhaar', label: 'Admin Aadhaar', required: true },
                             { key: 'doc_bank_proof', label: 'Bank Proof', required: true },
@@ -593,29 +594,29 @@ export default function MandalsTab({ showToast }: MandalsTabProps) {
 
                             return (
                               <div key={doc.key} className="flex items-center justify-between text-[11px]">
-                                <span className={`${doc.required ? 'text-gray-300' : 'text-gray-500'}`}>
+                                <span className={`${doc.required ? 'text-[#1A1208] dark:text-gray-300 font-bold' : 'text-[#7a6a55] dark:text-gray-500'}`}>
                                   {doc.label}
-                                  {doc.required && <span className="text-rose-400 ml-0.5">*</span>}
+                                  {doc.required && <span className="text-rose-500 ml-0.5">*</span>}
                                 </span>
                                 
                                 <div className="flex items-center gap-2">
                                   {isMissingOptional ? (
-                                    <span className="text-gray-550 text-[10px] italic pr-1 select-none">Not Attached</span>
+                                    <span className="text-[#7a6a55] dark:text-gray-500 text-[10px] italic pr-1 select-none font-medium">Not Attached</span>
                                   ) : (
                                     <>
                                       {/* Individual Doc Status Badge */}
                                       <span className={`px-2 py-0.5 rounded text-[9px] font-bold uppercase border
-                                        ${docStatus === 'approved' ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
-                                        : docStatus === 'rejected' ? 'bg-rose-500/10 text-rose-455 border-rose-500/20'
-                                        : 'bg-amber-500/10 text-amber-400 border-amber-500/20'}`}>
+                                        ${docStatus === 'approved' ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20'
+                                        : docStatus === 'rejected' ? 'bg-rose-500/10 text-rose-600 dark:text-rose-455 border-rose-500/20'
+                                        : 'bg-amber-500/10 text-[#E8650A] dark:text-amber-400 border-amber-500/20'}`}>
                                         {docStatus}
                                       </span>
 
                                       {/* View / Mock View Trigger */}
                                       <button
                                         onClick={() => handleViewDoc(mandal.id, doc.key, doc.label, path)}
-                                        className={`font-semibold text-xs transition-colors cursor-pointer
-                                          ${path ? 'text-orange-400 hover:text-orange-500' : 'text-gray-500 hover:text-gray-400 italic'}`}
+                                        className={`font-bold text-xs transition-colors cursor-pointer
+                                          ${path ? 'text-[#E8650A] dark:text-orange-400 hover:underline' : 'text-[#7a6a55] dark:text-gray-500 hover:text-gray-400 italic'}`}
                                       >
                                         {path ? 'View' : 'View (Mock)'}
                                       </button>
@@ -637,7 +638,7 @@ export default function MandalsTab({ showToast }: MandalsTabProps) {
                                           className={`w-5 h-5 rounded flex items-center justify-center text-[10px] font-bold border transition-colors cursor-pointer
                                             ${docStatus === 'approved'
                                               ? 'bg-emerald-600 border-emerald-500 text-white'
-                                              : 'bg-gray-800 border-gray-700 text-gray-400 hover:bg-emerald-950 hover:border-emerald-600 hover:text-emerald-400'}`}
+                                              : 'bg-white dark:bg-gray-800 border-[#1A1208]/15 dark:border-gray-700 text-[#7a6a55] dark:text-gray-400 hover:bg-emerald-500/10 hover:border-emerald-600 hover:text-emerald-600'}`}
                                         >
                                           ✓
                                         </button>
@@ -656,7 +657,7 @@ export default function MandalsTab({ showToast }: MandalsTabProps) {
                                           className={`w-5 h-5 rounded flex items-center justify-center text-[10px] font-bold border transition-colors cursor-pointer
                                             ${docStatus === 'rejected'
                                               ? 'bg-rose-600 border-rose-500 text-white'
-                                              : 'bg-gray-800 border-gray-700 text-gray-400 hover:bg-rose-950 hover:border-rose-600 hover:text-rose-455'}`}
+                                              : 'bg-white dark:bg-gray-800 border-[#1A1208]/15 dark:border-gray-700 text-[#7a6a55] dark:text-gray-400 hover:bg-rose-500/10 hover:border-rose-600 hover:text-rose-600'}`}
                                         >
                                           ✕
                                         </button>
@@ -671,13 +672,13 @@ export default function MandalsTab({ showToast }: MandalsTabProps) {
 
                         {/* KYC Notes */}
                         <div className="space-y-1.5">
-                          <label className="text-[10px] text-gray-500 font-bold uppercase tracking-wider block">Review Notes</label>
+                          <label className="text-[10px] text-[#7a6a55] dark:text-gray-500 font-bold uppercase tracking-wider block">Review Notes</label>
                           <textarea
                             value={kycNotes[mandal.id] || ''}
                             onChange={e => setKycNotes(prev => ({ ...prev, [mandal.id]: e.target.value }))}
                             placeholder="Add review notes (optional)..."
                             rows={2}
-                            className="w-full text-xs bg-gray-900 border border-gray-800 rounded-lg px-2.5 py-1.5 text-gray-250 placeholder-gray-500 focus:outline-none focus:border-orange-500 resize-none"
+                            className="w-full text-xs bg-white dark:bg-gray-900 border border-[#1A1208]/15 dark:border-gray-800 rounded-lg px-2.5 py-1.5 text-[#1A1208] dark:text-gray-250 placeholder-[#9e8c76] dark:placeholder-gray-500 focus:outline-none focus:border-[#E8650A] resize-none font-medium"
                           />
                         </div>
 
@@ -686,7 +687,7 @@ export default function MandalsTab({ showToast }: MandalsTabProps) {
                           <button
                             onClick={() => saveDocReviews(mandal.id)}
                             disabled={kycUpdating === mandal.id}
-                            className="w-full py-1.5 bg-gray-800 hover:bg-gray-750 text-gray-300 font-bold rounded-lg text-xs border border-gray-700 transition-colors disabled:opacity-40 cursor-pointer"
+                            className="w-full py-1.5 bg-[#F5EDE2] dark:bg-gray-800 hover:bg-[#ebdcc9] dark:hover:bg-gray-700 text-[#1A1208] dark:text-gray-300 font-bold rounded-lg text-xs border border-[#1A1208]/10 dark:border-gray-700 transition-colors disabled:opacity-40 cursor-pointer"
                           >
                             {kycUpdating === mandal.id ? 'Saving...' : 'Save Document Statuses'}
                           </button>
@@ -695,21 +696,21 @@ export default function MandalsTab({ showToast }: MandalsTabProps) {
                             <button
                               onClick={() => updateKycStatus(mandal.id, 'in_review')}
                               disabled={kycUpdating === mandal.id || mandal.kyc_status === 'in_review'}
-                              className="flex-1 py-2 text-[10px] font-bold rounded-lg border border-blue-500/30 bg-blue-500/10 text-blue-400 hover:bg-blue-500/20 disabled:opacity-40 transition-colors cursor-pointer"
+                              className="flex-1 py-2 text-[10px] font-bold rounded-lg border border-blue-500/30 bg-blue-500/10 text-blue-600 dark:text-blue-400 hover:bg-blue-500/20 disabled:opacity-40 transition-colors cursor-pointer"
                             >
                               Mark In Review
                             </button>
                             <button
                               onClick={() => updateKycStatus(mandal.id, 'approved')}
                               disabled={kycUpdating === mandal.id || mandal.kyc_status === 'approved'}
-                              className="flex-1 py-2 text-[10px] font-bold rounded-lg border border-emerald-500/30 bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20 disabled:opacity-40 transition-colors cursor-pointer"
+                              className="flex-1 py-2 text-[10px] font-bold rounded-lg border border-emerald-500/30 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/20 disabled:opacity-40 transition-colors cursor-pointer"
                             >
                               Approve KYC
                             </button>
                             <button
                               onClick={() => updateKycStatus(mandal.id, 'rejected')}
                               disabled={kycUpdating === mandal.id || mandal.kyc_status === 'rejected'}
-                              className="flex-1 py-2 text-[10px] font-bold rounded-lg border border-rose-500/30 bg-rose-500/10 text-rose-455 hover:bg-rose-500/20 disabled:opacity-40 transition-colors cursor-pointer"
+                              className="flex-1 py-2 text-[10px] font-bold rounded-lg border border-rose-500/30 bg-rose-500/10 text-rose-600 dark:text-rose-455 hover:bg-rose-500/20 disabled:opacity-40 transition-colors cursor-pointer"
                             >
                               Reject KYC
                             </button>
@@ -722,13 +723,13 @@ export default function MandalsTab({ showToast }: MandalsTabProps) {
                 )}
 
                 {/* Actions Footer */}
-                <div className="flex gap-2.5 pt-3 border-t border-gray-800 mt-4">
+                <div className="flex gap-2.5 pt-3 border-t border-[#1A1208]/10 dark:border-gray-800 mt-4">
                   {activeTab === 'pending' && (
                     <>
                       <button 
                         onClick={() => handleAction(mandal.id, 'approve')} 
                         disabled={isActing || mandal.kyc_status === 'rejected'} 
-                        className="flex-1 py-2 px-3 bg-orange-500 hover:bg-orange-600 disabled:opacity-50 disabled:bg-gray-850 disabled:border-gray-800 disabled:text-gray-500 text-white text-xs font-bold rounded-xl transition-all cursor-pointer flex items-center justify-center space-x-1"
+                        className="flex-1 py-2 px-3 bg-gradient-to-r from-[#E8650A] to-[#f97316] hover:from-[#d05807] hover:to-[#ea580c] disabled:opacity-50 text-white text-xs font-bold rounded-xl transition-all cursor-pointer flex items-center justify-center space-x-1 shadow-md shadow-[#E8650A]/20"
                         title={mandal.kyc_status === 'rejected' ? 'Cannot approve until resubmitted' : undefined}
                       >
                         {isActing ? <span>Processing...</span> : <span>Approve Mandal</span>}
@@ -737,7 +738,7 @@ export default function MandalsTab({ showToast }: MandalsTabProps) {
                       <button 
                         onClick={() => handleAction(mandal.id, 'reject')} 
                         disabled={isActing || mandal.kyc_status === 'rejected'} 
-                        className="py-2 px-3 bg-rose-950/20 hover:bg-rose-900 border border-rose-900/50 text-rose-455 disabled:opacity-50 text-xs font-bold rounded-xl transition-all cursor-pointer flex items-center justify-center"
+                        className="py-2 px-4 bg-rose-50 hover:bg-rose-100 dark:bg-rose-950/40 dark:hover:bg-rose-900/60 border border-rose-200 dark:border-rose-800/60 text-rose-700 dark:text-rose-400 disabled:opacity-50 text-xs font-bold rounded-xl transition-all cursor-pointer flex items-center justify-center"
                       >
                         Reject
                       </button>
@@ -745,7 +746,7 @@ export default function MandalsTab({ showToast }: MandalsTabProps) {
                   )}
 
                   {activeTab === 'rejected' && (
-                    <div className="flex-1 text-center py-2 bg-rose-950/10 border border-rose-900/20 text-rose-400 text-xs font-semibold rounded-xl select-none">
+                    <div className="flex-1 text-center py-2 bg-rose-50 dark:bg-rose-950/30 border border-rose-200 dark:border-rose-900/40 text-rose-700 dark:text-rose-400 text-xs font-bold rounded-xl select-none">
                       🔒 Awaiting Resubmission (Cannot Approve)
                     </div>
                   )}
@@ -754,7 +755,7 @@ export default function MandalsTab({ showToast }: MandalsTabProps) {
                     <button 
                       onClick={() => handleAction(mandal.id, 'suspend')} 
                       disabled={isActing} 
-                      className="flex-1 py-2 px-3 bg-rose-950/20 hover:bg-rose-900 border border-rose-900/50 text-rose-400 disabled:opacity-50 text-xs font-bold rounded-xl transition-all cursor-pointer flex items-center justify-center"
+                      className="flex-1 py-2.5 px-4 bg-rose-50 hover:bg-rose-100 dark:bg-rose-950/40 dark:hover:bg-rose-900/60 border border-rose-200 dark:border-rose-800/60 text-rose-700 dark:text-rose-400 disabled:opacity-50 text-xs font-bold rounded-xl transition-all cursor-pointer flex items-center justify-center shadow-sm"
                     >
                       {isActing ? <span>Processing...</span> : <span>Suspend Mandal</span>}
                     </button>
@@ -764,7 +765,7 @@ export default function MandalsTab({ showToast }: MandalsTabProps) {
                     <button 
                       onClick={() => handleAction(mandal.id, 'approve')} 
                       disabled={isActing} 
-                      className="flex-1 py-2 px-3 bg-orange-500 hover:bg-orange-600 disabled:opacity-50 text-white text-xs font-bold rounded-xl transition-all cursor-pointer flex items-center justify-center"
+                      className="flex-1 py-2.5 px-4 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 disabled:opacity-50 text-white text-xs font-bold rounded-xl transition-all cursor-pointer flex items-center justify-center shadow-md shadow-emerald-600/20"
                     >
                       {isActing ? <span>Processing...</span> : <span>Reactivate Mandal</span>}
                     </button>

@@ -9,6 +9,7 @@ import AllOrganizationsTab from '@/components/super-admin/AllOrganizationsTab'
 import EventsTab from '@/components/super-admin/EventsTab'
 import SubscriptionsTab from '@/components/super-admin/SubscriptionsTab'
 import PlansTab from '@/components/super-admin/PlansTab'
+import ThemeToggle from '@/components/ThemeToggle'
 
 type PlanRow = {
   id: string
@@ -36,6 +37,28 @@ function SuperAdminDashboardContent() {
   const [activeTab, setActiveTab] = useState<TabId>('mandals')
   const [plans, setPlans] = useState<PlanRow[]>([])
   const [toast, setToast] = useState<{ msg: string; type: 'success' | 'error' } | null>(null)
+
+  // Theme State (Syncs with Landing / Login / Register / Dashboard light/dark theme)
+  const [theme, setTheme] = useState<'light' | 'dark'>('light')
+
+  useEffect(() => {
+    const saved = localStorage.getItem('intellidon-theme') as 'light' | 'dark' | null
+    if (saved) {
+      setTheme(saved)
+      document.documentElement.classList.toggle('dark', saved === 'dark')
+    } else {
+      document.documentElement.classList.remove('dark')
+    }
+  }, [])
+
+  const toggleTheme = () => {
+    const next = theme === 'light' ? 'dark' : 'light'
+    setTheme(next)
+    localStorage.setItem('intellidon-theme', next)
+    document.documentElement.classList.toggle('dark', next === 'dark')
+  }
+
+  const isDark = theme === 'dark'
 
   // ── Auth & Query Params ──────────────────────────────────────
   useEffect(() => {
@@ -111,18 +134,18 @@ function SuperAdminDashboardContent() {
 
   if (!authorized) {
     return (
-      <div className="min-h-screen bg-gray-950 flex items-center justify-center">
+      <div className="min-h-screen bg-[#FDF8F3] dark:bg-gray-950 flex items-center justify-center transition-colors duration-300">
         <div className="flex flex-col items-center gap-3">
-          <div className="w-8 h-8 rounded-full border-2 border-t-orange-500 border-r-transparent border-b-orange-500 border-l-transparent animate-spin" />
-          <p className="text-gray-400 text-xs font-mono">Verifying authorization...</p>
+          <div className="w-8 h-8 rounded-full border-2 border-t-[#E8650A] border-r-transparent border-b-[#E8650A] border-l-transparent animate-spin" />
+          <p className="text-[#7a6a55] dark:text-gray-400 text-xs font-mono">Verifying authorization...</p>
         </div>
       </div>
     )
   }
 
   return (
-    <div className="min-h-screen bg-gray-950 text-white flex flex-col md:flex-row">
-      
+    <div className="min-h-screen bg-[#FDF8F3] dark:bg-gray-950 text-[#1A1208] dark:text-white flex flex-col md:flex-row transition-colors duration-300">
+
       {/* Toast Banner */}
       {toast && (
         <div className={`fixed top-4 right-4 z-[100] px-4 py-3 rounded-xl text-sm font-medium shadow-2xl transition-all duration-300
@@ -132,16 +155,18 @@ function SuperAdminDashboardContent() {
       )}
 
       {/* Unified Side Navigation Panel */}
-      <aside className="w-full md:w-64 bg-gray-900 border-b md:border-b-0 md:border-r border-gray-800 flex flex-col justify-between shrink-0 md:sticky md:top-0 md:h-screen">
+      <aside className="w-full md:w-64 bg-[#F5EDE2] dark:bg-gray-900 border-b md:border-b-0 md:border-r border-[#1A1208]/10 dark:border-gray-800 flex flex-col justify-between shrink-0 md:sticky md:top-0 md:h-screen transition-colors duration-300">
         <div>
           {/* Logo Brand Header */}
-          <div className="p-6 border-b border-gray-800 flex items-center space-x-3">
-            <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-amber-400 to-orange-600 flex items-center justify-center shadow-lg shadow-orange-500/20">
+          <div className="p-6 border-b border-[#1A1208]/10 dark:border-gray-800 flex items-center space-x-3">
+            <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-[#E8650A] to-[#C49A3C] flex items-center justify-center shadow-md shadow-[#E8650A]/20">
               <span className="text-white font-black text-base italic">i</span>
             </div>
             <div>
-              <h1 className="text-sm font-bold tracking-wide">Intellidon</h1>
-              <p className="text-[9px] text-orange-400 font-mono tracking-wider uppercase leading-none mt-0.5">Control Center</p>
+              <h1 className="text-sm font-extrabold tracking-tight text-[#1A1208] dark:text-white">
+                Intelli<span className="text-[#E8650A]">don</span>
+              </h1>
+              <p className="text-[9px] text-[#C49A3C] dark:text-orange-400 font-mono tracking-wider uppercase leading-none mt-0.5 font-bold">Control Center</p>
             </div>
           </div>
 
@@ -153,10 +178,10 @@ function SuperAdminDashboardContent() {
                 <button
                   key={tab.id}
                   onClick={() => handleTabChange(tab.id)}
-                  className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-xs font-semibold tracking-wide transition-all cursor-pointer text-left
-                    ${isActive 
-                      ? 'bg-orange-500 text-white shadow-md shadow-orange-500/10' 
-                      : 'text-gray-400 hover:text-white hover:bg-gray-800/50'}`}
+                  className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-xs font-bold tracking-wide transition-all cursor-pointer text-left
+                    ${isActive
+                      ? 'bg-gradient-to-r from-[#E8650A] to-[#f97316] text-white shadow-md shadow-[#E8650A]/20'
+                      : 'text-[#7a6a55] dark:text-gray-400 hover:text-[#1A1208] dark:hover:text-white hover:bg-white/60 dark:hover:bg-gray-800/50'}`}
                 >
                   <span className="text-sm leading-none">{tab.icon}</span>
                   <span>{tab.label}</span>
@@ -167,17 +192,21 @@ function SuperAdminDashboardContent() {
         </div>
 
         {/* Footer Admin Identity */}
-        <div className="p-4 border-t border-gray-800 bg-gray-950/40 flex items-center justify-between gap-3 flex-wrap md:flex-nowrap">
+        <div className="p-4 border-t border-[#1A1208]/10 dark:border-gray-800 bg-[#F5EDE2] dark:bg-gray-950/60 flex items-center justify-between gap-3 flex-wrap md:flex-nowrap transition-colors duration-300">
           <div className="min-w-0">
-            <p className="text-xs font-bold text-gray-250 truncate">{superAdminName}</p>
-            <p className="text-[9px] text-gray-550 font-mono uppercase tracking-wider mt-0.5">Super Admin</p>
+            <p className="text-xs font-bold text-[#1A1208] dark:text-white truncate">{superAdminName}</p>
+            <p className="text-[9px] text-[#7a6a55] dark:text-gray-400 font-mono uppercase tracking-wider mt-0.5">Super Admin</p>
           </div>
-          <button 
-            onClick={handleSignOut}
-            className="text-[10px] font-bold py-1.5 px-3 border border-gray-850 hover:border-gray-700 bg-gray-900 hover:bg-gray-800 rounded-lg text-gray-400 hover:text-white transition-all cursor-pointer"
-          >
-            Sign Out
-          </button>
+          <div className="flex items-center gap-2">
+            {/* Theme Toggle Button */}
+            <ThemeToggle />
+            <button
+              onClick={handleSignOut}
+              className="text-[10px] font-bold py-1.5 px-2.5 border border-red-500/20 dark:border-gray-800 hover:border-red-500/40 dark:hover:border-gray-700 bg-red-500/10 dark:bg-gray-900 hover:bg-red-500/20 dark:hover:bg-gray-800 rounded-lg text-red-600 dark:text-gray-300 hover:text-red-700 dark:hover:text-white transition-all cursor-pointer"
+            >
+              Sign Out
+            </button>
+          </div>
         </div>
       </aside>
 
@@ -207,7 +236,7 @@ function SuperAdminDashboardContent() {
         </div>
 
         {/* Global Footer brand info */}
-        <footer className="w-full max-w-4xl mx-auto border-t border-gray-900 pt-6 mt-12 flex justify-between items-center text-[10px] text-gray-500">
+        <footer className="w-full max-w-4xl mx-auto border-t border-[#1A1208]/10 dark:border-gray-900 pt-6 mt-12 flex justify-between items-center text-[10px] text-[#7a6a55] dark:text-gray-500">
           <span>Intellidon Super Admin Console</span>
           <span>Security Audited Session</span>
         </footer>
@@ -219,10 +248,10 @@ function SuperAdminDashboardContent() {
 export default function SuperAdminDashboard() {
   return (
     <Suspense fallback={
-      <div className="min-h-screen bg-gray-950 flex items-center justify-center">
+      <div className="min-h-screen bg-[#FDF8F3] dark:bg-gray-950 flex items-center justify-center transition-colors duration-300">
         <div className="flex flex-col items-center gap-3">
-          <div className="w-8 h-8 rounded-full border-2 border-t-orange-500 border-r-transparent border-b-orange-500 border-l-transparent animate-spin" />
-          <p className="text-gray-400 text-xs font-mono">Loading dashboard...</p>
+          <div className="w-8 h-8 rounded-full border-2 border-t-[#E8650A] border-r-transparent border-b-[#E8650A] border-l-transparent animate-spin" />
+          <p className="text-[#7a6a55] dark:text-gray-400 text-xs font-mono">Loading dashboard...</p>
         </div>
       </div>
     }>
@@ -230,3 +259,4 @@ export default function SuperAdminDashboard() {
     </Suspense>
   )
 }
+

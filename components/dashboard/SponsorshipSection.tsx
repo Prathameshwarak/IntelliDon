@@ -78,10 +78,10 @@ const PACKAGES = [
 ]
 
 const STATUS_STYLES: Record<string, string> = {
-  completed: 'bg-green-900/50 text-green-400',
-  partially_paid: 'bg-yellow-900/50 text-yellow-400',
-  pending: 'bg-gray-700 text-gray-300',
-  'n/a': 'bg-gray-800 text-gray-500'
+  completed: 'bg-emerald-500/10 text-emerald-600 dark:text-green-400 border border-emerald-500/20',
+  partially_paid: 'bg-amber-500/10 text-amber-600 dark:text-yellow-400 border border-amber-500/20',
+  pending: 'bg-rose-500/10 text-rose-600 dark:text-red-400 border border-rose-500/20',
+  'n/a': 'bg-[#F5EDE2] dark:bg-gray-800 text-[#7a6a55] dark:text-gray-400 border border-[#1A1208]/10 dark:border-gray-700'
 }
 const STATUS_LABELS: Record<string, string> = {
   completed: 'Fully Received',
@@ -438,84 +438,84 @@ export default function SponsorshipSection({ mandalId, events, showToast }: Prop
     <div className="flex flex-col gap-4">
       {/* Summary */}
       <div className="grid grid-cols-3 gap-2">
-        <div className="bg-gray-800 border border-gray-700 rounded-lg p-3">
-          <p className="text-[10px] uppercase text-gray-500 font-bold">Committed</p>
-          <p className="text-sm font-semibold text-white mt-1">{formatMoney(summary.total_committed)}</p>
+        <div className="bg-[#F5EDE2] dark:bg-gray-800 border border-[#1A1208]/10 dark:border-gray-700 rounded-xl p-3 shadow-sm">
+          <p className="text-[10px] uppercase text-[#7a6a55] dark:text-gray-400 font-bold">Committed</p>
+          <p className="text-sm font-bold text-[#1A1208] dark:text-white mt-1">{formatMoney(summary.total_committed)}</p>
         </div>
-        <div className="bg-gray-800 border border-gray-700 rounded-lg p-3">
-          <p className="text-[10px] uppercase text-gray-500 font-bold">Received</p>
-          <p className="text-sm font-semibold text-green-400 mt-1">{formatMoney(summary.total_received)}</p>
+        <div className="bg-[#F5EDE2] dark:bg-gray-800 border border-[#1A1208]/10 dark:border-gray-700 rounded-xl p-3 shadow-sm">
+          <p className="text-[10px] uppercase text-[#7a6a55] dark:text-gray-400 font-bold">Received</p>
+          <p className="text-sm font-bold text-emerald-600 dark:text-green-400 mt-1">{formatMoney(summary.total_received)}</p>
         </div>
-        <div className="bg-gray-800 border border-gray-700 rounded-lg p-3">
-          <p className="text-[10px] uppercase text-gray-500 font-bold">Pending</p>
-          <p className="text-sm font-semibold text-orange-400 mt-1">{formatMoney(summary.total_pending)}</p>
+        <div className="bg-[#F5EDE2] dark:bg-gray-800 border border-[#1A1208]/10 dark:border-gray-700 rounded-xl p-3 shadow-sm">
+          <p className="text-[10px] uppercase text-[#7a6a55] dark:text-gray-400 font-bold">Pending</p>
+          <p className="text-sm font-bold text-[#E8650A] dark:text-orange-400 mt-1">{formatMoney(summary.total_pending)}</p>
         </div>
       </div>
 
       <div className="flex items-center justify-between gap-2 flex-wrap">
         <select value={eventFilter} onChange={e => setEventFilter(e.target.value)}
-          className="bg-gray-900 border border-gray-700 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-orange-500">
+          className="bg-white dark:bg-gray-900 border border-[#1A1208]/15 dark:border-gray-700 rounded-lg px-3 py-2 text-xs text-[#1A1208] dark:text-white font-bold focus:outline-none focus:border-[#E8650A]">
           <option value="all">All Events</option>
           {events.map(ev => <option key={ev.id} value={ev.id}>{ev.name} {ev.year}</option>)}
         </select>
         <button
           onClick={() => (showForm ? resetForm() : setShowForm(true))}
-          className="text-sm bg-orange-500 hover:bg-orange-600 text-white px-4 py-2 rounded-lg font-medium"
+          className="text-xs bg-gradient-to-r from-[#E8650A] to-[#f97316] hover:from-[#d05807] hover:to-[#ea580c] text-white px-4 py-2.5 rounded-xl font-bold transition-all cursor-pointer shadow-md shadow-[#E8650A]/20"
         >
           {showForm ? 'Close Form' : '+ Add Sponsor'}
         </button>
       </div>
 
       {showForm && (
-        <div className="bg-gray-800 border border-gray-700 rounded-xl p-4 flex flex-col gap-3">
-          <p className="text-sm font-medium text-white">{editingId ? 'Edit Sponsor' : 'New Sponsor'}</p>
+        <div className="bg-[#F5EDE2] dark:bg-gray-800 border border-[#1A1208]/10 dark:border-gray-700 rounded-xl p-4 flex flex-col gap-3">
+          <p className="text-sm font-bold text-[#1A1208] dark:text-white">{editingId ? 'Edit Sponsor' : 'New Sponsor'}</p>
 
           <div>
-            <label className="text-xs text-gray-400 mb-1 block">Event</label>
+            <label className="text-xs text-[#7a6a55] dark:text-gray-400 mb-1 block font-bold">Event</label>
             <select value={form.event_id} onChange={e => setField('event_id', e.target.value)}
-              className="w-full bg-gray-900 border border-gray-700 rounded-lg px-3 py-2.5 text-sm text-white focus:outline-none focus:border-orange-500">
+              className="w-full bg-white dark:bg-gray-900 border border-[#1A1208]/15 dark:border-gray-700 rounded-lg px-3 py-2.5 text-sm text-[#1A1208] dark:text-white font-medium focus:outline-none focus:border-[#E8650A]">
               <option value="">Select event</option>
               {events.map(ev => <option key={ev.id} value={ev.id}>{ev.name} {ev.year}</option>)}
             </select>
           </div>
 
           {/* Details */}
-          <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mt-1">Details</p>
+          <p className="text-xs font-extrabold text-[#7a6a55] dark:text-gray-400 uppercase tracking-wide mt-1">Details</p>
           <input value={form.company_name} onChange={e => setField('company_name', e.target.value.slice(0, 75))} placeholder="Sponsor Company / Business / Name"
-            className="bg-gray-900 border border-gray-700 rounded-lg px-3 py-2.5 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-orange-500" />
+            className="bg-white dark:bg-gray-900 border border-[#1A1208]/15 dark:border-gray-700 rounded-lg px-3 py-2.5 text-sm text-[#1A1208] dark:text-white placeholder-[#9e8c76] dark:placeholder-gray-500 focus:outline-none focus:border-[#E8650A] font-medium" />
           <div className="grid grid-cols-2 gap-2">
             <input value={form.contact_person_name} onChange={e => setField('contact_person_name', e.target.value.slice(0, 50))} placeholder="Contact person name (optional)"
-              className="bg-gray-900 border border-gray-700 rounded-lg px-3 py-2.5 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-orange-500" />
+              className="bg-white dark:bg-gray-900 border border-[#1A1208]/15 dark:border-gray-700 rounded-lg px-3 py-2.5 text-sm text-[#1A1208] dark:text-white placeholder-[#9e8c76] dark:placeholder-gray-500 focus:outline-none focus:border-[#E8650A] font-medium" />
             <input value={form.contact_person_phone} onChange={e => setField('contact_person_phone', e.target.value.replace(/[^0-9]/g, '').slice(0, 10))} placeholder="Contact phone (optional)" type="tel" inputMode="numeric"
-              className="bg-gray-900 border border-gray-700 rounded-lg px-3 py-2.5 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-orange-500" />
+              className="bg-white dark:bg-gray-900 border border-[#1A1208]/15 dark:border-gray-700 rounded-lg px-3 py-2.5 text-sm text-[#1A1208] dark:text-white placeholder-[#9e8c76] dark:placeholder-gray-500 focus:outline-none focus:border-[#E8650A] font-medium" />
           </div>
           <input value={form.email} onChange={e => setField('email', e.target.value)} placeholder="Email (optional)" type="email"
-            className="bg-gray-900 border border-gray-700 rounded-lg px-3 py-2.5 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-orange-500" />
+            className="bg-white dark:bg-gray-900 border border-[#1A1208]/15 dark:border-gray-700 rounded-lg px-3 py-2.5 text-sm text-[#1A1208] dark:text-white placeholder-[#9e8c76] dark:placeholder-gray-500 focus:outline-none focus:border-[#E8650A] font-medium" />
           <input value={form.address} onChange={e => setField('address', e.target.value.slice(0, 100))} placeholder="Address (optional)"
-            className="bg-gray-900 border border-gray-700 rounded-lg px-3 py-2.5 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-orange-500" />
+            className="bg-white dark:bg-gray-900 border border-[#1A1208]/15 dark:border-gray-700 rounded-lg px-3 py-2.5 text-sm text-[#1A1208] dark:text-white placeholder-[#9e8c76] dark:placeholder-gray-500 focus:outline-none focus:border-[#E8650A] font-medium" />
 
           {!showMore ? (
-            <button type="button" onClick={() => setShowMore(true)} className="text-xs text-orange-400 hover:text-orange-300 font-medium self-start">
+            <button type="button" onClick={() => setShowMore(true)} className="text-xs text-[#E8650A] dark:text-orange-400 hover:underline font-bold self-start cursor-pointer">
               + More
             </button>
           ) : (
             <>
               <input value={form.gst_no} onChange={e => setField('gst_no', e.target.value.toUpperCase().slice(0, 15))} placeholder="GST No. (optional)"
-                className="bg-gray-900 border border-gray-700 rounded-lg px-3 py-2.5 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-orange-500" />
+                className="bg-white dark:bg-gray-900 border border-[#1A1208]/15 dark:border-gray-700 rounded-lg px-3 py-2.5 text-sm text-[#1A1208] dark:text-white placeholder-[#9e8c76] dark:placeholder-gray-500 focus:outline-none focus:border-[#E8650A] font-medium" />
               <input value={form.reference_name} onChange={e => setField('reference_name', e.target.value.slice(0, 50))} placeholder="Sponsor Reference Name (optional)"
-                className="bg-gray-900 border border-gray-700 rounded-lg px-3 py-2.5 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-orange-500" />
-              <button type="button" onClick={() => setShowMore(false)} className="text-xs text-gray-500 hover:text-gray-300 font-medium self-start">
+                className="bg-white dark:bg-gray-900 border border-[#1A1208]/15 dark:border-gray-700 rounded-lg px-3 py-2.5 text-sm text-[#1A1208] dark:text-white placeholder-[#9e8c76] dark:placeholder-gray-500 focus:outline-none focus:border-[#E8650A] font-medium" />
+              <button type="button" onClick={() => setShowMore(false)} className="text-xs text-[#7a6a55] dark:text-gray-500 hover:text-[#1A1208] dark:hover:text-gray-300 font-bold self-start cursor-pointer">
                 − Less
               </button>
             </>
           )}
 
           {/* Sponsor Type dropdown */}
-          <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mt-1">Sponsor Type</p>
+          <p className="text-xs font-extrabold text-[#7a6a55] dark:text-gray-400 uppercase tracking-wide mt-1">Sponsor Type</p>
           <select
             value={form.sponsor_type}
             onChange={e => setField('sponsor_type', e.target.value as '' | SponsorType)}
-            className="w-full bg-gray-900 border border-gray-700 rounded-lg px-3 py-2.5 text-sm text-white focus:outline-none focus:border-orange-500"
+            className="w-full bg-white dark:bg-gray-900 border border-[#1A1208]/15 dark:border-gray-700 rounded-lg px-3 py-2.5 text-sm text-[#1A1208] dark:text-white font-medium focus:outline-none focus:border-[#E8650A]"
           >
             <option value="">Select sponsor type</option>
             {SPONSOR_TYPES.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
@@ -524,13 +524,13 @@ export default function SponsorshipSection({ mandalId, events, showToast }: Prop
           {/* Finance-only fields */}
           {form.sponsor_type === 'finance' && (
             <>
-              <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mt-1">Finance Details</p>
+              <p className="text-xs font-extrabold text-[#7a6a55] dark:text-gray-400 uppercase tracking-wide mt-1">Finance Details</p>
               <div className="grid grid-cols-2 gap-2">
                 <input value={form.committed_amount} onChange={e => setField('committed_amount', onlyDigits9(e.target.value))}
                   type="text" inputMode="numeric" maxLength={9} placeholder="Committed Amount (₹)"
-                  className="bg-gray-900 border border-gray-700 rounded-lg px-3 py-2.5 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-orange-500" />
+                  className="bg-white dark:bg-gray-900 border border-[#1A1208]/15 dark:border-gray-700 rounded-lg px-3 py-2.5 text-sm text-[#1A1208] dark:text-white placeholder-[#9e8c76] dark:placeholder-gray-500 focus:outline-none focus:border-[#E8650A] font-medium" />
                 <input value={form.contribution_date} onChange={e => setField('contribution_date', e.target.value)} type="date" placeholder="Date"
-                  className="bg-gray-900 border border-gray-700 rounded-lg px-3 py-2.5 text-sm text-white focus:outline-none focus:border-orange-500" style={{ colorScheme: 'dark' }} />
+                  className="bg-white dark:bg-gray-900 border border-[#1A1208]/15 dark:border-gray-700 rounded-lg px-3 py-2.5 text-sm text-[#1A1208] dark:text-white focus:outline-none focus:border-[#E8650A] font-medium" />
               </div>
             </>
           )}
@@ -538,107 +538,107 @@ export default function SponsorshipSection({ mandalId, events, showToast }: Prop
           {/* Goods/Service-only fields */}
           {form.sponsor_type === 'goods_service' && (
             <>
-              <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mt-1">Goods / Service Details</p>
+              <p className="text-xs font-extrabold text-[#7a6a55] dark:text-gray-400 uppercase tracking-wide mt-1">Goods / Service Details</p>
               <input value={form.goods_service_description} onChange={e => setField('goods_service_description', e.target.value.slice(0, 75))} placeholder="Goods/Service Name"
-                className="bg-gray-900 border border-gray-700 rounded-lg px-3 py-2.5 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-orange-500" />
+                className="bg-white dark:bg-gray-900 border border-[#1A1208]/15 dark:border-gray-700 rounded-lg px-3 py-2.5 text-sm text-[#1A1208] dark:text-white placeholder-[#9e8c76] dark:placeholder-gray-500 focus:outline-none focus:border-[#E8650A] font-medium" />
               <div className="grid grid-cols-2 gap-2">
                 <input value={form.weight} onChange={e => setField('weight', e.target.value.slice(0, 10))} placeholder="Weight"
-                  className="bg-gray-900 border border-gray-700 rounded-lg px-3 py-2.5 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-orange-500" />
+                  className="bg-white dark:bg-gray-900 border border-[#1A1208]/15 dark:border-gray-700 rounded-lg px-3 py-2.5 text-sm text-[#1A1208] dark:text-white placeholder-[#9e8c76] dark:placeholder-gray-500 focus:outline-none focus:border-[#E8650A] font-medium" />
                 <input value={form.quantity} onChange={e => setField('quantity', onlyDigits9(e.target.value))} type="text" inputMode="numeric" maxLength={9} placeholder="Quantity"
-                  className="bg-gray-900 border border-gray-700 rounded-lg px-3 py-2.5 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-orange-500" />
+                  className="bg-white dark:bg-gray-900 border border-[#1A1208]/15 dark:border-gray-700 rounded-lg px-3 py-2.5 text-sm text-[#1A1208] dark:text-white placeholder-[#9e8c76] dark:placeholder-gray-500 focus:outline-none focus:border-[#E8650A] font-medium" />
               </div>
               <input value={form.estimated_value} onChange={e => setField('estimated_value', onlyDigits9(e.target.value))} type="text" inputMode="numeric" maxLength={9} placeholder="Estimated Value (₹) (optional)"
-                className="bg-gray-900 border border-gray-700 rounded-lg px-3 py-2.5 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-orange-500" />
+                className="bg-white dark:bg-gray-900 border border-[#1A1208]/15 dark:border-gray-700 rounded-lg px-3 py-2.5 text-sm text-[#1A1208] dark:text-white placeholder-[#9e8c76] dark:placeholder-gray-500 focus:outline-none focus:border-[#E8650A] font-medium" />
             </>
           )}
 
           {/* Ads Package-only fields */}
           {form.sponsor_type === 'ads_package' && (
             <>
-              <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mt-1">Ads Package Details</p>
+              <p className="text-xs font-extrabold text-[#7a6a55] dark:text-gray-400 uppercase tracking-wide mt-1">Ads Package Details</p>
               <select value={form.package} onChange={e => setField('package', e.target.value)}
-                className="w-full bg-gray-900 border border-gray-700 rounded-lg px-3 py-2.5 text-sm text-white focus:outline-none focus:border-orange-500">
+                className="w-full bg-white dark:bg-gray-900 border border-[#1A1208]/15 dark:border-gray-700 rounded-lg px-3 py-2.5 text-sm text-[#1A1208] dark:text-white font-medium focus:outline-none focus:border-[#E8650A]">
                 <option value="">Select package type</option>
                 {PACKAGES.map(p => <option key={p.value} value={p.value}>{p.label}</option>)}
               </select>
               {form.package === 'others' && (
                 <input value={form.package_name} onChange={e => setField('package_name', e.target.value.slice(0, 75))} placeholder="Package Name"
-                  className="bg-gray-900 border border-gray-700 rounded-lg px-3 py-2.5 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-orange-500" />
+                  className="bg-white dark:bg-gray-900 border border-[#1A1208]/15 dark:border-gray-700 rounded-lg px-3 py-2.5 text-sm text-[#1A1208] dark:text-white placeholder-[#9e8c76] dark:placeholder-gray-500 focus:outline-none focus:border-[#E8650A] font-medium" />
               )}
               <div className="grid grid-cols-2 gap-2">
                 <input value={form.committed_amount} onChange={e => setField('committed_amount', onlyDigits9(e.target.value))}
                   type="text" inputMode="numeric" maxLength={9} placeholder="Committed Amount (₹)"
-                  className="bg-gray-900 border border-gray-700 rounded-lg px-3 py-2.5 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-orange-500" />
+                  className="bg-white dark:bg-gray-900 border border-[#1A1208]/15 dark:border-gray-700 rounded-lg px-3 py-2.5 text-sm text-[#1A1208] dark:text-white placeholder-[#9e8c76] dark:placeholder-gray-500 focus:outline-none focus:border-[#E8650A] font-medium" />
                 <input value={form.contribution_date} onChange={e => setField('contribution_date', e.target.value)} type="date" placeholder="Date"
-                  className="bg-gray-900 border border-gray-700 rounded-lg px-3 py-2.5 text-sm text-white focus:outline-none focus:border-orange-500" style={{ colorScheme: 'dark' }} />
+                  className="bg-white dark:bg-gray-900 border border-[#1A1208]/15 dark:border-gray-700 rounded-lg px-3 py-2.5 text-sm text-[#1A1208] dark:text-white focus:outline-none focus:border-[#E8650A] font-medium" />
               </div>
             </>
           )}
 
           {form.sponsor_type && (
             <textarea value={form.notes} onChange={e => setField('notes', e.target.value.slice(0, 100))} placeholder="Note (optional)" rows={2}
-              className="bg-gray-900 border border-gray-700 rounded-lg px-3 py-2.5 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-orange-500 resize-none" />
+              className="bg-white dark:bg-gray-900 border border-[#1A1208]/15 dark:border-gray-700 rounded-lg px-3 py-2.5 text-sm text-[#1A1208] dark:text-white placeholder-[#9e8c76] dark:placeholder-gray-500 focus:outline-none focus:border-[#E8650A] font-medium resize-none" />
           )}
 
-          <div className="flex gap-2">
+          <div className="flex gap-2 pt-1">
             <button onClick={submitSponsorForm} disabled={submitting}
-              className="flex-1 bg-orange-500 hover:bg-orange-600 disabled:opacity-50 text-white text-sm font-medium py-2.5 rounded-lg">
+              className="flex-1 bg-gradient-to-r from-[#E8650A] to-[#f97316] hover:from-[#d05807] hover:to-[#ea580c] disabled:opacity-50 text-white text-xs font-bold py-2.5 rounded-xl transition-all cursor-pointer shadow-md shadow-[#E8650A]/20">
               {submitting ? 'Saving...' : editingId ? 'Save Changes' : 'Add Sponsor'}
             </button>
-            <button onClick={resetForm} className="px-4 bg-gray-700 text-gray-300 text-sm rounded-lg">Cancel</button>
+            <button onClick={resetForm} className="px-4 bg-[#F5EDE2] dark:bg-gray-700 hover:bg-[#ebdcc9] dark:hover:bg-gray-600 text-[#1A1208] dark:text-gray-300 border border-[#1A1208]/10 dark:border-gray-600 text-xs font-bold rounded-xl transition-colors cursor-pointer">Cancel</button>
           </div>
         </div>
       )}
 
       {loading ? (
-        <p className="text-gray-500 text-sm text-center py-8">Loading sponsors...</p>
+        <p className="text-[#7a6a55] dark:text-gray-400 text-sm text-center py-8 font-medium">Loading sponsors...</p>
       ) : sponsors.length === 0 ? (
-        <p className="text-gray-500 text-sm text-center py-8">No sponsors added yet.</p>
+        <p className="text-[#7a6a55] dark:text-gray-400 text-sm text-center py-8 font-medium">No sponsors added yet.</p>
       ) : (
         <div className="flex flex-col gap-3">
           {sponsors.map(s => {
             const isExpanded = expandedId === s.id
             const displayPackage = s.package === 'others' ? (s.package_name || 'Others') : s.package
             return (
-            <div key={s.id} ref={isExpanded ? expandedCardRef : undefined} className="bg-gray-800 border border-gray-700 rounded-xl p-4">
+            <div key={s.id} ref={isExpanded ? expandedCardRef : undefined} className="bg-white dark:bg-gray-800 border border-[#1A1208]/15 dark:border-gray-700 rounded-xl p-4 shadow-sm">
               <div className="flex items-start justify-between gap-3">
                 <div className="flex-1">
                   <div className="flex items-center gap-2 flex-wrap">
-                    <p className="text-sm font-medium text-white">{s.company_name}</p>
-                    <span className={`text-[10px] px-2 py-0.5 rounded-full font-semibold ${STATUS_STYLES[s.payment_status]}`}>
+                    <p className="text-sm font-bold text-[#1A1208] dark:text-white">{s.company_name}</p>
+                    <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold uppercase ${STATUS_STYLES[s.payment_status]}`}>
                       {STATUS_LABELS[s.payment_status]}
                     </span>
                     {displayPackage && (
-                      <span className="text-[10px] px-2 py-0.5 rounded-full font-semibold bg-purple-900/50 text-purple-300 capitalize">
+                      <span className="text-[10px] px-2 py-0.5 rounded-full font-bold bg-purple-500/10 text-purple-600 dark:text-purple-300 border border-purple-500/20 capitalize">
                         {displayPackage}
                       </span>
                     )}
                     {s.sponsor_type && (
-                      <span className="text-[10px] px-2 py-0.5 rounded-full font-semibold bg-blue-900/50 text-blue-300">
+                      <span className="text-[10px] px-2 py-0.5 rounded-full font-bold bg-blue-500/10 text-blue-600 dark:text-blue-300 border border-blue-500/20">
                         {SPONSOR_TYPES.find(t => t.value === s.sponsor_type)?.label || s.sponsor_type}
                       </span>
                     )}
                   </div>
                   {(s.contact_person_name || s.contact_person_phone) && (
-                    <p className="text-xs text-gray-400 mt-1">
+                    <p className="text-xs text-[#7a6a55] dark:text-gray-400 mt-1 font-medium">
                       {s.contact_person_name}{s.contact_person_name && s.contact_person_phone ? ' · ' : ''}{s.contact_person_phone}
                     </p>
                   )}
                   {events.find(ev => ev.id === s.event_id) && (
-                    <p className="text-xs text-gray-500 mt-0.5">
+                    <p className="text-xs text-[#7a6a55] dark:text-gray-500 mt-0.5 font-medium">
                       {events.find(ev => ev.id === s.event_id)!.name} {events.find(ev => ev.id === s.event_id)!.year}
                     </p>
                   )}
                 </div>
                 <div className="text-right shrink-0">
-                  <p className="text-sm font-semibold text-white">{formatMoney(s.committed_amount)}</p>
-                  <p className="text-[11px] text-green-400">Received: {formatMoney(s.amount_received)}</p>
-                  {s.amount_pending > 0 && <p className="text-[11px] text-orange-400">Due: {formatMoney(s.amount_pending)}</p>}
+                  <p className="text-sm font-bold text-[#1A1208] dark:text-white">{formatMoney(s.committed_amount)}</p>
+                  <p className="text-[11px] font-bold text-emerald-600 dark:text-green-400">Received: {formatMoney(s.amount_received)}</p>
+                  {s.amount_pending > 0 && <p className="text-[11px] font-bold text-[#E8650A] dark:text-orange-400">Due: {formatMoney(s.amount_pending)}</p>}
                 </div>
               </div>
 
               <div className="flex items-center gap-3 mt-3 flex-wrap">
-                <button onClick={() => toggleExpand(s, 'payments')} className="text-xs text-orange-400 hover:text-orange-300 font-medium">
+                <button onClick={() => toggleExpand(s, 'payments')} className="text-xs text-orange-600 dark:text-orange-400 hover:underline font-bold">
                   {isExpanded && expandedPanel === 'payments' ? 'Hide payments' : `Payments (${s.payments.length})`}
                 </button>
                 <button onClick={() => toggleExpand(s, 'benefits')} className="text-xs text-purple-400 hover:text-purple-300 font-medium">

@@ -117,59 +117,59 @@ export default function PlansTab({ plans, fetchPlans, showToast }: PlansTabProps
     <div className="space-y-6">
       {/* Add/Edit Plan Modal */}
       {(isAddingPlan || editingPlan) && (
-        <div className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4">
-          <div className="bg-gray-900 border border-gray-700 rounded-2xl w-full max-w-md shadow-2xl overflow-hidden animate-fade-in">
+        <div className="fixed inset-0 z-50 bg-black/60 dark:bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-gray-900 border border-[#1A1208]/15 dark:border-gray-700 rounded-2xl w-full max-w-md shadow-2xl overflow-hidden animate-fade-in transition-colors duration-300">
             {/* Modal Header */}
-            <div className="px-5 py-4 border-b border-gray-800 flex items-start justify-between gap-3">
+            <div className="px-5 py-4 border-b border-[#1A1208]/10 dark:border-gray-800 flex items-start justify-between gap-3 bg-[#F5EDE2] dark:bg-gray-950/20">
               <div>
-                <p className="font-semibold text-white">{isAddingPlan ? 'Add New Subscription Plan' : 'Edit Plan'}</p>
-                <p className="text-xs text-gray-400 mt-0.5">Customize plan pricing and features</p>
+                <p className="font-extrabold text-[#1A1208] dark:text-white">{isAddingPlan ? 'Add New Subscription Plan' : 'Edit Plan'}</p>
+                <p className="text-xs text-[#7a6a55] dark:text-gray-400 mt-0.5 font-medium">Customize plan pricing and features</p>
               </div>
-              <button onClick={() => { setIsAddingPlan(false); setEditingPlan(null) }} className="text-gray-500 hover:text-white text-lg mt-0.5 cursor-pointer">✕</button>
+              <button onClick={() => { setIsAddingPlan(false); setEditingPlan(null) }} className="text-[#7a6a55] dark:text-gray-500 hover:text-[#1A1208] dark:hover:text-white text-lg mt-0.5 cursor-pointer font-bold">✕</button>
             </div>
 
             <div className="px-5 py-4 flex flex-col gap-4">
               {/* Plan Slug ID */}
               <div>
-                <label className="text-xs text-gray-400 mb-1 block font-medium font-mono">Plan Code (slug, unique ID)*</label>
+                <label className="text-xs text-[#7a6a55] dark:text-gray-400 mb-1 block font-bold font-mono">Plan Code (slug, unique ID)*</label>
                 <input type="text" value={planFormId} onChange={e => setPlanFormId(e.target.value)}
                   disabled={!isAddingPlan}
                   placeholder="e.g. premium"
-                  className="w-full bg-gray-850 border border-gray-700 rounded-lg px-3 py-2.5 text-sm text-white focus:outline-none focus:border-orange-500 disabled:opacity-50 disabled:cursor-not-allowed" />
+                  className="w-full bg-white dark:bg-gray-800 border border-[#1A1208]/15 dark:border-gray-700 rounded-lg px-3 py-2.5 text-sm text-[#1A1208] dark:text-white placeholder-[#9e8c76] dark:placeholder-gray-500 focus:outline-none focus:border-[#E8650A] disabled:opacity-50 disabled:cursor-not-allowed font-medium" />
               </div>
 
               {/* Plan Name */}
               <div>
-                <label className="text-xs text-gray-400 mb-1 block font-medium">Plan Name*</label>
+                <label className="text-xs text-[#7a6a55] dark:text-gray-400 mb-1 block font-bold">Plan Name*</label>
                 <input type="text" value={planFormName} onChange={e => setPlanFormName(e.target.value)}
                   placeholder="e.g. Premium Plan"
-                  className="w-full bg-gray-850 border border-gray-700 rounded-lg px-3 py-2.5 text-sm text-white focus:outline-none focus:border-orange-500" />
+                  className="w-full bg-white dark:bg-gray-800 border border-[#1A1208]/15 dark:border-gray-700 rounded-lg px-3 py-2.5 text-sm text-[#1A1208] dark:text-white placeholder-[#9e8c76] dark:placeholder-gray-500 focus:outline-none focus:border-[#E8650A] font-medium" />
               </div>
 
               {/* Plan Price */}
               <div>
-                <label className="text-xs text-gray-400 mb-1 block font-medium">Price (₹)*</label>
+                <label className="text-xs text-[#7a6a55] dark:text-gray-400 mb-1 block font-bold">Price (₹)*</label>
                 <input type="number" value={planFormPrice} onChange={e => setPlanFormPrice(e.target.value)}
                   placeholder="e.g. 999"
-                  className="w-full bg-gray-850 border border-gray-700 rounded-lg px-3 py-2.5 text-sm text-white focus:outline-none focus:border-orange-500" />
+                  className="w-full bg-white dark:bg-gray-800 border border-[#1A1208]/15 dark:border-gray-700 rounded-lg px-3 py-2.5 text-sm text-[#1A1208] dark:text-white placeholder-[#9e8c76] dark:placeholder-gray-500 focus:outline-none focus:border-[#E8650A] font-medium" />
               </div>
 
               {/* Plan Features */}
               <div>
-                <label className="text-xs text-gray-400 mb-1 block font-medium">Features (one per line)*</label>
+                <label className="text-xs text-[#7a6a55] dark:text-gray-400 mb-1 block font-bold">Features (one per line)*</label>
                 <textarea value={planFormFeatures} onChange={e => setPlanFormFeatures(e.target.value)}
                   rows={4} placeholder="Feature 1&#10;Feature 2&#10;Feature 3"
-                  className="w-full bg-gray-850 border border-gray-700 rounded-lg px-3 py-2.5 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-orange-500 resize-none font-sans" />
+                  className="w-full bg-white dark:bg-gray-800 border border-[#1A1208]/15 dark:border-gray-700 rounded-lg px-3 py-2.5 text-sm text-[#1A1208] dark:text-white placeholder-[#9e8c76] dark:placeholder-gray-500 focus:outline-none focus:border-[#E8650A] resize-none font-sans font-medium" />
               </div>
 
               {/* Save Plan Actions */}
               <div className="flex gap-2 pt-1">
                 <button onClick={savePlan} disabled={planSubmitting}
-                  className="flex-1 bg-orange-500 hover:bg-orange-600 disabled:opacity-50 text-white font-semibold py-3 rounded-xl text-sm transition-colors cursor-pointer">
+                  className="flex-1 bg-gradient-to-r from-[#E8650A] to-[#f97316] hover:from-[#d05807] hover:to-[#ea580c] disabled:opacity-50 text-white font-bold py-3 rounded-xl text-sm transition-colors cursor-pointer shadow-md shadow-[#E8650A]/20">
                   {planSubmitting ? 'Saving...' : 'Save Plan'}
                 </button>
                 <button onClick={() => { setIsAddingPlan(false); setEditingPlan(null) }}
-                  className="px-5 bg-gray-700 hover:bg-gray-600 text-gray-300 rounded-xl text-sm transition-colors cursor-pointer">
+                  className="px-5 bg-[#F5EDE2] dark:bg-gray-700 hover:bg-[#ebdcc9] dark:hover:bg-gray-600 text-[#1A1208] dark:text-gray-300 border border-[#1A1208]/10 dark:border-gray-600 rounded-xl text-sm font-bold transition-colors cursor-pointer">
                   Cancel
                 </button>
               </div>
@@ -181,36 +181,36 @@ export default function PlansTab({ plans, fetchPlans, showToast }: PlansTabProps
       {/* Plan list view */}
       <div className="flex justify-between items-center gap-4 flex-wrap">
         <div>
-          <h3 className="text-xl font-bold text-white">Subscription Plans</h3>
-          <p className="text-xs text-gray-400">Define the plans displayed to mandal administrators</p>
+          <h3 className="text-xl font-extrabold text-[#1A1208] dark:text-white">Subscription Plans</h3>
+          <p className="text-xs text-[#7a6a55] dark:text-gray-400">Define the plans displayed to mandal administrators</p>
         </div>
         <button onClick={openAddPlan}
-          className="bg-orange-500 hover:bg-orange-600 text-white text-xs font-semibold py-2.5 px-4 rounded-xl transition-all shadow-md flex items-center gap-1.5 cursor-pointer">
+          className="bg-gradient-to-r from-[#E8650A] to-[#f97316] hover:from-[#d05807] hover:to-[#ea580c] text-white text-xs font-bold py-2.5 px-4 rounded-xl transition-all shadow-md shadow-[#E8650A]/20 flex items-center gap-1.5 cursor-pointer">
           <span>+</span> Add Plan
         </button>
       </div>
 
       {plans.length === 0 ? (
-        <div className="bg-gray-900 border border-gray-800 rounded-2xl p-12 text-center">
-          <p className="text-gray-500 text-sm">No plans found in the database.</p>
+        <div className="bg-white dark:bg-gray-900 border border-[#1A1208]/10 dark:border-gray-800 rounded-2xl p-12 text-center shadow-sm">
+          <p className="text-[#7a6a55] dark:text-gray-500 text-xs">No plans found in the database.</p>
         </div>
       ) : (
         <div className="flex flex-col gap-3">
           {plans.map(p => (
-            <div key={p.id} className="bg-gray-900 border border-gray-800 rounded-xl p-4 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+            <div key={p.id} className="bg-white dark:bg-gray-900 border border-[#1A1208]/10 dark:border-gray-800 rounded-xl p-4 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 shadow-sm">
               <div className="flex-1">
                 <div className="flex items-center gap-2 flex-wrap">
-                  <h4 className="font-bold text-white text-sm">{p.name}</h4>
-                  <span className="text-[9px] font-mono bg-gray-800 text-gray-405 px-2 py-0.5 rounded border border-gray-700 uppercase">
+                  <h4 className="font-extrabold text-[#1A1208] dark:text-white text-sm">{p.name}</h4>
+                  <span className="text-[9px] font-mono bg-[#F5EDE2] dark:bg-gray-800 text-[#1A1208] dark:text-gray-400 px-2 py-0.5 rounded border border-[#1A1208]/10 dark:border-gray-700 uppercase font-bold">
                     {p.id}
                   </span>
                 </div>
-                <p className="text-xs text-orange-400 font-semibold mt-0.5">{p.price_label} (₹{p.price})</p>
+                <p className="text-xs text-[#E8650A] dark:text-orange-400 font-extrabold mt-0.5">{p.price_label} (₹{p.price})</p>
                 
                 {p.features && p.features.length > 0 && (
                   <div className="mt-2.5 flex flex-wrap gap-1.5">
                     {p.features.map(f => (
-                      <span key={f} className="text-[10px] bg-gray-950 border border-gray-800 text-gray-300 px-2.5 py-0.5 rounded-full">
+                      <span key={f} className="text-[10px] bg-[#F5EDE2] dark:bg-gray-950 border border-[#1A1208]/10 dark:border-gray-800 text-[#1A1208] dark:text-gray-300 px-2.5 py-0.5 rounded-full font-medium">
                         ✓ {f}
                       </span>
                     ))}
@@ -220,11 +220,11 @@ export default function PlansTab({ plans, fetchPlans, showToast }: PlansTabProps
 
               <div className="flex gap-2 flex-shrink-0 w-full sm:w-auto justify-end">
                 <button onClick={() => openEditPlan(p)}
-                  className="text-xs bg-gray-800 hover:bg-gray-700 text-gray-300 px-3.5 py-2 rounded-lg transition-colors font-medium cursor-pointer">
+                  className="text-xs bg-[#F5EDE2] dark:bg-gray-800 hover:bg-[#ebdcc9] dark:hover:bg-gray-700 text-[#1A1208] dark:text-gray-300 px-3.5 py-2 rounded-lg transition-colors font-bold cursor-pointer border border-[#1A1208]/10 dark:border-gray-700">
                   Edit
                 </button>
                 <button onClick={() => deletePlan(p.id)}
-                  className="text-xs bg-red-950/40 hover:bg-red-900 border border-red-900/50 text-red-400 px-3.5 py-2 rounded-lg transition-colors font-medium cursor-pointer">
+                  className="text-xs bg-red-500/10 hover:bg-red-500/20 border border-red-500/20 text-red-600 dark:text-red-400 px-3.5 py-2 rounded-lg transition-colors font-bold cursor-pointer">
                   Delete
                 </button>
               </div>
@@ -232,6 +232,7 @@ export default function PlansTab({ plans, fetchPlans, showToast }: PlansTabProps
           ))}
         </div>
       )}
+
     </div>
   )
 }
