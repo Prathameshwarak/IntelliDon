@@ -12,20 +12,15 @@ const supabaseAdmin = createClient(
 // ── Document fields expected from the form ────────────────────
 const DOC_FIELDS = [
   'doc_reg_cert',       // registration certificate (optional)
-  'doc_admin_aadhaar',  // admin aadhaar (required)
+  'doc_admin_aadhaar',  // admin aadhaar (optional)
   'doc_admin_pan',      // admin PAN (optional)
   'doc_org_pan',        // org PAN (optional)
-  'doc_bank_proof',     // bank proof (required)
-  'doc_auth_letter',    // auth letter / committee resolution (required)
-  'doc_address_proof',  // address proof (required)
+  'doc_bank_proof',     // bank proof (optional)
+  'doc_auth_letter',    // auth letter / committee resolution (optional)
+  'doc_address_proof',  // address proof (optional)
 ]
 
-const REQUIRED_DOCS = [
-  'doc_admin_aadhaar',
-  'doc_bank_proof',
-  'doc_auth_letter',
-  'doc_address_proof',
-]
+const REQUIRED_DOCS = []
 
 // ── Upload one document file to kyc-documents bucket ──────────
 async function uploadDoc(file, mandalId, fieldName) {
