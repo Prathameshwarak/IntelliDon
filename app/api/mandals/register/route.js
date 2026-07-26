@@ -248,6 +248,38 @@ export async function POST(request) {
       )
     }
 
+    // ── Log legal consent audit trail ────────────────────────
+    try {
+      const forwarded = request.headers.get('x-forwarded-for')
+      const ip = forwarded
+        ? forwarded.split(',')[0].trim()
+        : request.headers.get('x-real-ip') || '127.0.0.1'
+      const userAgent = request.headers.get('user-agent') || 'unknown'
+
+      await supabaseAdmin.from('user_consents').insert([
+        {
+          user_id: authUser.user.id,
+          mandal_id: mandal.id,
+          document_type: 'terms_and_conditions',
+          document_version: 'v1.0',
+          ip_address: ip,
+          user_agent: userAgent,
+          accepted_at: new Date().toISOString()
+        },
+        {
+          user_id: authUser.user.id,
+          mandal_id: mandal.id,
+          document_type: 'privacy_policy',
+          document_version: 'v1.0',
+          ip_address: ip,
+          user_agent: userAgent,
+          accepted_at: new Date().toISOString()
+        }
+      ])
+    } catch (consentErr) {
+      console.warn('Non-blocking consent log warning:', consentErr)
+    }
+
     return NextResponse.json({
       success: true,
       mandal: {
