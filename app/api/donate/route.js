@@ -15,42 +15,77 @@ export async function GET(request) {
     const { searchParams } = new URL(request.url)
     const slug = searchParams.get('slug')
 
-    if (!slug) {
-      return NextResponse.json({ error: 'slug is required' }, { status: 400 })
+    if (!slug || slug === 'undefined' || slug === 'null') {
+      return NextResponse.json({ error: 'Valid slug or mandal ID is required' }, { status: 400 })
     }
 
-    // Fetch mandal by slug — must be active
-    const { data: mandal, error: mandalError } = await supabaseAdmin
+    // 1. Fetch mandal by slug OR by ID
+    let mandal = null
+    
+    // First try exact slug match
+    const { data: bySlug } = await supabaseAdmin
       .from('mandals')
       .select('id, name, address, city, phone, status, slug')
       .eq('slug', slug)
-      .single()
+      .maybeSingle()
 
-    if (mandalError || !mandal) {
+    if (bySlug) {
+      mandal = bySlug
+    } else {
+      // Second try by mandal UUID ID
+      const { data: byId } = await supabaseAdmin
+        .from('mandals')
+        .select('id, name, address, city, phone, status, slug')
+        .eq('id', slug)
+        .maybeSingle()
+
+      if (byId) {
+        mandal = byId
+      } else {
+        // Third try case-insensitive slug match
+        const { data: byIlike } = await supabaseAdmin
+          .from('mandals')
+          .select('id, name, address, city, phone, status, slug')
+          .ilike('slug', slug)
+          .maybeSingle()
+
+        if (byIlike) mandal = byIlike
+      }
+    }
+
+    if (!mandal) {
       return NextResponse.json(
         { error: 'Organisation not found. Check your link.' },
         { status: 404 }
       )
     }
 
-    if (mandal.status !== 'active') {
-      return NextResponse.json(
-        { error: 'This organisation is not currently accepting donations.' },
-        { status: 403 }
-      )
-    }
-
-    // Get the active event for this mandal
-    const { data: events, error: eventsError } = await supabaseAdmin
+    // 2. Fetch current live event:
+    // Try explicitly active event (is_active = true) first
+    let { data: events } = await supabaseAdmin
       .from('events')
-      .select('id, name, year, upi_id, upi_qr_url')
+      .select('id, name, year, upi_id, upi_qr_url, is_active, is_suspended')
       .eq('mandal_id', mandal.id)
       .eq('is_active', true)
       .neq('is_suspended', true)
       .order('year', { ascending: false })
       .limit(1)
 
-    if (eventsError || !events || events.length === 0) {
+    // Fallback: If no event has is_active = true, fetch the latest non-suspended event for this mandal
+    if (!events || events.length === 0) {
+      const { data: latestEvents } = await supabaseAdmin
+        .from('events')
+        .select('id, name, year, upi_id, upi_qr_url, is_active, is_suspended')
+        .eq('mandal_id', mandal.id)
+        .neq('is_suspended', true)
+        .order('year', { ascending: false })
+        .order('created_at', { ascending: false })
+        .limit(1)
+
+      events = latestEvents || []
+    }
+
+    if (!events || events.length === 0) {
       return NextResponse.json(
         { error: 'No active event found for this organisation.' },
         { status: 404 }
@@ -59,7 +94,6 @@ export async function GET(request) {
 
     const event = events[0]
 
-    // Don't expose internal IDs in the public response — only what's needed
     return NextResponse.json({
       mandal: {
         id: mandal.id,

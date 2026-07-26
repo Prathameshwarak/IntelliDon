@@ -356,7 +356,7 @@ export default function SubscriptionsTab({ plans, showToast }: SubscriptionsTabP
     }
   })
 
-  // Filter history logs
+  // ── Filter history logs
   const filteredHistoryLogs = historyLogs
     .filter(log => {
       if (!search.trim()) return true
@@ -379,32 +379,32 @@ export default function SubscriptionsTab({ plans, showToast }: SubscriptionsTabP
       {/* Edit Mandal Subscription Modal */}
       {editing && (
         <div className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4">
-          <div className="bg-gray-900 border border-gray-700 rounded-2xl w-full max-w-md shadow-2xl overflow-hidden animate-fade-in">
+          <div className="bg-white dark:bg-gray-900 border border-[#1A1208]/15 dark:border-gray-700 rounded-2xl w-full max-w-md shadow-2xl overflow-hidden animate-fade-in transition-colors duration-300">
             {/* Modal header */}
-            <div className="px-5 py-4 border-b border-gray-800 flex items-start justify-between gap-3">
+            <div className="px-5 py-4 border-b border-[#1A1208]/10 dark:border-gray-800 flex items-start justify-between gap-3 bg-[#F5EDE2] dark:bg-gray-950/20">
               <div>
-                <p className="font-semibold text-white">{editing.name}</p>
-                <p className="text-xs text-gray-400 mt-0.5">{editing.city} · {editing.id.slice(0, 8)}...</p>
+                <p className="font-extrabold text-[#1A1208] dark:text-white">{editing.name}</p>
+                <p className="text-xs text-[#7a6a55] dark:text-gray-400 mt-0.5 font-medium">{editing.city} · {editing.id.slice(0, 8)}...</p>
               </div>
-              <button onClick={() => setEditing(null)} className="text-gray-500 hover:text-white text-lg mt-0.5 cursor-pointer">✕</button>
+              <button onClick={() => setEditing(null)} className="text-[#7a6a55] dark:text-gray-400 hover:text-[#1A1208] dark:hover:text-white text-lg mt-0.5 cursor-pointer font-bold">✕</button>
             </div>
 
             <div className="px-5 py-4 flex flex-col gap-4">
               {/* Plan selection */}
               <div>
-                <label className="text-xs text-gray-400 mb-2 block font-medium">Plan</label>
+                <label className="text-xs text-[#7a6a55] dark:text-gray-400 mb-2 block font-bold">Plan</label>
                 {plans.length === 0 ? (
-                  <p className="text-xs text-gray-550 italic">No plans available. Manage plans first.</p>
+                  <p className="text-xs text-[#7a6a55] dark:text-gray-550 italic">No plans available. Manage plans first.</p>
                 ) : (
                   <div className="grid grid-cols-2 gap-2 max-h-36 overflow-y-auto pr-1">
                     {plans.map(p => (
                       <button key={p.id} onClick={() => setFormPlan(p.id)}
-                        className={`py-2 px-3 rounded-lg text-xs font-medium capitalize border transition-colors flex flex-col items-center justify-center cursor-pointer
+                        className={`py-2 px-3 rounded-lg text-xs font-bold capitalize border transition-colors flex flex-col items-center justify-center cursor-pointer
                           ${formPlan === p.id
-                            ? 'bg-orange-500 border-orange-500 text-white'
-                            : 'bg-gray-800 border-gray-700 text-gray-400 hover:border-gray-500'}`}>
-                        <span className="font-bold">{p.name}</span>
-                        <span className="text-[10px] opacity-75 mt-0.5">{p.price_label}</span>
+                            ? 'bg-gradient-to-r from-[#E8650A] to-[#f97316] border-transparent text-white shadow-md shadow-[#E8650A]/20'
+                            : 'bg-white dark:bg-gray-800 border-[#1A1208]/15 dark:border-gray-700 text-[#1A1208] dark:text-gray-400 hover:border-[#E8650A]'}`}>
+                        <span className="font-extrabold">{p.name}</span>
+                        <span className="text-[10px] opacity-80 mt-0.5">{p.price_label}</span>
                       </button>
                     ))}
                   </div>
@@ -413,14 +413,14 @@ export default function SubscriptionsTab({ plans, showToast }: SubscriptionsTabP
 
               {/* Status */}
               <div>
-                <label className="text-xs text-gray-400 mb-2 block font-medium">Status</label>
+                <label className="text-xs text-[#7a6a55] dark:text-gray-400 mb-2 block font-bold">Status</label>
                 <div className="grid grid-cols-2 gap-2">
                   {(['active', 'suspended'] as const).map(s => (
                     <button key={s} onClick={() => setFormStatus(s)}
-                      className={`py-2 rounded-lg text-xs font-medium capitalize border transition-colors cursor-pointer
+                      className={`py-2 rounded-lg text-xs font-bold capitalize border transition-colors cursor-pointer
                         ${formStatus === s
-                          ? s === 'active' ? 'bg-green-700 border-green-600 text-white' : 'bg-red-900 border-red-700 text-white'
-                          : 'bg-gray-800 border-gray-700 text-gray-400 hover:border-gray-500'}`}>
+                          ? s === 'active' ? 'bg-emerald-600 border-emerald-600 text-white' : 'bg-rose-600 border-rose-600 text-white'
+                          : 'bg-white dark:bg-gray-800 border-[#1A1208]/15 dark:border-gray-700 text-[#1A1208] dark:text-gray-400 hover:border-[#E8650A]'}`}>
                       {s}
                     </button>
                   ))}
@@ -429,10 +429,9 @@ export default function SubscriptionsTab({ plans, showToast }: SubscriptionsTabP
 
               {/* End date */}
               <div>
-                <label className="text-xs text-gray-400 mb-1 block font-medium">Valid until *</label>
+                <label className="text-xs text-[#7a6a55] dark:text-gray-400 mb-1 block font-bold">Valid until *</label>
                 <input type="date" min={addDays(30)} value={formEndsAt} onChange={e => setFormEndsAt(e.target.value)}
-                  className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2.5 text-sm text-white focus:outline-none focus:border-orange-500"
-                  style={{ colorScheme: 'dark' }} />
+                  className="w-full bg-white dark:bg-gray-800 border border-[#1A1208]/15 dark:border-gray-700 rounded-lg px-3 py-2.5 text-sm text-[#1A1208] dark:text-white focus:outline-none focus:border-[#E8650A] font-medium" />
                 <div className="flex gap-2 mt-2 flex-wrap">
                   {[
                     { label: '+30d', days: 30 },
@@ -442,7 +441,7 @@ export default function SubscriptionsTab({ plans, showToast }: SubscriptionsTabP
                   ].map(p => (
                     <button key={p.label}
                       onClick={() => setFormEndsAt(addDays(p.days))}
-                      className="text-xs bg-gray-700 hover:bg-gray-600 text-gray-300 px-3 py-1.5 rounded-lg transition-colors cursor-pointer">
+                      className="text-xs bg-[#F5EDE2] dark:bg-gray-700 hover:bg-[#ebdcc9] dark:hover:bg-gray-600 text-[#1A1208] dark:text-gray-300 px-3 py-1.5 rounded-lg transition-colors cursor-pointer border border-[#1A1208]/10 dark:border-gray-600 font-bold">
                       {p.label}
                     </button>
                   ))}
@@ -450,38 +449,38 @@ export default function SubscriptionsTab({ plans, showToast }: SubscriptionsTabP
               </div>
 
               {/* Mark payment */}
-              <div className="bg-gray-800 border border-gray-700 rounded-xl p-3">
+              <div className="bg-[#F5EDE2]/60 dark:bg-gray-800 border border-[#1A1208]/10 dark:border-gray-700 rounded-xl p-3">
                 <label className="flex items-center gap-2 cursor-pointer mb-2">
                   <div className={`w-4 h-4 rounded border-2 flex items-center justify-center transition-colors
-                    ${formMarkPaid ? 'bg-green-600 border-green-600' : 'border-gray-500'}`}
+                    ${formMarkPaid ? 'bg-emerald-600 border-emerald-600' : 'border-[#1A1208]/20 dark:border-gray-500'}`}
                     onClick={() => setFormMarkPaid(v => !v)}>
-                    {formMarkPaid && <span className="text-white text-xs">✓</span>}
+                    {formMarkPaid && <span className="text-white text-xs font-bold">✓</span>}
                   </div>
-                  <span className="text-xs text-gray-300 font-medium">Mark payment received</span>
+                  <span className="text-xs text-[#1A1208] dark:text-gray-300 font-bold">Mark payment received</span>
                 </label>
                 {formMarkPaid && (
                   <input type="number" value={formAmountPaid} onChange={e => setFormAmountPaid(e.target.value)}
                     placeholder="Amount paid (₹)"
-                    className="w-full bg-gray-900 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-orange-500" />
+                    className="w-full bg-white dark:bg-gray-900 border border-[#1A1208]/15 dark:border-gray-700 rounded-lg px-3 py-2 text-sm text-[#1A1208] dark:text-white placeholder-[#9e8c76] dark:placeholder-gray-500 focus:outline-none focus:border-[#E8650A] font-medium" />
                 )}
               </div>
 
               {/* Notes */}
               <div>
-                <label className="text-xs text-gray-400 mb-1 block font-medium">Notes</label>
+                <label className="text-xs text-[#7a6a55] dark:text-gray-400 mb-1 block font-bold">Notes</label>
                 <textarea value={formNotes} onChange={e => setFormNotes(e.target.value)}
                   rows={2} placeholder="e.g. Paid via GPay on 5 Jul 2026"
-                  className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2.5 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-orange-500 resize-none" />
+                  className="w-full bg-white dark:bg-gray-800 border border-[#1A1208]/15 dark:border-gray-700 rounded-lg px-3 py-2.5 text-sm text-[#1A1208] dark:text-white placeholder-[#9e8c76] dark:placeholder-gray-500 focus:outline-none focus:border-[#E8650A] resize-none font-medium" />
               </div>
 
               {/* Actions */}
               <div className="flex gap-2 pt-1">
                 <button onClick={saveSubscription} disabled={formSubmitting}
-                  className="flex-1 bg-orange-500 hover:bg-orange-600 disabled:opacity-50 text-white font-semibold py-3 rounded-xl text-sm transition-colors cursor-pointer">
+                  className="flex-1 bg-gradient-to-r from-[#E8650A] to-[#f97316] hover:from-[#d05807] hover:to-[#ea580c] disabled:opacity-50 text-white font-bold py-3 rounded-xl text-sm transition-colors cursor-pointer shadow-md shadow-[#E8650A]/20">
                   {formSubmitting ? 'Saving...' : 'Save Subscription'}
                 </button>
                 <button onClick={() => setEditing(null)}
-                  className="px-5 bg-gray-700 hover:bg-gray-600 text-gray-300 rounded-xl text-sm transition-colors cursor-pointer">
+                  className="px-5 bg-[#F5EDE2] dark:bg-gray-700 hover:bg-[#ebdcc9] dark:hover:bg-gray-600 text-[#1A1208] dark:text-gray-300 border border-[#1A1208]/10 dark:border-gray-600 rounded-xl text-sm font-bold transition-colors cursor-pointer">
                   Cancel
                 </button>
               </div>
@@ -493,51 +492,51 @@ export default function SubscriptionsTab({ plans, showToast }: SubscriptionsTabP
       {/* Sub-header info row */}
       <div className="flex justify-between items-center gap-4 flex-wrap">
         <div>
-          <h2 className="text-xl font-bold text-white">Mandal Subscriptions</h2>
-          <p className="text-xs text-gray-400">View and extend community organization subscription tiers.</p>
+          <h2 className="text-xl font-extrabold text-[#1A1208] dark:text-white">Mandal Subscriptions</h2>
+          <p className="text-xs text-[#7a6a55] dark:text-gray-400">View and extend community organization subscription tiers.</p>
         </div>
         <div className="flex items-center gap-2 flex-wrap justify-end">
-          <span className="text-[11px] bg-emerald-900/40 text-emerald-400 px-2.5 py-1 rounded-full font-medium">
+          <span className="text-[11px] bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 px-2.5 py-1 rounded-full font-bold">
             {activeCount} active
           </span>
           {expiringSoon > 0 && (
-            <span className="text-[11px] bg-yellow-900/40 text-yellow-400 px-2.5 py-1 rounded-full font-medium">
+            <span className="text-[11px] bg-amber-500/10 text-[#E8650A] dark:text-yellow-400 border border-amber-500/20 px-2.5 py-1 rounded-full font-bold">
               {expiringSoon} expiring soon
             </span>
           )}
-          <span className="text-[11px] bg-rose-900/40 text-rose-455 px-2.5 py-1 rounded-full font-medium">
+          <span className="text-[11px] bg-rose-500/10 text-rose-600 dark:text-rose-455 border border-rose-500/20 px-2.5 py-1 rounded-full font-bold">
             {expiredCount} expired
           </span>
         </div>
       </div>
 
       {/* Sub-tab navigation */}
-      <div className="flex gap-4 border-b border-gray-800">
+      <div className="flex gap-4 border-b border-[#1A1208]/10 dark:border-gray-800">
         <button
           onClick={() => setActiveSubTab('current')}
-          className={`pb-2.5 px-1 text-xs font-semibold border-b-2 transition-all cursor-pointer
+          className={`pb-2.5 px-1 text-xs font-bold border-b-2 transition-all cursor-pointer
             ${activeSubTab === 'current'
-              ? 'border-orange-500 text-orange-500 font-bold'
-              : 'border-transparent text-gray-450 hover:text-white'}`}
+              ? 'border-[#E8650A] text-[#E8650A] font-extrabold'
+              : 'border-transparent text-[#7a6a55] dark:text-gray-450 hover:text-[#1A1208] dark:hover:text-white'}`}
         >
           💳 Active Subscriptions
         </button>
         <button
           onClick={() => setActiveSubTab('history')}
-          className={`pb-2.5 px-1 text-xs font-semibold border-b-2 transition-all cursor-pointer
+          className={`pb-2.5 px-1 text-xs font-bold border-b-2 transition-all cursor-pointer
             ${activeSubTab === 'history'
-              ? 'border-orange-500 text-orange-500 font-bold'
-              : 'border-transparent text-gray-455 hover:text-white'}`}
+              ? 'border-[#E8650A] text-[#E8650A] font-extrabold'
+              : 'border-transparent text-[#7a6a55] dark:text-gray-400 hover:text-[#1A1208] dark:hover:text-white'}`}
         >
           📜 Allotment History
         </button>
       </div>
 
       {/* Subscription UPI ID Configuration Card */}
-      <div className="bg-gray-900 border border-gray-850 rounded-2xl p-4 flex flex-col sm:flex-row items-center justify-between gap-4">
+      <div className="bg-[#F5EDE2] dark:bg-gray-900 border border-[#1A1208]/10 dark:border-gray-800 rounded-2xl p-4 flex flex-col sm:flex-row items-center justify-between gap-4 shadow-sm">
         <div className="space-y-1">
-          <h4 className="text-xs font-bold text-orange-500 uppercase tracking-wider block">Subscription Payment UPI ID</h4>
-          <p className="text-[11px] text-gray-400">
+          <h4 className="text-xs font-extrabold text-[#E8650A] uppercase tracking-wider block">Subscription Payment UPI ID</h4>
+          <p className="text-[11px] text-[#7a6a55] dark:text-gray-400">
             Configure the UPI ID shown to mandal admins on their subscription page for payments.
           </p>
         </div>
@@ -547,12 +546,12 @@ export default function SubscriptionsTab({ plans, showToast }: SubscriptionsTabP
             value={subUpiId}
             onChange={e => setSubUpiId(e.target.value)}
             placeholder="e.g. intellidon@upi"
-            className="flex-1 sm:w-64 bg-gray-850 border border-gray-700 rounded-xl px-3 py-2 text-xs text-white placeholder-gray-500 focus:outline-none focus:border-orange-500"
+            className="flex-1 sm:w-64 bg-white dark:bg-gray-800 border border-[#1A1208]/15 dark:border-gray-700 rounded-xl px-3 py-2 text-xs text-[#1A1208] dark:text-white placeholder-[#9e8c76] dark:placeholder-gray-500 focus:outline-none focus:border-[#E8650A]"
           />
           <button
             onClick={saveSubUpiId}
             disabled={savingUpi}
-            className="bg-orange-500 hover:bg-orange-600 disabled:opacity-50 text-white text-xs font-semibold px-4 py-2 rounded-xl transition-colors cursor-pointer"
+            className="bg-gradient-to-r from-[#E8650A] to-[#f97316] hover:from-[#d05807] hover:to-[#ea580c] disabled:opacity-50 text-white text-xs font-bold px-4 py-2 rounded-xl transition-colors cursor-pointer shadow-md shadow-[#E8650A]/20"
           >
             {savingUpi ? 'Saving...' : 'Save UPI'}
           </button>
@@ -565,14 +564,14 @@ export default function SubscriptionsTab({ plans, showToast }: SubscriptionsTabP
           value={search}
           onChange={e => setSearch(e.target.value)}
           placeholder={activeSubTab === 'history' ? "Search mandal, plan, or admin..." : "Search mandal name or city..."}
-          className="flex-1 min-w-[200px] bg-gray-800 border border-gray-700 rounded-xl px-4 py-2.5 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-orange-500"
+          className="flex-1 min-w-[200px] bg-white dark:bg-gray-800 border border-[#1A1208]/15 dark:border-gray-700 rounded-xl px-4 py-2.5 text-xs text-[#1A1208] dark:text-white placeholder-[#9e8c76] dark:placeholder-gray-500 focus:outline-none focus:border-[#E8650A]"
         />
         {activeSubTab === 'current' && (
-          <div className="flex gap-1 bg-gray-800 border border-gray-700 rounded-xl p-1">
+          <div className="flex gap-1 bg-[#F5EDE2] dark:bg-gray-800 border border-[#1A1208]/10 dark:border-gray-700 rounded-xl p-1">
             {(['all', 'active', 'expired'] as const).map(f => (
               <button key={f} onClick={() => setFilter(f)}
-                className={`px-4 py-1.5 rounded-lg text-xs font-medium capitalize transition-colors cursor-pointer
-                  ${filter === f ? 'bg-orange-500 text-white' : 'text-gray-400 hover:text-white'}`}>
+                className={`px-4 py-1.5 rounded-lg text-xs font-bold capitalize transition-colors cursor-pointer
+                  ${filter === f ? 'bg-gradient-to-r from-[#E8650A] to-[#f97316] text-white shadow-sm' : 'text-[#7a6a55] dark:text-gray-400 hover:text-[#1A1208] dark:hover:text-white'}`}>
                 {f}
               </button>
             ))}
@@ -586,47 +585,48 @@ export default function SubscriptionsTab({ plans, showToast }: SubscriptionsTabP
         loading ? (
           <div className="flex flex-col items-center justify-center py-20 space-y-3">
             <div className="relative w-10 h-10">
-              <div className="absolute inset-0 rounded-full border-2 border-t-orange-500 border-r-transparent border-b-orange-500 border-l-transparent animate-spin" />
+              <div className="absolute inset-0 rounded-full border-2 border-t-[#E8650A] border-r-transparent border-b-[#E8650A] border-l-transparent animate-spin" />
             </div>
-            <p className="text-[10px] text-gray-500 font-mono animate-pulse">Loading subscriptions...</p>
+            <p className="text-[10px] text-[#7a6a55] dark:text-gray-500 font-mono animate-pulse">Loading subscriptions...</p>
           </div>
         ) : filtered.length === 0 ? (
-          <div className="bg-gray-900 border border-gray-800 rounded-2xl p-12 text-center">
-            <p className="text-gray-500 text-sm">No mandals found.</p>
+          <div className="bg-white dark:bg-gray-900 border border-[#1A1208]/10 dark:border-gray-800 rounded-2xl p-12 text-center shadow-sm">
+            <p className="text-[#7a6a55] dark:text-gray-500 text-xs">No mandals found.</p>
           </div>
         ) : (
           <div className="flex flex-col gap-3">
             {filtered.map(m => (
               <div key={m.id}
-                className={`bg-gray-900 border rounded-xl p-4 flex items-start justify-between gap-4
+                className={`bg-white dark:bg-gray-900 border rounded-xl p-4 flex items-start justify-between gap-4 shadow-sm
                   ${m.isExpired
-                    ? 'border-red-900/40'
+                    ? 'border-red-500/30 dark:border-red-900/40'
                     : m.daysRemaining <= 7
-                      ? 'border-yellow-800/50'
-                      : 'border-gray-800'}`}>
+                      ? 'border-amber-500/30 dark:border-yellow-800/50'
+                      : 'border-[#1A1208]/10 dark:border-gray-800'}`}>
 
                 {/* Left: mandal info */}
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 flex-wrap">
-                    <p className="font-semibold text-white text-sm">{m.name}</p>
-                    <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full capitalize
+                    <p className="font-bold text-[#1A1208] dark:text-white text-sm">{m.name}</p>
+                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full capitalize
                       ${m.isExpired
-                        ? 'bg-red-955 text-red-400'
+                        ? 'bg-red-500/10 text-red-600 dark:text-red-400 border border-red-500/20'
                         : m.daysRemaining <= 7
-                          ? 'bg-yellow-950 text-yellow-450'
-                          : 'bg-green-950 text-green-400'}`}>
+                          ? 'bg-amber-500/10 text-[#E8650A] dark:text-yellow-450 border border-amber-500/20'
+                          : 'bg-emerald-500/10 text-emerald-600 dark:text-green-400 border border-emerald-500/20'}`}>
                       {m.isExpired ? 'Expired' : `${m.daysRemaining}d left`}
                     </span>
                     {m.activeSub && (
-                      <span className="text-[10px] bg-gray-800 text-gray-300 px-2 py-0.5 rounded-full capitalize border border-gray-700">
+                      <span className="text-[10px] bg-[#F5EDE2] dark:bg-gray-800 text-[#1A1208] dark:text-gray-300 px-2 py-0.5 rounded-full capitalize border border-[#1A1208]/10 dark:border-gray-700 font-medium">
                         {m.activeSub.plan}
                       </span>
                     )}
                   </div>
-                  <p className="text-xs text-gray-400 mt-1">{m.city}</p>
+                  <p className="text-xs text-[#7a6a55] dark:text-gray-400 mt-1">{m.city}</p>
+
                   {m.activeSub ? (
                     <div className="flex items-center gap-2 mt-1.5 flex-wrap">
-                      <p className="text-[11px] text-gray-500">
+                      <p className="text-[11px] text-[#7a6a55] dark:text-gray-400 font-medium">
                         {m.isExpired
                           ? `Expired ${fmtDate(m.activeSub.ends_at)}`
                           : `Valid until ${fmtDate(m.activeSub.ends_at)}`}
@@ -641,17 +641,17 @@ export default function SubscriptionsTab({ plans, showToast }: SubscriptionsTabP
                             setPayAmount(planPrice ? planPrice.toString() : '')
                             setPayNotes('')
                           }}
-                          className="px-2 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider bg-rose-500/10 hover:bg-rose-500/25 text-rose-400 border border-rose-500/20 cursor-pointer transition-colors"
+                          className="px-2 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider bg-rose-500/10 hover:bg-rose-500/25 text-rose-600 dark:text-rose-400 border border-rose-500/20 cursor-pointer transition-colors"
                         >
                           Unpaid
                         </button>
                       ) : (
                         <div className="flex items-center gap-1.5">
-                          <span className="px-2 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 select-none">
+                          <span className="px-2 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 select-none">
                             Paid
                           </span>
                           {m.activeSub.last_payment_amount && (
-                            <span className="text-[10px] text-emerald-450 font-medium">
+                            <span className="text-[10px] text-emerald-600 dark:text-emerald-450 font-bold">
                               (Last paid ₹{m.activeSub.last_payment_amount}
                               {m.activeSub.last_payment_at && ` on ${fmtDate(m.activeSub.last_payment_at)}`})
                             </span>
@@ -660,10 +660,10 @@ export default function SubscriptionsTab({ plans, showToast }: SubscriptionsTabP
                       )}
                     </div>
                   ) : (
-                    <p className="text-[11px] text-gray-600 mt-1">No subscription</p>
+                    <p className="text-[11px] text-[#7a6a55] dark:text-gray-500 mt-1 italic">No subscription</p>
                   )}
                   {m.activeSub?.notes && (
-                    <p className="text-xs text-gray-500 mt-1 italic">{m.activeSub.notes}</p>
+                    <p className="text-xs text-[#7a6a55] dark:text-gray-400 mt-1 italic font-medium">{m.activeSub.notes}</p>
                   )}
                 </div>
 
@@ -671,15 +671,15 @@ export default function SubscriptionsTab({ plans, showToast }: SubscriptionsTabP
                 <div className="flex items-center gap-1.5 flex-shrink-0 flex-wrap justify-end">
                   {/* Quick extend buttons */}
                   <button onClick={() => quickExtend(m, 30)}
-                    className="text-xs bg-gray-800 hover:bg-gray-750 text-gray-300 px-2.5 py-1.5 rounded-lg transition-colors cursor-pointer">
+                    className="text-xs bg-[#F5EDE2] dark:bg-gray-800 hover:bg-[#ebdcc9] dark:hover:bg-gray-700 text-[#1A1208] dark:text-gray-300 px-2.5 py-1.5 rounded-lg transition-colors cursor-pointer border border-[#1A1208]/10 dark:border-gray-700 font-bold">
                     +30d
                   </button>
                   <button onClick={() => quickExtend(m, 90)}
-                    className="text-xs bg-gray-800 hover:bg-gray-750 text-gray-300 px-2.5 py-1.5 rounded-lg transition-colors cursor-pointer">
+                    className="text-xs bg-[#F5EDE2] dark:bg-gray-800 hover:bg-[#ebdcc9] dark:hover:bg-gray-700 text-[#1A1208] dark:text-gray-300 px-2.5 py-1.5 rounded-lg transition-colors cursor-pointer border border-[#1A1208]/10 dark:border-gray-700 font-bold">
                     +3mo
                   </button>
                   <button onClick={() => openEdit(m)}
-                    className="text-xs bg-orange-500 hover:bg-orange-600 text-white px-3 py-1.5 rounded-lg transition-colors font-semibold cursor-pointer">
+                    className="text-xs bg-gradient-to-r from-[#E8650A] to-[#f97316] hover:from-[#d05807] hover:to-[#ea580c] text-white px-3 py-1.5 rounded-lg transition-colors font-bold cursor-pointer shadow-md shadow-[#E8650A]/20">
                     Edit
                   </button>
                 </div>
@@ -692,20 +692,20 @@ export default function SubscriptionsTab({ plans, showToast }: SubscriptionsTabP
         loading ? (
           <div className="flex flex-col items-center justify-center py-20 space-y-3">
             <div className="relative w-10 h-10">
-              <div className="absolute inset-0 rounded-full border-2 border-t-orange-500 border-r-transparent border-b-orange-500 border-l-transparent animate-spin" />
+              <div className="absolute inset-0 rounded-full border-2 border-t-[#E8650A] border-r-transparent border-b-[#E8650A] border-l-transparent animate-spin" />
             </div>
-            <p className="text-[10px] text-gray-550 font-mono animate-pulse">Loading logs...</p>
+            <p className="text-[10px] text-[#7a6a55] dark:text-gray-550 font-mono animate-pulse">Loading logs...</p>
           </div>
         ) : filteredHistoryLogs.length === 0 ? (
-          <div className="bg-gray-900 border border-gray-800 rounded-2xl p-12 text-center">
-            <p className="text-gray-500 text-sm">No allotment history found.</p>
+          <div className="bg-white dark:bg-gray-900 border border-[#1A1208]/10 dark:border-gray-800 rounded-2xl p-12 text-center shadow-sm">
+            <p className="text-[#7a6a55] dark:text-gray-500 text-xs">No allotment history found.</p>
           </div>
         ) : (
-          <div className="bg-gray-900 border border-gray-800 rounded-xl overflow-hidden shadow-sm animate-fade-in">
+          <div className="bg-white dark:bg-gray-900 border border-[#1A1208]/10 dark:border-gray-800 rounded-xl overflow-hidden shadow-sm animate-fade-in">
             <div className="overflow-x-auto">
               <table className="w-full text-left text-xs">
                 <thead>
-                  <tr className="border-b border-gray-800 bg-gray-950/40 text-gray-400 font-medium">
+                  <tr className="border-b border-[#1A1208]/10 dark:border-gray-800 bg-[#F5EDE2] dark:bg-gray-950/40 text-[#7a6a55] dark:text-gray-400 font-bold">
                     <th className="p-3">Mandal</th>
                     <th className="p-3">Plan Allotted</th>
                     <th className="p-3">Valid Until</th>
@@ -715,35 +715,35 @@ export default function SubscriptionsTab({ plans, showToast }: SubscriptionsTabP
                     <th className="p-3">Notes</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-gray-800/50">
+                <tbody className="divide-y divide-[#1A1208]/10 dark:divide-gray-800/50">
                   {filteredHistoryLogs.map((log) => (
-                    <tr key={log.id} className="hover:bg-gray-800/10 transition-colors">
+                    <tr key={log.id} className="hover:bg-[#F5EDE2]/50 dark:hover:bg-gray-800/10 transition-colors">
                       <td className="p-3">
-                        <div className="font-semibold text-white">{log.mandal_name}</div>
-                        <div className="text-[10px] text-gray-500 mt-0.5">{log.mandal_city}</div>
+                        <div className="font-bold text-[#1A1208] dark:text-white">{log.mandal_name}</div>
+                        <div className="text-[10px] text-[#7a6a55] dark:text-gray-500 font-medium mt-0.5">{log.mandal_city}</div>
                       </td>
                       <td className="p-3">
                         <span className={`px-2.5 py-0.5 rounded-full font-bold text-[9px] uppercase tracking-wide border
                           ${log.plan === 'standard'
-                            ? 'bg-indigo-950 text-indigo-400 border-indigo-900/20'
+                            ? 'bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border-indigo-500/20'
                             : log.plan === 'basic'
-                            ? 'bg-orange-950 text-orange-400 border-orange-900/20'
-                            : 'bg-gray-850 text-gray-300 border-gray-700/20'
+                            ? 'bg-amber-500/10 text-[#E8650A] dark:text-orange-400 border-amber-500/20'
+                            : 'bg-[#F5EDE2] dark:bg-gray-800 text-[#1A1208] dark:text-gray-300 border border-[#1A1208]/10 dark:border-gray-700/20'
                           }`}
                         >
                           {log.plan}
                         </span>
                       </td>
-                      <td className="p-3 font-medium text-gray-300">
+                      <td className="p-3 font-bold text-[#1A1208] dark:text-gray-300">
                         {fmtDate(log.ends_at)}
                       </td>
-                      <td className="p-3 font-semibold text-green-400">
+                      <td className="p-3 font-bold text-emerald-600 dark:text-green-400">
                         {log.amount_paid !== null && log.amount_paid !== undefined ? `₹${log.amount_paid.toLocaleString('en-IN')}` : '—'}
                       </td>
-                      <td className="p-3 font-medium text-gray-300">
+                      <td className="p-3 font-bold text-[#1A1208] dark:text-gray-300">
                         {log.created_by}
                       </td>
-                      <td className="p-3 text-gray-550">
+                      <td className="p-3 text-[#7a6a55] dark:text-gray-500 font-medium">
                         {new Date(log.created_at).toLocaleString('en-IN', {
                           day: '2-digit',
                           month: 'short',
@@ -766,34 +766,34 @@ export default function SubscriptionsTab({ plans, showToast }: SubscriptionsTabP
 
       {/* Quick Pay Modal */}
       {payingMandal && payingMandal.activeSub && (
-        <div className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4">
-          <div className="bg-gray-900 border border-gray-800 rounded-2xl max-w-sm w-full p-6 space-y-4">
+        <div className="fixed inset-0 z-50 bg-black/60 dark:bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-gray-900 border border-[#1A1208]/15 dark:border-gray-800 rounded-2xl max-w-sm w-full p-6 space-y-4 shadow-2xl transition-colors duration-300">
             <div>
-              <h3 className="text-base font-bold text-white">Record Subscription Payment</h3>
-              <p className="text-xs text-gray-400 mt-1 font-mono">
+              <h3 className="text-base font-extrabold text-[#1A1208] dark:text-white">Record Subscription Payment</h3>
+              <p className="text-xs text-[#7a6a55] dark:text-gray-400 mt-1 font-mono font-medium">
                 {payingMandal.name} · {payingMandal.activeSub.plan} plan
               </p>
             </div>
 
             <div className="space-y-1">
-              <label className="text-xs text-gray-455 block font-medium">Amount Received (₹)</label>
+              <label className="text-xs text-[#7a6a55] dark:text-gray-400 block font-bold">Amount Received (₹)</label>
               <input
                 type="number"
                 value={payAmount}
                 onChange={e => setPayAmount(e.target.value)}
                 placeholder="e.g. 599"
-                className="w-full bg-gray-850 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-orange-500"
+                className="w-full bg-white dark:bg-gray-800 border border-[#1A1208]/15 dark:border-gray-700 rounded-lg px-3 py-2 text-sm text-[#1A1208] dark:text-white placeholder-[#9e8c76] dark:placeholder-gray-500 focus:outline-none focus:border-[#E8650A] font-medium"
               />
             </div>
 
             <div className="space-y-1">
-              <label className="text-xs text-gray-455 block font-medium">Notes / Method</label>
+              <label className="text-xs text-[#7a6a55] dark:text-gray-400 block font-bold">Notes / Method</label>
               <input
                 type="text"
                 value={payNotes}
                 onChange={e => setPayNotes(e.target.value)}
                 placeholder="e.g. GPay transaction, cash, etc."
-                className="w-full bg-gray-850 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-orange-500"
+                className="w-full bg-white dark:bg-gray-800 border border-[#1A1208]/15 dark:border-gray-700 rounded-lg px-3 py-2 text-sm text-[#1A1208] dark:text-white placeholder-[#9e8c76] dark:placeholder-gray-500 focus:outline-none focus:border-[#E8650A] font-medium"
               />
             </div>
 
@@ -801,13 +801,13 @@ export default function SubscriptionsTab({ plans, showToast }: SubscriptionsTabP
               <button
                 onClick={handleConfirmPayment}
                 disabled={paySubmitting || !payAmount}
-                className="flex-1 bg-green-600 hover:bg-green-700 disabled:opacity-50 text-white font-semibold py-2.5 rounded-xl text-xs transition-colors cursor-pointer"
+                className="flex-1 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white font-bold py-2.5 rounded-xl text-xs transition-colors cursor-pointer shadow-md shadow-emerald-600/20"
               >
                 {paySubmitting ? 'Processing...' : 'Mark as Paid'}
               </button>
               <button
                 onClick={() => setPayingMandal(null)}
-                className="px-4 bg-gray-750 hover:bg-gray-700 text-gray-300 rounded-xl text-xs transition-colors cursor-pointer border border-gray-700"
+                className="px-4 bg-[#F5EDE2] dark:bg-gray-800 hover:bg-[#ebdcc9] dark:hover:bg-gray-700 text-[#1A1208] dark:text-gray-300 rounded-xl text-xs font-bold transition-colors cursor-pointer border border-[#1A1208]/10 dark:border-gray-700"
               >
                 Cancel
               </button>

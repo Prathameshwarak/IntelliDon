@@ -9,6 +9,7 @@ import UpgradeBanner from '@/components/UpgradeBanner'
 import KycVerificationPanel from '@/components/dashboard/KycVerificationPanel'
 import SponsorshipSection from '@/components/dashboard/SponsorshipSection'
 import ExpenseManagerPanel from '@/components/dashboard/ExpenseManagerPanel'
+import ThemeToggle from '@/components/ThemeToggle'
 import { downloadReceipt, shareReceipt, type ReceiptData } from '@/lib/downloadReceipt'
 
 // ── TESTING / MIGRATION CONFIGURATION ──────────────────────────
@@ -81,14 +82,14 @@ interface CollectorGroup {
 // ── Role capability map — single source of truth ───────────────
 // Change permissions here and the entire UI updates automatically
 const CAN = {
-  verifyDonation:  (role: string) => ['admin', 'manager'].includes(role),
-  createEvent:     (role: string) => role === 'admin',
-  toggleEvent:     (role: string) => role === 'admin',
-  addMember:       (role: string) => role === 'admin',
-  removeMember:    (role: string) => role === 'admin',
-  seeTeamTab:      (role: string) => role === 'admin',   // manager cannot manage team
-  seeEventsTab:    (role: string) => ['admin', 'manager'].includes(role),
-  manageExpenses:  (role: string) => ['admin', 'manager'].includes(role),  // Adhyaksha + Khajindar (#11)
+  verifyDonation: (role: string) => ['admin', 'manager'].includes(role),
+  createEvent: (role: string) => role === 'admin',
+  toggleEvent: (role: string) => role === 'admin',
+  addMember: (role: string) => role === 'admin',
+  removeMember: (role: string) => role === 'admin',
+  seeTeamTab: (role: string) => role === 'admin',   // manager cannot manage team
+  seeEventsTab: (role: string) => ['admin', 'manager'].includes(role),
+  manageExpenses: (role: string) => ['admin', 'manager'].includes(role),  // Adhyaksha + Khajindar (#11)
 }
 
 export default function DashboardPage() {
@@ -98,6 +99,28 @@ export default function DashboardPage() {
   const [mandalId, setMandalId] = useState<string | null>(null)
   const [mandalName, setMandalName] = useState('')
   const [mandalKyc, setMandalKyc] = useState<any>(null)
+
+  // Theme State (Syncs with Landing / Login / Register light/dark theme)
+  const [theme, setTheme] = useState<'light' | 'dark'>('light')
+
+  useEffect(() => {
+    const saved = localStorage.getItem('intellidon-theme') as 'light' | 'dark' | null
+    if (saved) {
+      setTheme(saved)
+      document.documentElement.classList.toggle('dark', saved === 'dark')
+    } else {
+      document.documentElement.classList.remove('dark')
+    }
+  }, [])
+
+  const toggleTheme = () => {
+    const next = theme === 'light' ? 'dark' : 'light'
+    setTheme(next)
+    localStorage.setItem('intellidon-theme', next)
+    document.documentElement.classList.toggle('dark', next === 'dark')
+  }
+
+  const isDark = theme === 'dark'
 
   // Default tab — manager only sees donations, admin sees all
   const [tab, setTab] = useState<Tab>('donations')
@@ -171,7 +194,7 @@ export default function DashboardPage() {
       d.status,
       new Date(d.created_at).toLocaleString('en-IN')
     ])
-    
+
     const csvContent = [
       headers.join(','),
       ...rows.map(row => row.map(val => {
@@ -518,7 +541,7 @@ export default function DashboardPage() {
       showToast('Passwords do not match', 'error')
       return
     }
-    
+
     setChangingPassword(true)
     try {
       const { error } = await supabase.auth.updateUser({
@@ -526,7 +549,7 @@ export default function DashboardPage() {
         data: { requires_password_change: false }
       })
       if (error) throw error
-      
+
       showToast('Password changed successfully!', 'success')
       setRequiresPasswordChange(false)
     } catch (err: any) {
@@ -538,7 +561,7 @@ export default function DashboardPage() {
 
   async function handleKycPopupUpload(e: React.FormEvent) {
     e.preventDefault()
-    
+
     const missingDocs = []
     if (mandalKyc) {
       if (!mandalKyc.doc_admin_aadhaar && !kycFiles.doc_admin_aadhaar) missingDocs.push('Admin Aadhaar')
@@ -551,32 +574,32 @@ export default function DashboardPage() {
       showToast(`Please select: ${missingDocs.join(', ')}`, 'error')
       return
     }
-    
+
     setUploadingKyc(true)
     try {
       const updates: Record<string, string> = {}
-      
+
       for (const [field, file] of Object.entries(kycFiles)) {
         if (!file) continue
         const ext = file.name.split('.').pop() || 'pdf'
         const path = `${mandalId}/${field}.${ext}`
-        
+
         const { error: uploadError } = await supabase.storage
           .from('kyc-documents')
           .upload(path, file, { upsert: true })
-          
+
         if (uploadError) throw new Error(`Failed to upload ${file.name}: ${uploadError.message}`)
-        
+
         updates[field] = path
       }
-      
+
       const { error: dbError } = await supabase
         .from('mandals')
         .update(updates)
         .eq('id', mandalId)
-        
+
       if (dbError) throw dbError
-      
+
       showToast('KYC Documents uploaded successfully!', 'success')
       setMandalKyc((prev: any) => prev ? { ...prev, ...updates } : prev)
     } catch (err: any) {
@@ -727,7 +750,7 @@ export default function DashboardPage() {
       return
     }
     if (!confirm(`Are you sure you want to verify all pending ${paymentMode === 'cash' ? 'Cash' : 'UPI'} collections for this collector?`)) return
-    
+
     setBulkVerifyModalCollector(null)
     setBulkVerifyingCollector(collectorId)
     setBulkVerifyingMode(paymentMode)
@@ -763,7 +786,7 @@ export default function DashboardPage() {
       showToast('Subscription expired. Please renew plan.', 'error')
       return
     }
-    
+
     const targetEventId = (summaryEventFilter && summaryEventFilter !== 'all')
       ? summaryEventFilter
       : undefined
@@ -825,23 +848,23 @@ export default function DashboardPage() {
   async function createEvent() {
     if (!CAN.createEvent(userRole)) return
     setDateError('')
- 
+
     // Client-side validation — matches server rules
     if (!eventName.trim()) { showToast('Event name is required', 'error'); return }
     if (!eventUpiId.trim()) { showToast('UPI ID is required', 'error'); return }
     if (!eventStartDate) { showToast('Start date is required', 'error'); return }
     if (!eventEndDate) { showToast('End date is required', 'error'); return }
- 
+
     const start = new Date(eventStartDate)
     const end = new Date(eventEndDate)
-    const today = new Date(); today.setHours(0,0,0,0)
- 
+    const today = new Date(); today.setHours(0, 0, 0, 0)
+
     if (end <= start) { setDateError('End date must be after start date'); return }
- 
+
     const days = Math.round((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24))
     if (days > 50) { setDateError(`Duration is ${days} days — maximum is 50 days`); return }
     if (start < today) { setDateError('Start date cannot be in the past'); return }
- 
+
     setEventSubmitting(true)
     const headers = await getAuthHeaders()
     const res = await fetch('/api/events', {
@@ -871,7 +894,7 @@ export default function DashboardPage() {
     } else showToast(data.error || 'Could not create event', 'error')
     setEventSubmitting(false)
   }
- 
+
   async function toggleEvent(eventId: string, currentActive: boolean) {
     if (!CAN.toggleEvent(userRole)) return
     const headers = await getAuthHeaders()
@@ -896,7 +919,7 @@ export default function DashboardPage() {
       showToast(data.error || 'Could not update event', 'error')
     }
   }
- 
+
   function startEditingEvent(ev: Event) {
     setEditingEventId(ev.id)
     setEventName(ev.name)
@@ -907,7 +930,7 @@ export default function DashboardPage() {
     setDateError('')
     setShowEventForm(true)
   }
- 
+
   function cancelEventForm() {
     setEditingEventId(null)
     setEventName('')
@@ -918,31 +941,31 @@ export default function DashboardPage() {
     setDateError('')
     setShowEventForm(false)
   }
- 
+
   async function updateEvent() {
     if (!CAN.createEvent(userRole) || !editingEventId) return
     setDateError('')
- 
+
     if (!eventName.trim()) { showToast('Event name is required', 'error'); return }
     if (!eventUpiId.trim()) { showToast('UPI ID is required', 'error'); return }
     if (!eventStartDate) { showToast('Start date is required', 'error'); return }
     if (!eventEndDate) { showToast('End date is required', 'error'); return }
- 
+
     const start = new Date(eventStartDate)
     const end = new Date(eventEndDate)
- 
+
     if (end <= start) { setDateError('End date must be after start date'); return }
- 
+
     const days = Math.round((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24))
     if (days > 50) { setDateError(`Duration is ${days} days — maximum is 50 days`); return }
- 
+
     const originalEvent = events.find(e => e.id === editingEventId)
-    const today = new Date(); today.setHours(0,0,0,0)
+    const today = new Date(); today.setHours(0, 0, 0, 0)
     if (originalEvent && eventStartDate !== originalEvent.start_date && start < today) {
       setDateError('Start date cannot be in the past')
       return
     }
- 
+
     setEventSubmitting(true)
     const headers = await getAuthHeaders()
     const res = await fetch('/api/events', {
@@ -1151,21 +1174,21 @@ export default function DashboardPage() {
     const lowercase = 'abcdefghijkmnopqrstuvwxyz';
     const numbers = '23456789';
     const symbols = '#@$%&*!';
-    
+
     let chars = '';
     const firstUpper = uppercase[Math.floor(Math.random() * uppercase.length)];
     const firstLower = lowercase[Math.floor(Math.random() * lowercase.length)];
     const firstNumber = numbers[Math.floor(Math.random() * numbers.length)];
     const firstSymbol = symbols[Math.floor(Math.random() * symbols.length)];
-    
+
     const all = uppercase + lowercase + numbers + symbols;
     for (let i = 4; i < length; i++) {
       chars += all[Math.floor(Math.random() * all.length)];
     }
-    
+
     const passwordArray = [firstUpper, firstLower, firstNumber, firstSymbol, ...chars.split('')];
     const generated = passwordArray.sort(() => 0.5 - Math.random()).join('');
-    
+
     setTempPassword(generated)
   }
 
@@ -1395,7 +1418,7 @@ export default function DashboardPage() {
   // Filter donations for the history tab
   const filteredHistoryDonations = donations.filter(d => {
     const query = historySearch.toLowerCase().trim()
-    const matchesSearch = !query || 
+    const matchesSearch = !query ||
       (d.donor_name && d.donor_name.toLowerCase().includes(query)) ||
       (d.donor_phone && d.donor_phone.toLowerCase().includes(query)) ||
       (d.receipt_number && d.receipt_number.toLowerCase().includes(query)) ||
@@ -1518,10 +1541,10 @@ export default function DashboardPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-955 flex items-center justify-center">
+      <div className="min-h-screen bg-[#FDF8F3] dark:bg-gray-955 flex items-center justify-center transition-colors duration-300">
         <div className="flex flex-col items-center gap-3">
-          <div className="w-8 h-8 rounded-full border-2 border-t-orange-500 border-r-transparent border-b-orange-500 border-l-transparent animate-spin" />
-          <p className="text-gray-500 text-xs font-mono animate-pulse">Loading dashboard...</p>
+          <div className="w-8 h-8 rounded-full border-2 border-t-[#E8650A] border-r-transparent border-b-[#E8650A] border-l-transparent animate-spin" />
+          <p className="text-[#7a6a55] dark:text-gray-500 text-xs font-mono animate-pulse">Loading dashboard...</p>
         </div>
       </div>
     )
@@ -1533,7 +1556,7 @@ export default function DashboardPage() {
       <div className="min-h-screen bg-gray-950 flex flex-col items-center justify-center p-4">
         <div className="bg-gray-900 border border-gray-800 rounded-2xl w-full max-w-md p-8 text-center space-y-6 shadow-2xl relative overflow-hidden">
           <div className="absolute top-0 left-0 right-0 h-1 bg-orange-500" />
-          
+
           <div className="w-16 h-16 mx-auto rounded-full bg-orange-950/30 border border-orange-900/50 flex items-center justify-center text-orange-500 text-3xl">
             🔒
           </div>
@@ -1548,7 +1571,7 @@ export default function DashboardPage() {
           <form onSubmit={handleMandatoryPasswordChange} className="space-y-4 text-left">
             <div>
               <label className="block text-xs font-semibold text-gray-400 mb-1">New Password</label>
-              <input 
+              <input
                 type="password"
                 required
                 value={newPassword}
@@ -1560,7 +1583,7 @@ export default function DashboardPage() {
 
             <div>
               <label className="block text-xs font-semibold text-gray-400 mb-1">Confirm New Password</label>
-              <input 
+              <input
                 type="password"
                 required
                 value={confirmPassword}
@@ -1626,10 +1649,10 @@ export default function DashboardPage() {
 
     if (!BYPASS_KYC_VERIFICATION) {
       return (
-        <KycVerificationPanel 
-          mandal={mandalKyc} 
+        <KycVerificationPanel
+          mandal={mandalKyc}
           userId={userId || ''}
-          showToast={showToast} 
+          showToast={showToast}
           onResubmitSuccess={initDashboard}
         />
       )
@@ -1639,7 +1662,7 @@ export default function DashboardPage() {
   const isKycDocsMissing = !BYPASS_KYC_VERIFICATION && !!(mandalKyc && (!mandalKyc.doc_admin_aadhaar || !mandalKyc.doc_bank_proof || !mandalKyc.doc_auth_letter || !mandalKyc.doc_address_proof))
 
   return (
-    <div className="min-h-screen bg-gray-950 text-white">
+    <div className="min-h-screen bg-[#FDF8F3] dark:bg-gray-950 text-[#1A1208] dark:text-white transition-colors duration-300">
 
       {/* Toast */}
       {toast && (
@@ -1673,21 +1696,21 @@ export default function DashboardPage() {
       )}
 
       {/* Header */}
-      <div className="bg-gray-900 border-b border-gray-800 px-3 sm:px-6 py-3 sm:py-4 flex flex-wrap items-center justify-between gap-2">
+      <div className="bg-[#F5EDE2] dark:bg-gray-900 border-b border-[#1A1208]/10 dark:border-gray-800 px-3 sm:px-6 py-3 sm:py-4 flex flex-wrap items-center justify-between gap-2 transition-colors duration-300">
         <div className="min-w-0">
-          <p className="text-xs text-gray-400">Intellidon</p>
-          <p className="text-sm sm:text-base font-semibold truncate max-w-40 sm:max-w-none">{mandalName}</p>
+          <p className="text-xs text-[#7a6a55] dark:text-gray-400 font-medium">Intellidon</p>
+          <p className="text-sm sm:text-base font-bold text-[#1A1208] dark:text-white truncate max-w-40 sm:max-w-none">{mandalName}</p>
         </div>
         <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
-          <span className={`text-[10px] sm:text-xs font-medium px-2 sm:px-2.5 py-1 rounded-full capitalize
+          <span className={`text-[10px] sm:text-xs font-semibold px-2 sm:px-2.5 py-1 rounded-full capitalize
             ${userRole === 'admin'
-              ? 'bg-orange-900/50 text-orange-400'
-              : 'bg-blue-900/50 text-blue-400'}`}>
+              ? 'bg-[#E8650A]/10 text-[#E8650A] dark:bg-orange-900/50 dark:text-orange-400 border border-[#E8650A]/20'
+              : 'bg-blue-500/10 text-blue-600 dark:bg-blue-900/50 dark:text-blue-400 border border-blue-500/20'}`}>
             {userRole === 'admin' ? 'Adhyaksha' : 'Khajindar'}
           </span>
           <button
             onClick={() => router.push('/share')}
-            className="text-[10px] sm:text-xs bg-gray-700 hover:bg-gray-600 text-white px-2 sm:px-3 py-1.5 rounded-lg transition-colors whitespace-nowrap"
+            className="text-[10px] sm:text-xs bg-[#FDF8F3] dark:bg-gray-700 hover:bg-[#ebdcc9] dark:hover:bg-gray-600 text-[#1A1208] dark:text-white border border-[#1A1208]/10 dark:border-gray-600 px-2 sm:px-3 py-1.5 rounded-lg transition-colors whitespace-nowrap font-medium"
           >
             🔗 <span className="hidden sm:inline">Share Link</span>
           </button>
@@ -1698,32 +1721,36 @@ export default function DashboardPage() {
                 ? 'bg-red-600 hover:bg-red-500 text-white'
                 : sub.daysRemaining <= 7
                   ? 'bg-yellow-600 hover:bg-yellow-500 text-white'
-                  : 'bg-gray-700 hover:bg-gray-600 text-white'}`}
+                  : 'bg-[#FDF8F3] dark:bg-gray-700 hover:bg-[#ebdcc9] dark:hover:bg-gray-600 text-[#1A1208] dark:text-white border border-[#1A1208]/10 dark:border-gray-600'}`}
           >
             {sub.isExpired ? '⚠ Expired' : sub.daysRemaining <= 7 ? `⚠ ${sub.daysRemaining}d` : '📋 Plan'}
           </button>
+
+          {/* Theme Toggle Button */}
+          <ThemeToggle />
+
           <button
             onClick={() => supabase.auth.signOut().then(() => router.push('/login'))}
-            className="text-[10px] sm:text-xs text-red-400 hover:text-red-300 transition-colors whitespace-nowrap"
+            className="text-[10px] sm:text-xs text-red-600 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300 font-semibold transition-colors whitespace-nowrap"
           >
             Sign out
           </button>
         </div>
-      </div>  
+      </div>
 
       {/* Subscription strip */}
       {!sub.loading && (
         <div
-          className={`px-4 py-2.5 flex items-center justify-between gap-3 text-xs
+          className={`px-4 py-2.5 flex items-center justify-between gap-3 text-xs border-b shadow-xs transition-colors
             ${sub.isExpired
-              ? 'bg-red-950/60 border-b border-red-900/50'
+              ? 'bg-rose-500/10 border-rose-500/20 text-rose-700 dark:text-red-400'
               : sub.daysRemaining <= 7
-                ? 'bg-yellow-950/60 border-b border-yellow-900/50'
-                : 'bg-gray-900/60 border-b border-gray-800'}`}
+                ? 'bg-amber-500/10 border-amber-500/20 text-amber-800 dark:text-yellow-400'
+                : 'bg-[#F5EDE2] dark:bg-gray-900/90 border-[#1A1208]/10 dark:border-gray-800 text-[#1A1208] dark:text-white'}`}
         >
           <div className="flex items-center gap-2">
-            <span className={`font-medium capitalize
-              ${sub.isExpired ? 'text-red-400' : sub.daysRemaining <= 7 ? 'text-yellow-400' : 'text-gray-400'}`}>
+            <span className={`font-bold capitalize
+              ${sub.isExpired ? 'text-rose-700 dark:text-red-400' : sub.daysRemaining <= 7 ? 'text-amber-800 dark:text-yellow-400' : 'text-[#1A1208] dark:text-white'}`}>
               {sub.isExpired
                 ? '⚠ Subscription expired — history, events, and team management are locked'
                 : sub.subscription
@@ -1733,12 +1760,12 @@ export default function DashboardPage() {
           </div>
           <button
             onClick={() => router.push('/dashboard/subscription')}
-            className={`shrink-0 font-semibold px-3 py-1.5 rounded-lg transition-colors
+            className={`shrink-0 font-bold px-3 py-1.5 rounded-lg transition-all cursor-pointer
               ${sub.isExpired
-                ? 'bg-red-600 hover:bg-red-500 text-white'
+                ? 'bg-rose-600 hover:bg-rose-500 text-white'
                 : sub.daysRemaining <= 7
-                  ? 'bg-yellow-600 hover:bg-yellow-500 text-white'
-                  : 'text-gray-400 hover:text-white'}`}
+                  ? 'bg-amber-600 hover:bg-amber-500 text-white'
+                  : 'text-[#E8650A] dark:text-orange-400 hover:underline'}`}
           >
             {sub.isExpired ? 'Upgrade now' : sub.daysRemaining <= 7 ? 'Renew' : 'View plan'}
           </button>
@@ -1749,8 +1776,8 @@ export default function DashboardPage() {
 
         {/* Role notice for manager */}
         {userRole === 'manager' && (
-          <div className="bg-blue-900/20 border border-blue-800 rounded-xl px-4 py-3 mb-5 text-xs text-blue-300">
-            You are logged in as <strong>Khajindar (Manager)</strong>. You can view donations, verify cash, and view events. Team and event management is handled by the Adhyaksha.
+          <div className="bg-blue-500/10 border border-blue-500/20 rounded-xl px-4 py-3 mb-5 text-xs text-blue-700 dark:text-blue-300 font-medium">
+            You are logged in as <strong className="font-bold">Khajindar (Manager)</strong>. You can view donations, verify cash, and view events. Team and event management is handled by the Adhyaksha.
           </div>
         )}
 
@@ -1762,18 +1789,18 @@ export default function DashboardPage() {
               <div className="flex items-center justify-between gap-2 mb-2 px-1 flex-wrap">
                 <div className="flex items-center gap-2">
                   <span className="text-sm">📊</span>
-                  <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wider">
+                  <h3 className="text-xs font-semibold text-[#7a6a55] dark:text-gray-400 uppercase tracking-wider">
                     Donations Summary
                   </h3>
                 </div>
                 <select
                   value={summaryEventFilter}
                   onChange={e => setSummaryEventFilter(e.target.value)}
-                  className="bg-gray-950 border border-gray-800 rounded-lg px-3 py-1.5 text-xs text-gray-300 focus:outline-none focus:border-orange-500 transition-colors"
+                  className="bg-white dark:bg-gray-950 border border-[#1A1208]/15 dark:border-gray-800 rounded-lg px-3 py-1.5 text-xs text-[#1A1208] dark:text-gray-300 focus:outline-none focus:border-[#E8650A] transition-colors font-medium"
                 >
-                  <option value="all" className="bg-gray-900 text-white">All Events</option>
+                  <option value="all" className="bg-white dark:bg-gray-900 text-[#1A1208] dark:text-white">All Events</option>
                   {events.map(ev => (
-                    <option key={ev.id} value={ev.id} className="bg-gray-900 text-white">{ev.name} {ev.year}</option>
+                    <option key={ev.id} value={ev.id} className="bg-white dark:bg-gray-900 text-[#1A1208] dark:text-white">{ev.name} {ev.year}</option>
                   ))}
                 </select>
               </div>
@@ -1786,9 +1813,9 @@ export default function DashboardPage() {
                   { label: 'Sponsors', value: summarySponsorsCount },
                   { label: 'Estimated Sponsors Amount', value: formatAmount(summarySponsorsEstimatedAmount) },
                 ].map(card => (
-                  <div key={card.label} className="bg-gray-800 rounded-xl p-4 flex flex-col h-full">
-                    <p className="text-xs text-gray-400 mb-2">{card.label}</p>
-                    <p className="text-xl font-semibold text-white mt-auto">{card.value}</p>
+                  <div key={card.label} className="bg-[#F5EDE2] dark:bg-gray-800 border border-[#1A1208]/10 dark:border-gray-700/50 rounded-xl p-4 flex flex-col h-full shadow-sm">
+                    <p className="text-xs text-[#7a6a55] dark:text-gray-400 mb-2 font-medium">{card.label}</p>
+                    <p className="text-xl font-bold text-[#1A1208] dark:text-white mt-auto">{card.value}</p>
                   </div>
                 ))}
               </div>
@@ -1797,13 +1824,13 @@ export default function DashboardPage() {
         )}
 
         {/* Tabs — only show tabs the role has access to */}
-        <div className="flex gap-1 bg-gray-900 rounded-xl p-1 border border-gray-800 mb-6 w-full sm:w-fit overflow-x-auto">
+        <div className="flex gap-1 bg-[#F5EDE2] dark:bg-gray-900 rounded-xl p-1 border border-[#1A1208]/10 dark:border-gray-800 mb-6 w-full sm:w-fit overflow-x-auto">
           {availableTabs.map(t => (
             <button
               key={t}
               onClick={() => setTab(t)}
-              className={`px-3 sm:px-5 py-2 rounded-lg text-xs sm:text-sm font-medium capitalize transition-colors whitespace-nowrap shrink-0
-                ${tab === t ? 'bg-orange-500 text-white' : 'text-gray-400 hover:text-white'}`}
+              className={`px-3 sm:px-5 py-2 rounded-lg text-xs sm:text-sm font-bold capitalize transition-colors whitespace-nowrap shrink-0
+                ${tab === t ? 'bg-gradient-to-r from-[#E8650A] to-[#f97316] text-white shadow-md shadow-[#E8650A]/20' : 'text-[#7a6a55] dark:text-gray-400 hover:text-[#1A1208] dark:hover:text-white'}`}
             >
               {t}
             </button>
@@ -1815,13 +1842,13 @@ export default function DashboardPage() {
           <div className="flex flex-col gap-4">
 
             {/* Sub-tab toggle: Support Fund / Sponsorship — mirrors the Ranking tab pattern */}
-            <div className="flex gap-1 bg-gray-900 rounded-xl p-1 border border-gray-800 w-full sm:w-fit">
+            <div className="flex gap-1 bg-[#F5EDE2] dark:bg-gray-900 rounded-xl p-1 border border-[#1A1208]/10 dark:border-gray-800 w-full sm:w-fit">
               {(['support_fund', 'sponsorship'] as const).map(st => (
                 <button
                   key={st}
                   onClick={() => setDonationSubTab(st)}
-                  className={`flex-1 sm:flex-none px-3 sm:px-5 py-2 rounded-lg text-xs sm:text-sm font-medium transition-colors whitespace-nowrap
-                    ${donationSubTab === st ? 'bg-orange-500 text-white' : 'text-gray-400 hover:text-white'}`}
+                  className={`flex-1 sm:flex-none px-3 sm:px-5 py-2 rounded-lg text-xs sm:text-sm font-bold transition-colors whitespace-nowrap
+                    ${donationSubTab === st ? 'bg-gradient-to-r from-[#E8650A] to-[#f97316] text-white shadow-md shadow-[#E8650A]/20' : 'text-[#7a6a55] dark:text-gray-400 hover:text-[#1A1208] dark:hover:text-white'}`}
                 >
                   {st === 'support_fund' ? '💵 Support Fund' : '🤝 Sponsorship'}
                 </button>
@@ -1829,181 +1856,181 @@ export default function DashboardPage() {
             </div>
 
             {donationSubTab === 'support_fund' && (
-            <>
-            {/* Direct Self-Donation Drawer Toggle Button */}
-            <div className="flex justify-between items-center bg-gray-900 border border-gray-800 rounded-xl p-4">
-              <div>
-                <h3 className="text-sm font-semibold text-white">Direct Self-Donations</h3>
-                <p className="text-xs text-gray-400">Donations made directly by scanning the QR code</p>
-              </div>
-              <button
-                onClick={() => setIsSelfDrawerOpen(true)}
-                className="bg-orange-500 hover:bg-orange-600 text-white font-medium text-xs px-4 py-2.5 rounded-lg flex items-center gap-1.5 transition-colors shadow-md"
-              >
-                🌐 Verify Self-Donations
-                {pendingSelfCount > 0 && (
-                  <span className="bg-white text-orange-600 text-[10px] font-bold px-1.5 py-0.5 rounded-full">
-                    {pendingSelfCount}
-                  </span>
-                )}
-              </button>
-            </div>
+              <>
+                {/* Direct Self-Donation Drawer Toggle Button */}
+                <div className="flex justify-between items-center bg-[#F5EDE2] dark:bg-gray-900 border border-[#1A1208]/10 dark:border-gray-800 rounded-xl p-4 shadow-sm">
+                  <div>
+                    <h3 className="text-sm font-bold text-[#1A1208] dark:text-white">Direct Self-Donations</h3>
+                    <p className="text-xs text-[#7a6a55] dark:text-gray-400 font-medium">Donations made directly by scanning the QR code</p>
+                  </div>
+                  <button
+                    onClick={() => setIsSelfDrawerOpen(true)}
+                    className="bg-gradient-to-r from-[#E8650A] to-[#f97316] hover:from-[#d05807] hover:to-[#ea580c] text-white font-bold text-xs px-4 py-2.5 rounded-xl flex items-center gap-1.5 transition-all shadow-md shadow-[#E8650A]/20 cursor-pointer"
+                  >
+                    🌐 Verify Self-Donations
+                    {pendingSelfCount > 0 && (
+                      <span className="bg-white text-[#E8650A] text-[10px] font-bold px-1.5 py-0.5 rounded-full shadow-sm">
+                        {pendingSelfCount}
+                      </span>
+                    )}
+                  </button>
+                </div>
 
-            {donationsLoading ? (
-              <p className="text-gray-400 text-sm text-center py-12">Loading donations...</p>
-            ) : visibleCollectorList.length === 0 ? (
-              <div className="text-center py-12 bg-gray-900/30 border border-gray-800 rounded-xl">
-                <p className="text-gray-550 text-sm">No collectors awaiting settlement.</p>
-                <p className="text-gray-600 text-xs mt-1">All collections have been settled successfully.</p>
-              </div>
-            ) : (
-              <div className="flex flex-col gap-3">
-                <p className="text-xs text-gray-400 font-medium px-1 uppercase tracking-wider">Collectors Awaiting Settlement</p>
-                {visibleCollectorList.map(c => {
-                  const isExpanded = expandedCollectors[c.id]
-                  const hasPendingCash = c.pendingCash > 0
-                  const isPending = c.pendingCash > 0 || c.pendingUpi > 0
+                {donationsLoading ? (
+                  <p className="text-[#7a6a55] dark:text-gray-400 text-sm text-center py-12 font-medium">Loading donations...</p>
+                ) : visibleCollectorList.length === 0 ? (
+                  <div className="text-center py-12 bg-[#F5EDE2]/60 dark:bg-gray-900/30 border border-[#1A1208]/10 dark:border-gray-800 rounded-xl shadow-sm">
+                    <p className="text-[#1A1208] dark:text-gray-300 text-sm font-bold">No collectors awaiting settlement.</p>
+                    <p className="text-[#7a6a55] dark:text-gray-500 text-xs mt-1 font-medium">All collections have been settled successfully.</p>
+                  </div>
+                ) : (
+                  <div className="flex flex-col gap-3">
+                    <p className="text-xs text-[#7a6a55] dark:text-gray-400 font-bold px-1 uppercase tracking-wider">Collectors Awaiting Settlement</p>
+                    {visibleCollectorList.map(c => {
+                      const isExpanded = expandedCollectors[c.id]
+                      const hasPendingCash = c.pendingCash > 0
+                      const isPending = c.pendingCash > 0 || c.pendingUpi > 0
 
-                  return (
-                    <div 
-                      key={c.id} 
-                      className={`bg-gray-900 border rounded-xl overflow-hidden transition-all duration-200
-                        ${isExpanded ? 'border-orange-500/50 shadow-lg' : 'border-gray-800'}`}
-                    >
-                      {/* Main Row clickable to toggle expansion */}
-                      <div 
-                        onClick={() => setExpandedCollectors(prev => ({ ...prev, [c.id]: !prev[c.id] }))}
-                        className="p-4 flex flex-col md:flex-row md:items-center justify-between gap-4 cursor-pointer hover:bg-gray-800/40 transition-colors"
-                      >
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2 flex-wrap">
-                            <span className="text-base font-semibold text-white">{c.name}</span>
-                            <span className="text-xs bg-gray-800 text-gray-400 px-2 py-0.5 rounded-full font-medium">
-                              {c.donations.filter(d => (d.status === 'verified' || d.status === 'pending') && !d.settlement_id).length} unsettled collection{c.donations.filter(d => (d.status === 'verified' || d.status === 'pending') && !d.settlement_id).length !== 1 ? 's' : ''}
-                            </span>
-                          </div>
-                          
-                          {/* Cash & UPI breakdown */}
-                          <div className="flex gap-4 mt-2 text-xs flex-wrap">
-                            <div className="bg-gray-950/60 rounded-lg px-3 py-1.5 border border-gray-800/80">
-                              <span className="text-gray-500 mr-1.5">Unsettled Cash:</span>
-                              <span className="font-bold text-yellow-400">{formatAmount(c.pendingCash)}</span>
-                            </div>
-                            <div className="bg-gray-950/60 rounded-lg px-3 py-1.5 border border-gray-800/80">
-                              <span className="text-gray-500 mr-1.5">Unsettled UPI:</span>
-                              <span className="font-bold text-yellow-400">{formatAmount(c.pendingUpi)}</span>
-                            </div>
-                          </div>
-                        </div>
-
-                        {/* Action buttons & Arrow */}
-                        <div className="flex items-center gap-2 flex-wrap justify-end self-end md:self-auto" onClick={e => e.stopPropagation()}>
-                          {isPending && CAN.verifyDonation(userRole) && (
-                            <>
-                              {c.pendingCash > 0 && c.pendingUpi > 0 ? (
-                                <button
-                                  onClick={() => setBulkVerifyModalCollector(c)}
-                                  disabled={bulkVerifyingCollector === c.id}
-                                  className="bg-green-650 hover:bg-green-700 text-white font-medium text-xs px-3 py-2 rounded-lg transition-colors flex items-center gap-1 disabled:opacity-50 cursor-pointer shadow-md"
-                                >
-                                  {bulkVerifyingCollector === c.id ? 'Settling...' : '✓ Settle Handover'}
-                                </button>
-                              ) : c.pendingCash > 0 ? (
-                                <button
-                                  onClick={() => settleCollector(c.id, 'cash')}
-                                  disabled={bulkVerifyingCollector === c.id}
-                                  className="bg-green-650 hover:bg-green-700 text-white font-medium text-xs px-3 py-2 rounded-lg transition-colors flex items-center gap-1 disabled:opacity-50 cursor-pointer shadow-md"
-                                >
-                                  {bulkVerifyingCollector === c.id ? 'Settling...' : `✓ Verify Cash Handover (${formatAmount(c.pendingCash)})`}
-                                </button>
-                              ) : (
-                                <button
-                                  onClick={() => settleCollector(c.id, 'upi')}
-                                  disabled={bulkVerifyingCollector === c.id}
-                                  className="bg-green-650 hover:bg-green-700 text-white font-medium text-xs px-3 py-2 rounded-lg transition-colors flex items-center gap-1 disabled:opacity-50 cursor-pointer shadow-md"
-                                >
-                                  {bulkVerifyingCollector === c.id ? 'Settling...' : `✓ Verify UPI Handover (${formatAmount(c.pendingUpi)})`}
-                                </button>
-                              )}
-                            </>
-                          )}
-
-                          <button 
+                      return (
+                        <div
+                          key={c.id}
+                          className={`bg-white dark:bg-gray-900 border rounded-xl overflow-hidden transition-all duration-200 shadow-sm
+                        ${isExpanded ? 'border-[#E8650A]/50 shadow-md' : 'border-[#1A1208]/10 dark:border-gray-800'}`}
+                        >
+                          {/* Main Row clickable to toggle expansion */}
+                          <div
                             onClick={() => setExpandedCollectors(prev => ({ ...prev, [c.id]: !prev[c.id] }))}
-                            className="text-gray-400 hover:text-white p-1 ml-1 cursor-pointer"
+                            className="p-4 flex flex-col md:flex-row md:items-center justify-between gap-4 cursor-pointer hover:bg-[#F5EDE2]/40 dark:hover:bg-gray-800/40 transition-colors"
                           >
-                            <svg 
-                              className={`w-4 h-4 transform transition-transform duration-200 ${isExpanded ? 'rotate-180' : ''}`} 
-                              fill="none" 
-                              viewBox="0 0 24 24" 
-                              stroke="currentColor"
-                            >
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 9l-7 7-7-7" />
-                            </svg>
-                          </button>
-                        </div>
-                      </div>
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <span className="text-base font-bold text-[#1A1208] dark:text-white">{c.name}</span>
+                                <span className="text-xs bg-[#F5EDE2] dark:bg-gray-800 text-[#7a6a55] dark:text-gray-400 px-2 py-0.5 rounded-full font-bold">
+                                  {c.donations.filter(d => (d.status === 'verified' || d.status === 'pending') && !d.settlement_id).length} unsettled collection{c.donations.filter(d => (d.status === 'verified' || d.status === 'pending') && !d.settlement_id).length !== 1 ? 's' : ''}
+                                </span>
+                              </div>
 
-                      {/* Expandable Collections Table */}
-                      {isExpanded && (
-                        <div className="border-t border-gray-800 bg-gray-950/20 p-4">
-                          <h4 className="text-xs font-semibold text-gray-500 mb-3 uppercase tracking-wider">
-                            Individual Collections List
-                          </h4>
-                          <div className="overflow-x-auto">
-                            <table className="w-full text-left text-xs">
-                              <thead>
-                                <tr className="border-b border-gray-800 text-gray-500 font-medium pb-2 block md:table-row">
-                                  <th className="py-2 md:table-cell">Donor</th>
-                                  <th className="py-2 md:table-cell">Phone</th>
-                                  <th className="py-2 md:table-cell">Amount</th>
-                                  <th className="py-2 md:table-cell">Mode</th>
-                                  <th className="py-2 md:table-cell">Status</th>
-                                  <th className="py-2 md:table-cell text-right">Receipt</th>
-                                </tr>
-                              </thead>
-                              <tbody className="divide-y divide-gray-800/40">
-                                {c.donations.map(d => (
-                                  <tr key={d.id} className="hover:bg-gray-800/10">
-                                    <td className="py-3 font-medium text-white">{d.donor_name}</td>
-                                    <td className="py-3 text-gray-400">{d.donor_phone}</td>
-                                    <td className="py-3 font-semibold text-white">{formatAmount(d.amount)}</td>
-                                    <td className="py-3 text-gray-400 capitalize">
-                                      {d.payment_mode === 'cash' ? '💵 Cash' : '📱 UPI'}
-                                    </td>
-                                    <td className="py-3">
-                                      <span className={`px-2 py-0.5 rounded-full font-semibold text-[10px] uppercase tracking-wide
-                                        ${d.status === 'verified' ? 'bg-green-950 text-green-400 border border-green-900/20' 
-                                        : d.status === 'rejected' ? 'bg-red-950 text-red-400 border border-red-900/20'
-                                        : 'bg-yellow-950 text-yellow-400 border border-yellow-900/20'}`}>
-                                        {d.status}
-                                      </span>
-                                    </td>
-                                    <td className="py-3 text-right">
-                                      {d.receipt_data && d.status === 'verified' ? (
-                                        <button
-                                          onClick={() => downloadReceipt(d.receipt_data!)}
-                                          className="inline-block bg-gray-800 hover:bg-gray-700 text-gray-300 font-medium px-2 py-1 rounded transition-colors text-[10px] cursor-pointer"
-                                        >
-                                          ↓ Receipt
-                                        </button>
-                                      ) : (
-                                        <span className="text-gray-600">—</span>
-                                      )}
-                                    </td>
-                                  </tr>
-                                ))}
-                              </tbody>
-                            </table>
+                              {/* Cash & UPI breakdown */}
+                              <div className="flex gap-4 mt-2 text-xs flex-wrap">
+                                <div className="bg-[#F5EDE2]/80 dark:bg-gray-950/60 rounded-lg px-3 py-1.5 border border-[#1A1208]/10 dark:border-gray-800/80">
+                                  <span className="text-[#7a6a55] dark:text-gray-500 mr-1.5 font-bold">Unsettled Cash:</span>
+                                  <span className="font-bold text-[#E8650A] dark:text-yellow-400">{formatAmount(c.pendingCash)}</span>
+                                </div>
+                                <div className="bg-[#F5EDE2]/80 dark:bg-gray-950/60 rounded-lg px-3 py-1.5 border border-[#1A1208]/10 dark:border-gray-800/80">
+                                  <span className="text-[#7a6a55] dark:text-gray-500 mr-1.5 font-bold">Unsettled UPI:</span>
+                                  <span className="font-bold text-[#E8650A] dark:text-yellow-400">{formatAmount(c.pendingUpi)}</span>
+                                </div>
+                              </div>
+                            </div>
+
+                            {/* Action buttons & Arrow */}
+                            <div className="flex items-center gap-2 flex-wrap justify-end self-end md:self-auto" onClick={e => e.stopPropagation()}>
+                              {isPending && CAN.verifyDonation(userRole) && (
+                                <>
+                                  {c.pendingCash > 0 && c.pendingUpi > 0 ? (
+                                    <button
+                                      onClick={() => setBulkVerifyModalCollector(c)}
+                                      disabled={bulkVerifyingCollector === c.id}
+                                      className="bg-green-650 hover:bg-green-700 text-white font-medium text-xs px-3 py-2 rounded-lg transition-colors flex items-center gap-1 disabled:opacity-50 cursor-pointer shadow-md"
+                                    >
+                                      {bulkVerifyingCollector === c.id ? 'Settling...' : '✓ Settle Handover'}
+                                    </button>
+                                  ) : c.pendingCash > 0 ? (
+                                    <button
+                                      onClick={() => settleCollector(c.id, 'cash')}
+                                      disabled={bulkVerifyingCollector === c.id}
+                                      className="bg-green-650 hover:bg-green-700 text-white font-medium text-xs px-3 py-2 rounded-lg transition-colors flex items-center gap-1 disabled:opacity-50 cursor-pointer shadow-md"
+                                    >
+                                      {bulkVerifyingCollector === c.id ? 'Settling...' : `✓ Verify Cash Handover (${formatAmount(c.pendingCash)})`}
+                                    </button>
+                                  ) : (
+                                    <button
+                                      onClick={() => settleCollector(c.id, 'upi')}
+                                      disabled={bulkVerifyingCollector === c.id}
+                                      className="bg-green-650 hover:bg-green-700 text-white font-medium text-xs px-3 py-2 rounded-lg transition-colors flex items-center gap-1 disabled:opacity-50 cursor-pointer shadow-md"
+                                    >
+                                      {bulkVerifyingCollector === c.id ? 'Settling...' : `✓ Verify UPI Handover (${formatAmount(c.pendingUpi)})`}
+                                    </button>
+                                  )}
+                                </>
+                              )}
+
+                              <button
+                                onClick={() => setExpandedCollectors(prev => ({ ...prev, [c.id]: !prev[c.id] }))}
+                                className="text-gray-400 hover:text-white p-1 ml-1 cursor-pointer"
+                              >
+                                <svg
+                                  className={`w-4 h-4 transform transition-transform duration-200 ${isExpanded ? 'rotate-180' : ''}`}
+                                  fill="none"
+                                  viewBox="0 0 24 24"
+                                  stroke="currentColor"
+                                >
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 9l-7 7-7-7" />
+                                </svg>
+                              </button>
+                            </div>
                           </div>
+
+                          {/* Expandable Collections Table */}
+                          {isExpanded && (
+                            <div className="border-t border-gray-800 bg-gray-950/20 p-4">
+                              <h4 className="text-xs font-semibold text-gray-500 mb-3 uppercase tracking-wider">
+                                Individual Collections List
+                              </h4>
+                              <div className="overflow-x-auto">
+                                <table className="w-full text-left text-xs">
+                                  <thead>
+                                    <tr className="border-b border-gray-800 text-gray-500 font-medium pb-2 block md:table-row">
+                                      <th className="py-2 md:table-cell">Donor</th>
+                                      <th className="py-2 md:table-cell">Phone</th>
+                                      <th className="py-2 md:table-cell">Amount</th>
+                                      <th className="py-2 md:table-cell">Mode</th>
+                                      <th className="py-2 md:table-cell">Status</th>
+                                      <th className="py-2 md:table-cell text-right">Receipt</th>
+                                    </tr>
+                                  </thead>
+                                  <tbody className="divide-y divide-gray-800/40">
+                                    {c.donations.map(d => (
+                                      <tr key={d.id} className="hover:bg-gray-800/10">
+                                        <td className="py-3 font-medium text-white">{d.donor_name}</td>
+                                        <td className="py-3 text-gray-400">{d.donor_phone}</td>
+                                        <td className="py-3 font-semibold text-white">{formatAmount(d.amount)}</td>
+                                        <td className="py-3 text-gray-400 capitalize">
+                                          {d.payment_mode === 'cash' ? '💵 Cash' : '📱 UPI'}
+                                        </td>
+                                        <td className="py-3">
+                                          <span className={`px-2 py-0.5 rounded-full font-semibold text-[10px] uppercase tracking-wide
+                                        ${d.status === 'verified' ? 'bg-green-950 text-green-400 border border-green-900/20'
+                                              : d.status === 'rejected' ? 'bg-red-950 text-red-400 border border-red-900/20'
+                                                : 'bg-yellow-950 text-yellow-400 border border-yellow-900/20'}`}>
+                                            {d.status}
+                                          </span>
+                                        </td>
+                                        <td className="py-3 text-right">
+                                          {d.receipt_data && d.status === 'verified' ? (
+                                            <button
+                                              onClick={() => downloadReceipt(d.receipt_data!)}
+                                              className="inline-block bg-[#F5EDE2] dark:bg-gray-800 hover:bg-[#eaddce] dark:hover:bg-gray-700 text-[#7a6a55] dark:text-gray-300 font-medium px-2 py-1 rounded transition-colors text-[10px] cursor-pointer"
+                                            >
+                                              ↓ Receipt
+                                            </button>
+                                          ) : (
+                                            <span className="text-[#7a6a55] dark:text-gray-600">—</span>
+                                          )}
+                                        </td>
+                                      </tr>
+                                    ))}
+                                  </tbody>
+                                </table>
+                              </div>
+                            </div>
+                          )}
                         </div>
-                      )}
-                    </div>
-                  )
-                })}
-              </div>
-            )}
-            </>
+                      )
+                    })}
+                  </div>
+                )}
+              </>
             )}
 
             {donationSubTab === 'sponsorship' && (
@@ -2012,20 +2039,20 @@ export default function DashboardPage() {
           </div>
         )}
 
-      
+
         {/* ── TAB: Ranking (Collectors + Donors) ── */}
         {tab === 'ranking' && (
           <div className="flex flex-col gap-4">
 
             {/* Sub-tab toggle + event scope selector (applies to whichever sub-tab is active) */}
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-              <div className="flex gap-1 bg-gray-900 rounded-xl p-1 border border-gray-800 w-full sm:w-fit">
+              <div className="flex gap-1 bg-[#F5EDE2] dark:bg-gray-900 rounded-xl p-1 border border-[#1A1208]/10 dark:border-gray-800 w-full sm:w-fit">
                 {(['collectors', 'donors', 'sponsors'] as const).map(st => (
                   <button
                     key={st}
                     onClick={() => setRankingSubTab(st)}
-                    className={`flex-1 sm:flex-none px-3 sm:px-5 py-2 rounded-lg text-xs sm:text-sm font-medium capitalize transition-colors whitespace-nowrap
-                      ${rankingSubTab === st ? 'bg-orange-500 text-white' : 'text-gray-400 hover:text-white'}`}
+                    className={`flex-1 sm:flex-none px-3 sm:px-5 py-2 rounded-lg text-xs sm:text-sm font-bold capitalize transition-colors whitespace-nowrap cursor-pointer
+                      ${rankingSubTab === st ? 'bg-gradient-to-r from-[#E8650A] to-[#f97316] text-white shadow-md shadow-[#E8650A]/20' : 'text-[#7a6a55] dark:text-gray-400 hover:text-[#1A1208] dark:hover:text-white'}`}
                   >
                     {st === 'collectors' ? '👥 Collectors' : st === 'donors' ? '🎗️ Donors' : '🤝 Sponsors'}
                   </button>
@@ -2034,11 +2061,11 @@ export default function DashboardPage() {
               <select
                 value={rankingEventFilter}
                 onChange={e => setRankingEventFilter(e.target.value)}
-                className="bg-gray-950 border border-gray-800 rounded-lg px-3 py-2 text-xs text-gray-300 focus:outline-none focus:border-orange-500 transition-colors w-full sm:w-auto"
+                className="bg-white dark:bg-gray-950 border border-[#1A1208]/15 dark:border-gray-800 rounded-lg px-3 py-2 text-xs text-[#1A1208] dark:text-gray-300 font-bold focus:outline-none focus:border-[#E8650A] transition-colors w-full sm:w-auto"
               >
-                <option value="all" className="bg-gray-900 text-white">All Events</option>
+                <option value="all" className="bg-white dark:bg-gray-900 text-[#1A1208] dark:text-white">All Events</option>
                 {events.map(ev => (
-                  <option key={ev.id} value={ev.id} className="bg-gray-900 text-white">{ev.name} {ev.year}</option>
+                  <option key={ev.id} value={ev.id} className="bg-white dark:bg-gray-900 text-[#1A1208] dark:text-white">{ev.name} {ev.year}</option>
                 ))}
               </select>
             </div>
@@ -2046,14 +2073,14 @@ export default function DashboardPage() {
             {/* ── Collector Ranking ── */}
             {rankingSubTab === 'collectors' && (
               donationsLoading ? (
-                <p className="text-gray-400 text-sm text-center py-12">Loading ranking...</p>
+                <p className="text-[#7a6a55] dark:text-gray-400 text-sm text-center py-12 font-medium">Loading ranking...</p>
               ) : rankingList.length === 0 ? (
-                <div className="text-center py-12 bg-gray-900/30 border border-gray-800 rounded-xl">
-                  <p className="text-gray-500 text-sm">No collector activity yet.</p>
+                <div className="text-center py-12 bg-[#F5EDE2]/60 dark:bg-gray-900/30 border border-[#1A1208]/10 dark:border-gray-800 rounded-xl">
+                  <p className="text-[#7a6a55] dark:text-gray-500 text-sm font-bold">No collector activity yet.</p>
                 </div>
               ) : (
                 <div className="flex flex-col gap-3">
-                  <p className="text-xs text-gray-400 font-medium px-1 uppercase tracking-wider">
+                  <p className="text-xs text-[#7a6a55] dark:text-gray-400 font-bold px-1 uppercase tracking-wider">
                     Leaderboard — by total amount collected
                   </p>
                   {rankingList.map((c, index) => {
@@ -2062,19 +2089,19 @@ export default function DashboardPage() {
                     return (
                       <div
                         key={c.id}
-                        className={`bg-gray-900 border rounded-xl p-4 flex items-center gap-4
-                          ${rank === 1 ? 'border-yellow-500/40 shadow-lg' : 'border-gray-800'}`}
+                        className={`bg-white dark:bg-gray-900 border rounded-xl p-4 flex items-center gap-4 shadow-sm
+                          ${rank === 1 ? 'border-amber-500/50 shadow-lg shadow-amber-500/10' : 'border-[#1A1208]/10 dark:border-gray-800'}`}
                       >
                         <div className={`w-10 h-10 shrink-0 rounded-full flex items-center justify-center text-sm font-bold
-                          ${rank <= 3 ? 'bg-gray-800' : 'bg-gray-800 text-gray-400'}`}>
+                          ${rank <= 3 ? 'bg-[#F5EDE2] dark:bg-gray-800 text-[#1A1208] dark:text-white' : 'bg-[#F5EDE2] dark:bg-gray-800 text-[#7a6a55] dark:text-gray-400'}`}>
                           {medal ? <span className="text-xl">{medal}</span> : <span>#{rank}</span>}
                         </div>
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center justify-between gap-2 mb-1.5">
-                            <span className="text-sm font-semibold text-white truncate">{c.name}</span>
-                            <span className="text-sm font-bold text-white shrink-0">{formatAmount(c.totalAmount)}</span>
+                            <span className="text-sm font-bold text-[#1A1208] dark:text-white truncate">{c.name}</span>
+                            <span className="text-sm font-extrabold text-[#1A1208] dark:text-white shrink-0">{formatAmount(c.totalAmount)}</span>
                           </div>
-                          <div className="flex gap-3 mt-1.5 text-[11px] text-gray-500">
+                          <div className="flex gap-3 mt-1.5 text-[11px] text-[#7a6a55] dark:text-gray-400 font-medium">
                             <span>💵 Cash: {formatAmount(c.totalCash)}</span>
                             <span>📱 UPI: {formatAmount(c.totalUpi)}</span>
                             <span>{c.donationsCount} donation{c.donationsCount !== 1 ? 's' : ''}</span>
@@ -2090,14 +2117,14 @@ export default function DashboardPage() {
             {/* ── Donor Ranking ── */}
             {rankingSubTab === 'donors' && (
               donationsLoading ? (
-                <p className="text-gray-400 text-sm text-center py-12">Loading ranking...</p>
+                <p className="text-[#7a6a55] dark:text-gray-400 text-sm text-center py-12 font-medium">Loading ranking...</p>
               ) : donorRankingList.length === 0 ? (
-                <div className="text-center py-12 bg-gray-900/30 border border-gray-800 rounded-xl">
-                  <p className="text-gray-500 text-sm">No donor activity yet.</p>
+                <div className="text-center py-12 bg-[#F5EDE2]/60 dark:bg-gray-900/30 border border-[#1A1208]/10 dark:border-gray-800 rounded-xl">
+                  <p className="text-[#7a6a55] dark:text-gray-500 text-sm font-bold">No donor activity yet.</p>
                 </div>
               ) : (
                 <div className="flex flex-col gap-3">
-                  <p className="text-xs text-gray-400 font-medium px-1 uppercase tracking-wider">
+                  <p className="text-xs text-[#7a6a55] dark:text-gray-400 font-bold px-1 uppercase tracking-wider">
                     Top Donors — by total amount donated
                   </p>
                   {donorRankingList.map((d, index) => {
@@ -2106,19 +2133,19 @@ export default function DashboardPage() {
                     return (
                       <div
                         key={d.phone + index}
-                        className={`bg-gray-900 border rounded-xl p-4 flex items-center gap-4
-                          ${rank === 1 ? 'border-yellow-500/40 shadow-lg' : 'border-gray-800'}`}
+                        className={`bg-white dark:bg-gray-900 border rounded-xl p-4 flex items-center gap-4 shadow-sm
+                          ${rank === 1 ? 'border-amber-500/50 shadow-lg shadow-amber-500/10' : 'border-[#1A1208]/10 dark:border-gray-800'}`}
                       >
                         <div className={`w-10 h-10 shrink-0 rounded-full flex items-center justify-center text-sm font-bold
-                          ${rank <= 3 ? 'bg-gray-800' : 'bg-gray-800 text-gray-400'}`}>
+                          ${rank <= 3 ? 'bg-[#F5EDE2] dark:bg-gray-800 text-[#1A1208] dark:text-white' : 'bg-[#F5EDE2] dark:bg-gray-800 text-[#7a6a55] dark:text-gray-400'}`}>
                           {medal ? <span className="text-xl">{medal}</span> : <span>#{rank}</span>}
                         </div>
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center justify-between gap-2 mb-1.5">
-                            <span className="text-sm font-semibold text-white truncate">{d.name}</span>
-                            <span className="text-sm font-bold text-white shrink-0">{formatAmount(d.totalAmount)}</span>
+                            <span className="text-sm font-bold text-[#1A1208] dark:text-white truncate">{d.name}</span>
+                            <span className="text-sm font-extrabold text-[#1A1208] dark:text-white shrink-0">{formatAmount(d.totalAmount)}</span>
                           </div>
-                          <div className="flex gap-3 mt-1.5 text-[11px] text-gray-500">
+                          <div className="flex gap-3 mt-1.5 text-[11px] text-[#7a6a55] dark:text-gray-400 font-medium">
                             <span>{d.phone}</span>
                             <span>{d.donationCount} donation{d.donationCount !== 1 ? 's' : ''}</span>
                           </div>
@@ -2133,14 +2160,14 @@ export default function DashboardPage() {
             {/* ── Sponsor Ranking ── */}
             {rankingSubTab === 'sponsors' && (
               sponsorRankingLoading ? (
-                <p className="text-gray-400 text-sm text-center py-12">Loading ranking...</p>
+                <p className="text-[#7a6a55] dark:text-gray-400 text-sm text-center py-12 font-medium">Loading ranking...</p>
               ) : rankingSponsorList.length === 0 ? (
-                <div className="text-center py-12 bg-gray-900/30 border border-gray-800 rounded-xl">
-                  <p className="text-gray-500 text-sm">No sponsors added yet.</p>
+                <div className="text-center py-12 bg-[#F5EDE2]/60 dark:bg-gray-900/30 border border-[#1A1208]/10 dark:border-gray-800 rounded-xl">
+                  <p className="text-[#7a6a55] dark:text-gray-500 text-sm font-bold">No sponsors added yet.</p>
                 </div>
               ) : (
                 <div className="flex flex-col gap-3">
-                  <p className="text-xs text-gray-400 font-medium px-1 uppercase tracking-wider">
+                  <p className="text-xs text-[#7a6a55] dark:text-gray-400 font-bold px-1 uppercase tracking-wider">
                     Sponsors — by contribution value
                   </p>
                   {[...rankingSponsorList]
@@ -2156,19 +2183,19 @@ export default function DashboardPage() {
                       return (
                         <div
                           key={s.id}
-                          className={`bg-gray-900 border rounded-xl p-4 flex items-center gap-4
-                            ${rank === 1 ? 'border-yellow-500/40 shadow-lg' : 'border-gray-800'}`}
+                          className={`bg-white dark:bg-gray-900 border rounded-xl p-4 flex items-center gap-4 shadow-sm
+                            ${rank === 1 ? 'border-amber-500/50 shadow-lg shadow-amber-500/10' : 'border-[#1A1208]/10 dark:border-gray-800'}`}
                         >
                           <div className={`w-10 h-10 shrink-0 rounded-full flex items-center justify-center text-sm font-bold
-                            ${rank <= 3 ? 'bg-gray-800' : 'bg-gray-800 text-gray-400'}`}>
+                            ${rank <= 3 ? 'bg-[#F5EDE2] dark:bg-gray-800 text-[#1A1208] dark:text-white' : 'bg-[#F5EDE2] dark:bg-gray-800 text-[#7a6a55] dark:text-gray-400'}`}>
                             {medal ? <span className="text-xl">{medal}</span> : <span>#{rank}</span>}
                           </div>
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center justify-between gap-2 mb-1.5">
-                              <span className="text-sm font-semibold text-white truncate">{s.company_name}</span>
-                              <span className="text-sm font-bold text-white shrink-0">{formatAmount(value)}</span>
+                              <span className="text-sm font-bold text-[#1A1208] dark:text-white truncate">{s.company_name}</span>
+                              <span className="text-sm font-extrabold text-[#1A1208] dark:text-white shrink-0">{formatAmount(value)}</span>
                             </div>
-                            <div className="flex gap-3 mt-1.5 text-[11px] text-gray-500">
+                            <div className="flex gap-3 mt-1.5 text-[11px] text-[#7a6a55] dark:text-gray-400 font-medium">
                               <span>{isGoods ? '📦 Goods/Service' : '💰 Finance'}</span>
                               {!isGoods && <span>Received: {formatAmount(s.amount_received)}</span>}
                             </div>
@@ -2186,229 +2213,229 @@ export default function DashboardPage() {
           <div className="flex flex-col gap-4">
 
             {/* Record type toggle */}
-            <div className="flex gap-1 bg-gray-900 rounded-xl p-1 border border-gray-800 w-full sm:w-fit">
+            <div className="flex gap-1 bg-[#F5EDE2] dark:bg-gray-900 rounded-xl p-1 border border-[#1A1208]/10 dark:border-gray-800 w-full sm:w-fit">
               {(['donations', 'sponsors'] as const).map(rt => (
                 <button
                   key={rt}
                   onClick={() => setHistoryRecordType(rt)}
-                  className={`flex-1 sm:flex-none px-3 sm:px-5 py-2 rounded-lg text-xs sm:text-sm font-medium capitalize transition-colors whitespace-nowrap
-                    ${historyRecordType === rt ? 'bg-orange-500 text-white' : 'text-gray-400 hover:text-white'}`}
+                  className={`flex-1 sm:flex-none px-3 sm:px-5 py-2 rounded-lg text-xs sm:text-sm font-bold capitalize transition-colors whitespace-nowrap cursor-pointer
+                    ${historyRecordType === rt ? 'bg-gradient-to-r from-[#E8650A] to-[#f97316] text-white shadow-md shadow-[#E8650A]/20' : 'text-[#7a6a55] dark:text-gray-400 hover:text-[#1A1208] dark:hover:text-white'}`}
                 >
                   {rt === 'donations' ? '🎗️ Donations' : '🤝 Sponsors'}
                 </button>
               ))}
             </div>
-            
+
             {historyRecordType === 'donations' && (
-            <>
-            {/* Search and Filters Bar */}
-            <div className="bg-gray-900 border border-gray-800 rounded-xl p-4 flex flex-col gap-3 md:flex-row md:items-center">
-              
-              {/* Search input */}
-              <div className="flex-1 relative">
-                <input
-                  type="text"
-                  placeholder="Search by donor name, phone, amount, or receipt..."
-                  value={historySearch}
-                  onChange={e => setHistorySearch(e.target.value)}
-                  className="w-full bg-gray-950 border border-gray-800 rounded-lg pl-9 pr-3 py-2 text-xs text-white placeholder-gray-500 focus:outline-none focus:border-orange-500 transition-colors"
-                />
-                <span className="absolute left-3 top-2 text-gray-500 text-xs">
-                  🔍
-                </span>
-              </div>
+              <>
+                {/* Search and Filters Bar */}
+                <div className="bg-[#F5EDE2] dark:bg-gray-900 border border-[#1A1208]/10 dark:border-gray-800 rounded-xl p-4 flex flex-col gap-3 md:flex-row md:items-center shadow-sm">
 
-              {/* Single combined Filter button — Event / Donation Type / Payment Mode */}
-              <div className="relative w-full md:w-auto">
-                <button
-                  type="button"
-                  onClick={() => setHistoryFilterOpen(o => !o)}
-                  className="w-full md:w-auto flex items-center justify-center gap-1.5 bg-gray-950 border border-gray-800 rounded-lg px-4 py-2 text-xs text-gray-300 hover:border-orange-500 transition-colors"
-                >
-                  ⚙️ Filter
-                  {historyActiveFilterCount > 0 && (
-                    <span className="bg-orange-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full">
-                      {historyActiveFilterCount}
+                  {/* Search input */}
+                  <div className="flex-1 relative">
+                    <input
+                      type="text"
+                      placeholder="Search by donor name, phone, amount, or receipt..."
+                      value={historySearch}
+                      onChange={e => setHistorySearch(e.target.value)}
+                      className="w-full bg-white dark:bg-gray-950 border border-[#1A1208]/15 dark:border-gray-800 rounded-lg pl-9 pr-3 py-2 text-xs text-[#1A1208] dark:text-white placeholder-[#9e8c76] dark:placeholder-gray-500 font-medium focus:outline-none focus:border-[#E8650A] transition-colors"
+                    />
+                    <span className="absolute left-3 top-2 text-[#7a6a55] dark:text-gray-500 text-xs">
+                      🔍
                     </span>
-                  )}
-                </button>
+                  </div>
 
-                {historyFilterOpen && (
-                  <>
-                    {/* Click-outside backdrop to close the panel */}
-                    <div className="fixed inset-0 z-10" onClick={() => setHistoryFilterOpen(false)} />
-                    <div className="absolute right-0 z-20 mt-2 w-full sm:w-72 bg-gray-900 border border-gray-800 rounded-xl shadow-2xl p-4 flex flex-col gap-3">
-                      {/* Event filter */}
-                      <div>
-                        <label className="text-[11px] text-gray-500 mb-1 block">Event</label>
-                        <select
-                          value={historyEventFilter}
-                          onChange={e => setHistoryEventFilter(e.target.value)}
-                          className="w-full bg-gray-950 border border-gray-800 rounded-lg px-3 py-2 text-xs text-gray-300 focus:outline-none focus:border-orange-500 transition-colors"
-                        >
-                          <option value="all" className="bg-gray-900 text-white">All Events</option>
-                          {events.map(ev => (
-                            <option key={ev.id} value={ev.id} className="bg-gray-900 text-white">{ev.name} {ev.year}</option>
-                          ))}
-                        </select>
-                      </div>
+                  {/* Single combined Filter button — Event / Donation Type / Payment Mode */}
+                  <div className="relative w-full md:w-auto">
+                    <button
+                      type="button"
+                      onClick={() => setHistoryFilterOpen(o => !o)}
+                      className="w-full md:w-auto flex items-center justify-center gap-1.5 bg-white dark:bg-gray-950 border border-[#1A1208]/15 dark:border-gray-800 rounded-lg px-4 py-2 text-xs text-[#1A1208] dark:text-gray-300 font-bold hover:border-[#E8650A] transition-colors cursor-pointer"
+                    >
+                      ⚙️ Filter
+                      {historyActiveFilterCount > 0 && (
+                        <span className="bg-[#E8650A] text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full">
+                          {historyActiveFilterCount}
+                        </span>
+                      )}
+                    </button>
 
-                      {/* Donation Type filter (collectors / self-donation / individual collector) */}
-                      <div>
-                        <label className="text-[11px] text-gray-500 mb-1 block">Donation Type</label>
-                        <select
-                          value={historyCollectorFilter}
-                          onChange={e => setHistoryCollectorFilter(e.target.value)}
-                          className="w-full bg-gray-950 border border-gray-800 rounded-lg px-3 py-2 text-xs text-gray-300 focus:outline-none focus:border-orange-500 transition-colors"
-                        >
-                          <option value="all" className="bg-gray-900 text-white">All Collectors</option>
-                          <option value="self" className="bg-gray-900 text-white">Self-Donations (Online)</option>
-                          {distinctCollectors.map(c => (
-                            <option key={c.id} value={c.id} className="bg-gray-900 text-white">{c.name}</option>
-                          ))}
-                        </select>
-                      </div>
+                    {historyFilterOpen && (
+                      <>
+                        {/* Click-outside backdrop to close the panel */}
+                        <div className="fixed inset-0 z-10" onClick={() => setHistoryFilterOpen(false)} />
+                        <div className="absolute right-0 z-20 mt-2 w-full sm:w-72 bg-white dark:bg-gray-900 border border-[#1A1208]/15 dark:border-gray-800 rounded-xl shadow-2xl p-4 flex flex-col gap-3">
+                          {/* Event filter */}
+                          <div>
+                            <label className="text-[11px] text-[#7a6a55] dark:text-gray-400 mb-1 block font-bold">Event</label>
+                            <select
+                              value={historyEventFilter}
+                              onChange={e => setHistoryEventFilter(e.target.value)}
+                              className="w-full bg-white dark:bg-gray-950 border border-[#1A1208]/15 dark:border-gray-800 rounded-lg px-3 py-2 text-xs text-[#1A1208] dark:text-gray-300 font-medium focus:outline-none focus:border-[#E8650A] transition-colors"
+                            >
+                              <option value="all" className="bg-white dark:bg-gray-900 text-[#1A1208] dark:text-white">All Events</option>
+                              {events.map(ev => (
+                                <option key={ev.id} value={ev.id} className="bg-white dark:bg-gray-900 text-[#1A1208] dark:text-white">{ev.name} {ev.year}</option>
+                              ))}
+                            </select>
+                          </div>
 
-                      {/* Payment Mode filter */}
-                      <div>
-                        <label className="text-[11px] text-gray-500 mb-1 block">Payment Mode</label>
-                        <select
-                          value={historyTypeFilter}
-                          onChange={e => setHistoryTypeFilter(e.target.value)}
-                          className="w-full bg-gray-950 border border-gray-800 rounded-lg px-3 py-2 text-xs text-gray-300 focus:outline-none focus:border-orange-500 transition-colors"
-                        >
-                          <option value="all" className="bg-gray-900 text-white">All Modes</option>
-                          <option value="cash" className="bg-gray-900 text-white">💵 Cash</option>
-                          <option value="upi_collector" className="bg-gray-900 text-white">📱 UPI (collector)</option>
-                          <option value="upi_self" className="bg-gray-900 text-white">📱 UPI (self)</option>
-                        </select>
-                      </div>
+                          {/* Donation Type filter (collectors / self-donation / individual collector) */}
+                          <div>
+                            <label className="text-[11px] text-[#7a6a55] dark:text-gray-400 mb-1 block font-bold">Donation Type</label>
+                            <select
+                              value={historyCollectorFilter}
+                              onChange={e => setHistoryCollectorFilter(e.target.value)}
+                              className="w-full bg-white dark:bg-gray-950 border border-[#1A1208]/15 dark:border-gray-800 rounded-lg px-3 py-2 text-xs text-[#1A1208] dark:text-gray-300 font-medium focus:outline-none focus:border-[#E8650A] transition-colors"
+                            >
+                              <option value="all" className="bg-white dark:bg-gray-900 text-[#1A1208] dark:text-white">All Collectors</option>
+                              <option value="self" className="bg-white dark:bg-gray-900 text-[#1A1208] dark:text-white">Self-Donations (Online)</option>
+                              {distinctCollectors.map(c => (
+                                <option key={c.id} value={c.id} className="bg-white dark:bg-gray-900 text-[#1A1208] dark:text-white">{c.name}</option>
+                              ))}
+                            </select>
+                          </div>
 
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setHistoryEventFilter('all')
-                          setHistoryCollectorFilter('all')
-                          setHistoryTypeFilter('all')
-                        }}
-                        className="text-[11px] text-gray-500 hover:text-orange-400 underline self-center pt-1 transition-colors"
-                      >
-                        Reset Filters
-                      </button>
-                    </div>
-                  </>
-                )}
-              </div>
-            </div>
+                          {/* Payment Mode filter */}
+                          <div>
+                            <label className="text-[11px] text-[#7a6a55] dark:text-gray-400 mb-1 block font-bold">Payment Mode</label>
+                            <select
+                              value={historyTypeFilter}
+                              onChange={e => setHistoryTypeFilter(e.target.value)}
+                              className="w-full bg-white dark:bg-gray-950 border border-[#1A1208]/15 dark:border-gray-800 rounded-lg px-3 py-2 text-xs text-[#1A1208] dark:text-gray-300 font-medium focus:outline-none focus:border-[#E8650A] transition-colors"
+                            >
+                              <option value="all" className="bg-white dark:bg-gray-900 text-[#1A1208] dark:text-white">All Modes</option>
+                              <option value="cash" className="bg-white dark:bg-gray-900 text-[#1A1208] dark:text-white">💵 Cash</option>
+                              <option value="upi_collector" className="bg-white dark:bg-gray-900 text-[#1A1208] dark:text-white">📱 UPI (collector)</option>
+                              <option value="upi_self" className="bg-white dark:bg-gray-900 text-[#1A1208] dark:text-white">📱 UPI (self)</option>
+                            </select>
+                          </div>
 
-            {/* Export buttons */}
-            <div className="flex gap-2">
-              <button
-                onClick={() => handleExportCSV(filteredHistoryDonations, `mandal_history_${new Date().toISOString().slice(0, 10)}.csv`)}
-                disabled={filteredHistoryDonations.length === 0}
-                className="flex-1 sm:flex-initial sm:px-6 py-2 bg-gray-900 border border-gray-800 text-gray-300 font-semibold rounded-lg text-xs hover:bg-gray-850 hover:text-white transition-colors disabled:opacity-50"
-              >
-                📥 Export CSV
-              </button>
-              <button
-                onClick={() => handleExportPDF(filteredHistoryDonations, 'Mandal Collection History Report')}
-                disabled={filteredHistoryDonations.length === 0}
-                className="flex-1 sm:flex-initial sm:px-6 py-2 bg-gray-900 border border-gray-800 text-gray-300 font-semibold rounded-lg text-xs hover:bg-gray-850 hover:text-white transition-colors disabled:opacity-50"
-              >
-                📄 Export PDF
-              </button>
-            </div>
-
-            {/* Donations Table/List */}
-            {donationsLoading ? (
-              <p className="text-gray-400 text-sm text-center py-12">Loading history...</p>
-            ) : filteredHistoryDonations.length === 0 ? (
-              <div className="text-center py-12 bg-gray-900/30 border border-gray-800 rounded-xl">
-                <p className="text-gray-500 text-sm">No donations match your filters.</p>
-              </div>
-            ) : (
-              <div className="bg-gray-900 border border-gray-800 rounded-xl overflow-hidden">
-                <div className="overflow-x-auto">
-                  <table className="w-full text-left text-xs">
-                    <thead>
-                      <tr className="border-b border-gray-800 bg-gray-950/40 text-gray-500 font-medium">
-                        <th className="p-3">Receipt No</th>
-                        <th className="p-3">Donor</th>
-                        <th className="p-3">Phone</th>
-                        <th className="p-3">Amount</th>
-                        <th className="p-3">Collector</th>
-                        <th className="p-3">Mode</th>
-                        <th className="p-3">Status</th>
-                        <th className="p-3 text-right">Receipt</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-800/50">
-                      {filteredHistoryDonations.map(d => (
-                        <tr key={d.id} className="hover:bg-gray-800/10 transition-colors">
-                          <td className="p-3 font-mono text-gray-400 font-semibold">{d.receipt_number}</td>
-                          <td className="p-3 font-medium text-white">{d.donor_name}</td>
-                          <td className="p-3 text-gray-400">{d.donor_phone}</td>
-                          <td className="p-3 font-bold text-white">{formatAmount(d.amount)}</td>
-                          <td className="p-3 text-gray-300">
-                            {d.payment_mode === 'upi_self' ? '🌐 Self' : (d.users?.full_name || 'Unknown')}
-                          </td>
-                          <td className="p-3 text-gray-400">
-                            {d.payment_mode === 'cash' ? '💵 Cash' 
-                            : d.payment_mode === 'upi_collector' ? '📱 UPI (C)' 
-                            : '📱 UPI (S)'}
-                          </td>
-                          <td className="p-3">
-                            <span className={`px-2 py-0.5 rounded-full font-semibold text-[10px] uppercase tracking-wide
-                              ${d.status === 'verified' ? 'bg-green-950 text-green-400 border border-green-900/20' 
-                              : d.status === 'rejected' ? 'bg-red-950 text-red-400 border border-red-900/20'
-                              : 'bg-yellow-950 text-yellow-400 border border-yellow-900/20'}`}>
-                              {d.status}
-                            </span>
-                          </td>
-                          <td className="p-3 text-right">
-                            {d.receipt_data && d.status === 'verified' ? (
-                              <button
-                                onClick={() => downloadReceipt(d.receipt_data!)}
-                                className="inline-block bg-gray-800 hover:bg-gray-700 text-gray-300 font-medium px-2 py-1 rounded transition-colors text-[10px] cursor-pointer"
-                              >
-                                ↓ Receipt
-                              </button>
-                            ) : (
-                              <span className="text-gray-600">—</span>
-                            )}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setHistoryEventFilter('all')
+                              setHistoryCollectorFilter('all')
+                              setHistoryTypeFilter('all')
+                            }}
+                            className="text-[11px] text-[#7a6a55] dark:text-gray-500 hover:text-[#E8650A] dark:hover:text-orange-400 underline self-center pt-1 transition-colors cursor-pointer"
+                          >
+                            Reset Filters
+                          </button>
+                        </div>
+                      </>
+                    )}
+                  </div>
                 </div>
-              </div>
-            )}
-            </>
+
+                {/* Export buttons */}
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => handleExportCSV(filteredHistoryDonations, `mandal_history_${new Date().toISOString().slice(0, 10)}.csv`)}
+                    disabled={filteredHistoryDonations.length === 0}
+                    className="flex-1 sm:flex-initial sm:px-6 py-2 bg-[#F5EDE2] dark:bg-gray-900 border border-[#1A1208]/10 dark:border-gray-800 text-[#1A1208] dark:text-gray-300 font-bold rounded-lg text-xs hover:bg-[#ebdcc9] dark:hover:bg-gray-800 transition-colors disabled:opacity-50 cursor-pointer shadow-sm"
+                  >
+                    📥 Export CSV
+                  </button>
+                  <button
+                    onClick={() => handleExportPDF(filteredHistoryDonations, 'Mandal Collection History Report')}
+                    disabled={filteredHistoryDonations.length === 0}
+                    className="flex-1 sm:flex-initial sm:px-6 py-2 bg-[#F5EDE2] dark:bg-gray-900 border border-[#1A1208]/10 dark:border-gray-800 text-[#1A1208] dark:text-gray-300 font-bold rounded-lg text-xs hover:bg-[#ebdcc9] dark:hover:bg-gray-800 transition-colors disabled:opacity-50 cursor-pointer shadow-sm"
+                  >
+                    📄 Export PDF
+                  </button>
+                </div>
+
+                {/* Donations Table/List */}
+                {donationsLoading ? (
+                  <p className="text-[#7a6a55] dark:text-gray-400 text-sm text-center py-12 font-medium">Loading history...</p>
+                ) : filteredHistoryDonations.length === 0 ? (
+                  <div className="text-center py-12 bg-[#F5EDE2]/60 dark:bg-gray-900/30 border border-[#1A1208]/10 dark:border-gray-800 rounded-xl">
+                    <p className="text-[#7a6a55] dark:text-gray-500 text-sm font-bold">No donations match your filters.</p>
+                  </div>
+                ) : (
+                  <div className="bg-white dark:bg-gray-900 border border-[#1A1208]/10 dark:border-gray-800 rounded-xl overflow-hidden shadow-sm">
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-left text-xs">
+                        <thead>
+                          <tr className="border-b border-[#1A1208]/10 dark:border-gray-800 bg-[#F5EDE2] dark:bg-gray-950/40 text-[#7a6a55] dark:text-gray-400 font-bold">
+                            <th className="p-3">Receipt No</th>
+                            <th className="p-3">Donor</th>
+                            <th className="p-3">Phone</th>
+                            <th className="p-3">Amount</th>
+                            <th className="p-3">Collector</th>
+                            <th className="p-3">Mode</th>
+                            <th className="p-3">Status</th>
+                            <th className="p-3 text-right">Receipt</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-[#1A1208]/5 dark:divide-gray-800/50">
+                          {filteredHistoryDonations.map(d => (
+                            <tr key={d.id} className="hover:bg-[#F5EDE2]/40 dark:hover:bg-gray-800/10 transition-colors">
+                              <td className="p-3 font-mono text-[#7a6a55] dark:text-gray-400 font-semibold">{d.receipt_number}</td>
+                              <td className="p-3 font-bold text-[#1A1208] dark:text-white">{d.donor_name}</td>
+                              <td className="p-3 text-[#7a6a55] dark:text-gray-400 font-medium">{d.donor_phone}</td>
+                              <td className="p-3 font-bold text-[#1A1208] dark:text-white">{formatAmount(d.amount)}</td>
+                              <td className="p-3 text-[#1A1208] dark:text-gray-300 font-medium">
+                                {d.payment_mode === 'upi_self' ? '🌐 Self' : (d.users?.full_name || 'Unknown')}
+                              </td>
+                              <td className="p-3 text-[#7a6a55] dark:text-gray-400 font-medium">
+                                {d.payment_mode === 'cash' ? '💵 Cash'
+                                  : d.payment_mode === 'upi_collector' ? '📱 UPI (C)'
+                                    : '📱 UPI (S)'}
+                              </td>
+                              <td className="p-3">
+                                <span className={`px-2 py-0.5 rounded-full font-bold text-[10px] uppercase tracking-wide
+                              ${d.status === 'verified' ? 'bg-emerald-500/10 text-emerald-600 dark:text-green-400 border border-emerald-500/20'
+                                    : d.status === 'rejected' ? 'bg-rose-500/10 text-rose-600 dark:text-red-400 border border-rose-500/20'
+                                      : 'bg-amber-500/10 text-amber-600 dark:text-yellow-400 border border-amber-500/20'}`}>
+                                  {d.status}
+                                </span>
+                              </td>
+                              <td className="p-3 text-right">
+                                {d.receipt_data && d.status === 'verified' ? (
+                                  <button
+                                    onClick={() => downloadReceipt(d.receipt_data!)}
+                                    className="inline-block bg-[#F5EDE2] dark:bg-gray-800 hover:bg-[#eaddce] dark:hover:bg-gray-700 text-[#7a6a55] dark:text-gray-300 font-bold px-2.5 py-1 rounded-lg transition-colors text-[10px] cursor-pointer border border-[#1A1208]/10 dark:border-gray-700"
+                                  >
+                                    ↓ Receipt
+                                  </button>
+                                ) : (
+                                  <span className="text-[#7a6a55] dark:text-gray-600">—</span>
+                                )}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                )}
+              </>
             )}
 
             {historyRecordType === 'sponsors' && (
               <>
                 {/* Search and Event filter */}
-                <div className="bg-gray-900 border border-gray-800 rounded-xl p-4 flex flex-col gap-3 md:flex-row md:items-center">
+                <div className="bg-[#F5EDE2] dark:bg-gray-900 border border-[#1A1208]/10 dark:border-gray-800 rounded-xl p-4 flex flex-col gap-3 md:flex-row md:items-center shadow-sm">
                   <div className="flex-1 relative">
                     <input
                       type="text"
                       placeholder="Search by sponsor company name..."
                       value={historySearch}
                       onChange={e => setHistorySearch(e.target.value)}
-                      className="w-full bg-gray-950 border border-gray-800 rounded-lg pl-9 pr-3 py-2 text-xs text-white placeholder-gray-500 focus:outline-none focus:border-orange-500 transition-colors"
+                      className="w-full bg-white dark:bg-gray-950 border border-[#1A1208]/15 dark:border-gray-800 rounded-lg pl-9 pr-3 py-2 text-xs text-[#1A1208] dark:text-white placeholder-[#9e8c76] dark:placeholder-gray-500 font-medium focus:outline-none focus:border-[#E8650A] transition-colors"
                     />
-                    <span className="absolute left-3 top-2 text-gray-500 text-xs">🔍</span>
+                    <span className="absolute left-3 top-2 text-[#7a6a55] dark:text-gray-500 text-xs">🔍</span>
                   </div>
                   <select
                     value={historySponsorEventFilter}
                     onChange={e => setHistorySponsorEventFilter(e.target.value)}
-                    className="w-full md:w-auto bg-gray-950 border border-gray-800 rounded-lg px-3 py-2 text-xs text-gray-300 focus:outline-none focus:border-orange-500 transition-colors"
+                    className="w-full md:w-auto bg-white dark:bg-gray-950 border border-[#1A1208]/15 dark:border-gray-800 rounded-lg px-3 py-2 text-xs text-[#1A1208] dark:text-gray-300 font-bold focus:outline-none focus:border-[#E8650A] transition-colors"
                   >
-                    <option value="all" className="bg-gray-900 text-white">All Events</option>
+                    <option value="all" className="bg-white dark:bg-gray-900 text-[#1A1208] dark:text-white">All Events</option>
                     {events.map(ev => (
-                      <option key={ev.id} value={ev.id} className="bg-gray-900 text-white">{ev.name} {ev.year}</option>
+                      <option key={ev.id} value={ev.id} className="bg-white dark:bg-gray-900 text-[#1A1208] dark:text-white">{ev.name} {ev.year}</option>
                     ))}
                   </select>
                 </div>
@@ -2418,14 +2445,14 @@ export default function DashboardPage() {
                   <button
                     onClick={() => handleExportSponsorCSV(filteredHistorySponsors, `sponsor_history_${new Date().toISOString().slice(0, 10)}.csv`)}
                     disabled={filteredHistorySponsors.length === 0}
-                    className="flex-1 sm:flex-initial sm:px-6 py-2 bg-gray-900 border border-gray-800 text-gray-300 font-semibold rounded-lg text-xs hover:bg-gray-850 hover:text-white transition-colors disabled:opacity-50"
+                    className="flex-1 sm:flex-initial sm:px-6 py-2 bg-[#F5EDE2] dark:bg-gray-900 border border-[#1A1208]/10 dark:border-gray-800 text-[#1A1208] dark:text-gray-300 font-bold rounded-lg text-xs hover:bg-[#ebdcc9] dark:hover:bg-gray-800 transition-colors disabled:opacity-50 cursor-pointer shadow-sm"
                   >
                     📥 Export CSV
                   </button>
                   <button
                     onClick={() => handleExportSponsorPDF(filteredHistorySponsors, 'Sponsorship History Report')}
                     disabled={filteredHistorySponsors.length === 0}
-                    className="flex-1 sm:flex-initial sm:px-6 py-2 bg-gray-900 border border-gray-800 text-gray-300 font-semibold rounded-lg text-xs hover:bg-gray-850 hover:text-white transition-colors disabled:opacity-50"
+                    className="flex-1 sm:flex-initial sm:px-6 py-2 bg-[#F5EDE2] dark:bg-gray-900 border border-[#1A1208]/10 dark:border-gray-800 text-[#1A1208] dark:text-gray-300 font-bold rounded-lg text-xs hover:bg-[#ebdcc9] dark:hover:bg-gray-800 transition-colors disabled:opacity-50 cursor-pointer shadow-sm"
                   >
                     📄 Export PDF
                   </button>
@@ -2433,17 +2460,17 @@ export default function DashboardPage() {
 
                 {/* Sponsors Table */}
                 {sponsorRankingLoading ? (
-                  <p className="text-gray-400 text-sm text-center py-12">Loading sponsors...</p>
+                  <p className="text-[#7a6a55] dark:text-gray-400 text-sm text-center py-12 font-medium">Loading sponsors...</p>
                 ) : filteredHistorySponsors.length === 0 ? (
-                  <div className="text-center py-12 bg-gray-900/30 border border-gray-800 rounded-xl">
-                    <p className="text-gray-500 text-sm">No sponsors match your filters.</p>
+                  <div className="text-center py-12 bg-[#F5EDE2]/60 dark:bg-gray-900/30 border border-[#1A1208]/10 dark:border-gray-800 rounded-xl">
+                    <p className="text-[#7a6a55] dark:text-gray-500 text-sm font-bold">No sponsors match your filters.</p>
                   </div>
                 ) : (
-                  <div className="bg-gray-900 border border-gray-800 rounded-xl overflow-hidden">
+                  <div className="bg-white dark:bg-gray-900 border border-[#1A1208]/10 dark:border-gray-800 rounded-xl overflow-hidden shadow-sm">
                     <div className="overflow-x-auto">
                       <table className="w-full text-left text-xs">
                         <thead>
-                          <tr className="border-b border-gray-800 bg-gray-950/40 text-gray-500 font-medium">
+                          <tr className="border-b border-[#1A1208]/10 dark:border-gray-800 bg-[#F5EDE2] dark:bg-gray-950/40 text-[#7a6a55] dark:text-gray-400 font-bold">
                             <th className="p-3">Company</th>
                             <th className="p-3">Type</th>
                             <th className="p-3">Event</th>
@@ -2453,27 +2480,27 @@ export default function DashboardPage() {
                             <th className="p-3">Status</th>
                           </tr>
                         </thead>
-                        <tbody className="divide-y divide-gray-800/50">
+                        <tbody className="divide-y divide-[#1A1208]/5 dark:divide-gray-800/50">
                           {filteredHistorySponsors.map(s => {
                             const ev = events.find(e => e.id === s.event_id)
                             const isGoods = s.sponsor_type === 'goods_service'
                             return (
-                              <tr key={s.id} className="hover:bg-gray-800/10 transition-colors">
-                                <td className="p-3 font-medium text-white">{s.company_name}</td>
-                                <td className="p-3 text-gray-400">{isGoods ? '📦 Goods/Service' : '💰 Finance'}</td>
-                                <td className="p-3 text-gray-400">{ev ? `${ev.name} ${ev.year}` : '—'}</td>
-                                <td className="p-3 text-gray-300">
+                              <tr key={s.id} className="hover:bg-[#F5EDE2]/40 dark:hover:bg-gray-800/10 transition-colors">
+                                <td className="p-3 font-bold text-[#1A1208] dark:text-white">{s.company_name}</td>
+                                <td className="p-3 text-[#7a6a55] dark:text-gray-400 font-medium">{isGoods ? '📦 Goods/Service' : '💰 Finance'}</td>
+                                <td className="p-3 text-[#7a6a55] dark:text-gray-400 font-medium">{ev ? `${ev.name} ${ev.year}` : '—'}</td>
+                                <td className="p-3 text-[#1A1208] dark:text-gray-300 font-medium">
                                   {s.contact_person_name || '—'}{s.contact_person_phone ? ` · ${s.contact_person_phone}` : ''}
                                 </td>
-                                <td className="p-3 font-bold text-white">
+                                <td className="p-3 font-bold text-[#1A1208] dark:text-white">
                                   {formatAmount(isGoods ? (s.estimated_value || 0) : s.committed_amount)}
                                 </td>
-                                <td className="p-3 text-gray-300">{formatAmount(s.amount_received)}</td>
+                                <td className="p-3 text-[#1A1208] dark:text-gray-300 font-bold">{formatAmount(s.amount_received)}</td>
                                 <td className="p-3">
-                                  <span className={`px-2 py-0.5 rounded-full font-semibold text-[10px] uppercase tracking-wide
-                                    ${s.payment_status === 'completed' ? 'bg-green-950 text-green-400 border border-green-900/20'
-                                    : s.payment_status === 'pending' ? 'bg-yellow-950 text-yellow-400 border border-yellow-900/20'
-                                    : 'bg-orange-950 text-orange-400 border border-orange-900/20'}`}>
+                                  <span className={`px-2 py-0.5 rounded-full font-bold text-[10px] uppercase tracking-wide
+                                    ${s.payment_status === 'completed' ? 'bg-emerald-500/10 text-emerald-600 dark:text-green-400 border border-emerald-500/20'
+                                      : s.payment_status === 'pending' ? 'bg-amber-500/10 text-amber-600 dark:text-yellow-400 border border-amber-500/20'
+                                        : 'bg-orange-500/10 text-orange-600 dark:text-orange-400 border border-orange-500/20'}`}>
                                     {s.payment_status.replace('_', ' ')}
                                   </span>
                                 </td>
@@ -2501,211 +2528,209 @@ export default function DashboardPage() {
               onBack={() => setExpenseManagerEvent(null)}
             />
           ) : (
-          <div className="flex flex-col gap-4">
-            <div className="flex items-center justify-between">
-              <p className="text-sm text-gray-400">{events.length} event{events.length !== 1 ? 's' : ''}</p>
-              {CAN.createEvent(userRole) && (
-                <button
-                  onClick={() => {
-                    if (showEventForm) {
-                      cancelEventForm()
-                    } else {
-                      setShowEventForm(true)
-                    }
-                  }}
-                  className="text-sm bg-orange-500 hover:bg-orange-600 text-white px-4 py-2 rounded-lg"
-                >
-                  {showEventForm ? 'Close Form' : '+ New Event'}
-                </button>
+            <div className="flex flex-col gap-4">
+              <div className="flex items-center justify-between">
+                <p className="text-sm text-[#7a6a55] dark:text-gray-400 font-bold">{events.length} event{events.length !== 1 ? 's' : ''}</p>
+                {CAN.createEvent(userRole) && (
+                  <button
+                    onClick={() => {
+                      if (showEventForm) {
+                        cancelEventForm()
+                      } else {
+                        setShowEventForm(true)
+                      }
+                    }}
+                    className="text-xs bg-gradient-to-r from-[#E8650A] to-[#f97316] hover:from-[#d05807] hover:to-[#ea580c] text-white px-4 py-2.5 rounded-xl font-bold transition-all shadow-md shadow-[#E8650A]/20 cursor-pointer"
+                  >
+                    {showEventForm ? 'Close Form' : '+ New Event'}
+                  </button>
+                )}
+              </div>
+
+              {showEventForm && CAN.createEvent(userRole) && (
+                <div className="bg-[#F5EDE2] dark:bg-gray-800 border border-[#1A1208]/10 dark:border-gray-700 rounded-xl p-4 flex flex-col gap-3 shadow-sm">
+                  <p className="text-sm font-bold text-[#1A1208] dark:text-white">
+                    {editingEventId ? 'Edit Event' : 'Create New Event'}
+                  </p>
+
+                  {/* Event name */}
+                  <div>
+                    <label className="text-xs text-[#7a6a55] dark:text-gray-400 mb-1 block font-bold">Event Name *</label>
+                    <input
+                      value={eventName}
+                      onChange={e => setEventName(e.target.value)}
+                      placeholder="e.g. Ganeshotsav"
+                      className="w-full bg-white dark:bg-gray-900 border border-[#1A1208]/15 dark:border-gray-700 rounded-lg px-3 py-2.5 text-sm text-[#1A1208] dark:text-white placeholder-[#9e8c76] dark:placeholder-gray-500 font-medium focus:outline-none focus:border-[#E8650A]"
+                    />
+                  </div>
+
+                  {/* Year */}
+                  <div>
+                    <label className="text-xs text-[#7a6a55] dark:text-gray-400 mb-1 block font-bold">Year</label>
+                    <input
+                      value={eventYear}
+                      disabled
+                      type="number"
+                      className="w-full bg-white/60 dark:bg-gray-950 border border-[#1A1208]/10 dark:border-gray-800 rounded-lg px-3 py-2.5 text-sm text-[#7a6a55] dark:text-gray-500 font-mono font-medium cursor-not-allowed"
+                    />
+                  </div>
+
+                  {/* UPI ID — required */}
+                  <div>
+                    <label className="text-xs text-[#7a6a55] dark:text-gray-400 mb-1 block font-bold">UPI ID *</label>
+                    <input
+                      value={eventUpiId}
+                      onChange={e => setEventUpiId(e.target.value)}
+                      placeholder="e.g. mandal@okaxis"
+                      className="w-full bg-white dark:bg-gray-900 border border-[#1A1208]/15 dark:border-gray-700 rounded-lg px-3 py-2.5 text-sm text-[#1A1208] dark:text-white placeholder-[#9e8c76] dark:placeholder-gray-500 font-medium focus:outline-none focus:border-[#E8650A]"
+                    />
+                    <p className="text-xs text-[#7a6a55] dark:text-gray-500 mt-1 font-medium">This is used to generate the UPI QR code for donations</p>
+                  </div>
+
+                  {/* Date row */}
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="text-xs text-[#7a6a55] dark:text-gray-400 mb-1 block font-bold">Start Date *</label>
+                      <input
+                        type="date"
+                        value={eventStartDate}
+                        onChange={e => { setEventStartDate(e.target.value); setDateError('') }}
+                        min={
+                          editingEventId && eventStartDate && eventStartDate < new Date().toISOString().split('T')[0]
+                            ? eventStartDate
+                            : new Date().toISOString().split('T')[0]
+                        }
+                        className="w-full bg-white dark:bg-gray-900 border border-[#1A1208]/15 dark:border-gray-700 rounded-lg px-3 py-2.5 text-sm text-[#1A1208] dark:text-white font-medium focus:outline-none focus:border-[#E8650A]"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-xs text-[#7a6a55] dark:text-gray-400 mb-1 block font-bold">End Date *</label>
+                      <input
+                        type="date"
+                        value={eventEndDate}
+                        onChange={e => { setEventEndDate(e.target.value); setDateError('') }}
+                        min={
+                          editingEventId && eventEndDate && eventEndDate < (eventStartDate || new Date().toISOString().split('T')[0])
+                            ? eventEndDate
+                            : (eventStartDate || new Date().toISOString().split('T')[0])
+                        }
+                        className="w-full bg-white dark:bg-gray-900 border border-[#1A1208]/15 dark:border-gray-700 rounded-lg px-3 py-2.5 text-sm text-[#1A1208] dark:text-white font-medium focus:outline-none focus:border-[#E8650A]"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Duration preview */}
+                  {eventStartDate && eventEndDate && (() => {
+                    const days = Math.round(
+                      (new Date(eventEndDate).getTime() - new Date(eventStartDate).getTime())
+                      / (1000 * 60 * 60 * 24)
+                    )
+                    return days > 0 ? (
+                      <div className={`text-xs px-3 py-2 rounded-lg font-bold ${days > 50 ? 'bg-rose-500/10 text-rose-600 dark:text-red-400 border border-rose-500/20' : 'bg-white dark:bg-gray-700 text-[#1A1208] dark:text-gray-300 border border-[#1A1208]/10 dark:border-gray-600'}`}>
+                        Duration: <span className="font-bold">{days} days</span>
+                        {days > 50 && ' — exceeds 50 day limit'}
+                        {days <= 50 && ` of 50 day maximum`}
+                      </div>
+                    ) : null
+                  })()}
+
+                  {/* Date error */}
+                  {dateError && (
+                    <div className="bg-rose-500/10 border border-rose-500/20 rounded-lg px-3 py-2">
+                      <p className="text-rose-600 dark:text-red-400 text-xs font-bold">{dateError}</p>
+                    </div>
+                  )}
+
+                  <div className="flex gap-2 pt-1">
+                    <button
+                      onClick={editingEventId ? updateEvent : createEvent}
+                      disabled={eventSubmitting}
+                      className="flex-1 bg-gradient-to-r from-[#E8650A] to-[#f97316] hover:from-[#d05807] hover:to-[#ea580c] disabled:opacity-50 text-white text-xs font-bold py-2.5 rounded-xl transition-all cursor-pointer shadow-md shadow-[#E8650A]/20"
+                    >
+                      {eventSubmitting ? 'Saving...' : editingEventId ? 'Save Changes' : 'Create Event'}
+                    </button>
+                    <button onClick={cancelEventForm} className="px-4 bg-[#F5EDE2] dark:bg-gray-700 hover:bg-[#ebdcc9] dark:hover:bg-gray-600 text-[#1A1208] dark:text-gray-300 border border-[#1A1208]/10 dark:border-gray-600 text-xs font-bold rounded-xl transition-colors cursor-pointer">
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {events.length === 0 ? (
+                <p className="text-[#7a6a55] dark:text-gray-500 text-sm text-center py-8 font-medium">
+                  {CAN.createEvent(userRole) ? 'No events yet. Create one above.' : 'No events created yet. Ask the Adhyaksha to create an event.'}
+                </p>
+              ) : (
+                events.map(ev => {
+                  const isExpired = ev.is_expired || ev.end_date < new Date().toISOString().split('T')[0]
+                  const isSuspended = ev.is_suspended
+                  return (
+                    <div key={ev.id} className={`bg-white dark:bg-gray-800 border rounded-xl p-4 shadow-sm transition-all
+                    ${isExpired || isSuspended ? 'border-[#1A1208]/10 dark:border-gray-700 opacity-60' : 'border-[#1A1208]/15 dark:border-gray-700'}`}>
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="flex-1">
+                          <p className="font-bold text-[#1A1208] dark:text-white text-sm">{ev.name} {ev.year}</p>
+                          <p className="text-xs text-[#7a6a55] dark:text-gray-400 mt-1 font-mono font-medium">
+                            {ev.upi_id ? `UPI: ${ev.upi_id}` : 'No UPI ID'}
+                          </p>
+                          <p className="text-xs text-[#7a6a55] dark:text-gray-400 mt-1 font-medium">
+                            {new Date(ev.start_date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}
+                            {' — '}
+                            {new Date(ev.end_date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
+                            {ev.days_remaining > 0 && !isExpired && !isSuspended && (
+                              <span className="text-[#E8650A] dark:text-orange-400 ml-2 font-bold">{ev.days_remaining} days left</span>
+                            )}
+                          </p>
+                        </div>
+                        <div className="flex items-center gap-2 shrink-0">
+                          <span className={`text-xs font-bold px-2.5 py-1 rounded-full uppercase tracking-wider
+                          ${isSuspended
+                              ? 'bg-rose-500/10 text-rose-600 dark:text-red-400 border border-rose-500/20'
+                              : isExpired
+                                ? 'bg-[#F5EDE2] dark:bg-gray-700 text-[#7a6a55] dark:text-gray-400 border border-[#1A1208]/10 dark:border-gray-600'
+                                : ev.is_active
+                                  ? 'bg-emerald-500/10 text-emerald-600 dark:text-green-400 border border-emerald-500/20'
+                                  : 'bg-[#F5EDE2] dark:bg-gray-700 text-[#7a6a55] dark:text-gray-400 border border-[#1A1208]/10 dark:border-gray-600'}`}>
+                            {isSuspended ? 'Suspended by Intellidon Admin' : isExpired ? 'Expired' : ev.is_active ? 'Active' : 'Inactive'}
+                          </span>
+                          {/* Toggle only available if not expired and not suspended */}
+                          {!isExpired && !isSuspended && CAN.toggleEvent(userRole) && (
+                            <button
+                              onClick={() => toggleEvent(ev.id, ev.is_active)}
+                              className="text-xs text-[#7a6a55] dark:text-gray-400 hover:text-[#1A1208] dark:hover:text-white transition-colors font-bold cursor-pointer"
+                            >
+                              {ev.is_active ? 'Deactivate' : 'Activate'}
+                            </button>
+                          )}
+                          {/* Edit only available if not expired and not suspended */}
+                          {!isExpired && !isSuspended && CAN.createEvent(userRole) && (
+                            <button
+                              onClick={() => startEditingEvent(ev)}
+                              className="text-xs text-[#E8650A] dark:text-orange-400 hover:underline transition-colors ml-2 font-bold cursor-pointer"
+                            >
+                              Edit
+                            </button>
+                          )}
+                          {isExpired && (
+                            <span className="text-xs text-[#7a6a55] dark:text-gray-500 font-medium">Permanently off</span>
+                          )}
+                        </div>
+                      </div>
+                      {CAN.manageExpenses(userRole) && (
+                        <div className="mt-3 pt-3 border-t border-[#1A1208]/10 dark:border-gray-700">
+                          <button
+                            onClick={() => setExpenseManagerEvent(ev)}
+                            className="text-xs bg-[#F5EDE2] dark:bg-gray-700/60 hover:bg-[#ebdcc9] dark:hover:bg-gray-700 text-[#1A1208] dark:text-gray-200 border border-[#1A1208]/10 dark:border-gray-600 px-3 py-1.5 rounded-lg transition-colors font-bold cursor-pointer"
+                          >
+                            💰 Manage Expenses
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  )
+                })
               )}
             </div>
-
-            {showEventForm && CAN.createEvent(userRole) && (
-              <div className="bg-gray-800 border border-gray-700 rounded-xl p-4 flex flex-col gap-3">
-                <p className="text-sm font-medium">
-                  {editingEventId ? 'Edit Event' : 'Create New Event'}
-                </p>
-
-                {/* Event name */}
-                <div>
-                  <label className="text-xs text-gray-400 mb-1 block">Event Name *</label>
-                  <input
-                    value={eventName}
-                    onChange={e => setEventName(e.target.value)}
-                    placeholder="e.g. Ganeshotsav"
-                    className="w-full bg-gray-900 border border-gray-700 rounded-lg px-3 py-2.5 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-orange-500"
-                  />
-                </div>
-
-                {/* Year */}
-                <div>
-                  <label className="text-xs text-gray-400 mb-1 block">Year</label>
-                  <input
-                    value={eventYear}
-                    disabled
-                    type="number"
-                    className="w-full bg-gray-950 border border-gray-800 rounded-lg px-3 py-2.5 text-sm text-gray-500 cursor-not-allowed"
-                  />
-                </div>
-
-                {/* UPI ID — required */}
-                <div>
-                  <label className="text-xs text-gray-400 mb-1 block">UPI ID *</label>
-                  <input
-                    value={eventUpiId}
-                    onChange={e => setEventUpiId(e.target.value)}
-                    placeholder="e.g. mandal@okaxis"
-                    className="w-full bg-gray-900 border border-gray-700 rounded-lg px-3 py-2.5 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-orange-500"
-                  />
-                  <p className="text-xs text-gray-500 mt-1">This is used to generate the UPI QR code for donations</p>
-                </div>
-
-                {/* Date row */}
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="text-xs text-gray-400 mb-1 block">Start Date *</label>
-                    <input
-                      type="date"
-                      value={eventStartDate}
-                      onChange={e => { setEventStartDate(e.target.value); setDateError('') }}
-                      min={
-                        editingEventId && eventStartDate && eventStartDate < new Date().toISOString().split('T')[0]
-                          ? eventStartDate
-                          : new Date().toISOString().split('T')[0]
-                      }
-                      className="w-full bg-gray-900 border border-gray-700 rounded-lg px-3 py-2.5 text-sm text-white focus:outline-none focus:border-orange-500"
-                      style={{ colorScheme: 'dark' }}
-                    />
-                  </div>
-                  <div>
-                    <label className="text-xs text-gray-400 mb-1 block">End Date *</label>
-                    <input
-                      type="date"
-                      value={eventEndDate}
-                      onChange={e => { setEventEndDate(e.target.value); setDateError('') }}
-                      min={
-                        editingEventId && eventEndDate && eventEndDate < (eventStartDate || new Date().toISOString().split('T')[0])
-                          ? eventEndDate
-                          : (eventStartDate || new Date().toISOString().split('T')[0])
-                      }
-                      className="w-full bg-gray-900 border border-gray-700 rounded-lg px-3 py-2.5 text-sm text-white focus:outline-none focus:border-orange-500"
-                      style={{ colorScheme: 'dark' }}
-                    />
-                  </div>
-                </div>
-
-                {/* Duration preview */}
-                {eventStartDate && eventEndDate && (() => {
-                  const days = Math.round(
-                    (new Date(eventEndDate).getTime() - new Date(eventStartDate).getTime())
-                    / (1000 * 60 * 60 * 24)
-                  )
-                  return days > 0 ? (
-                    <div className={`text-xs px-3 py-2 rounded-lg ${days > 50 ? 'bg-red-900/40 text-red-400' : 'bg-gray-700 text-gray-300'}`}>
-                      Duration: <span className="font-medium">{days} days</span>
-                      {days > 50 && ' — exceeds 50 day limit'}
-                      {days <= 50 && ` of 50 day maximum`}
-                    </div>
-                  ) : null
-                })()}
-
-                {/* Date error */}
-                {dateError && (
-                  <div className="bg-red-900/40 border border-red-700 rounded-lg px-3 py-2">
-                    <p className="text-red-400 text-xs">{dateError}</p>
-                  </div>
-                )}
-
-                <div className="flex gap-2">
-                  <button
-                    onClick={editingEventId ? updateEvent : createEvent}
-                    disabled={eventSubmitting}
-                    className="flex-1 bg-orange-500 hover:bg-orange-600 disabled:opacity-50 text-white text-sm font-medium py-2.5 rounded-lg"
-                  >
-                    {eventSubmitting ? 'Saving...' : editingEventId ? 'Save Changes' : 'Create Event'}
-                  </button>
-                  <button onClick={cancelEventForm} className="px-4 bg-gray-700 text-gray-300 text-sm rounded-lg">
-                    Cancel
-                  </button>
-                </div>
-              </div>
-            )}
-
-            {events.length === 0 ? (
-              <p className="text-gray-500 text-sm text-center py-8">
-                {CAN.createEvent(userRole) ? 'No events yet. Create one above.' : 'No events created yet. Ask the Adhyaksha to create an event.'}
-              </p>
-            ) : (
-              events.map(ev => {
-                const isExpired = ev.is_expired || ev.end_date < new Date().toISOString().split('T')[0]
-                const isSuspended = ev.is_suspended
-                return (
-                  <div key={ev.id} className={`bg-gray-800 border rounded-xl p-4
-                    ${isExpired || isSuspended ? 'border-gray-700 opacity-60' : 'border-gray-700'}`}>
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="flex-1">
-                        <p className="font-medium text-white text-sm">{ev.name} {ev.year}</p>
-                        <p className="text-xs text-gray-400 mt-1">
-                          {ev.upi_id ? `UPI: ${ev.upi_id}` : 'No UPI ID'}
-                        </p>
-                        <p className="text-xs text-gray-550 mt-1">
-                          {new Date(ev.start_date).toLocaleDateString('en-IN', { day:'numeric', month:'short' })}
-                          {' — '}
-                          {new Date(ev.end_date).toLocaleDateString('en-IN', { day:'numeric', month:'short', year:'numeric' })}
-                          {ev.days_remaining > 0 && !isExpired && !isSuspended && (
-                            <span className="text-orange-400 ml-2">{ev.days_remaining} days left</span>
-                          )}
-                        </p>
-                      </div>
-                      <div className="flex items-center gap-2 shrink-0">
-                        <span className={`text-xs font-medium px-2.5 py-1 rounded-full
-                          ${isSuspended
-                            ? 'bg-red-900/50 text-red-400'
-                            : isExpired
-                              ? 'bg-gray-700 text-gray-500'
-                              : ev.is_active
-                                ? 'bg-green-900/50 text-green-400'
-                                : 'bg-gray-700 text-gray-400'}`}>
-                          {isSuspended ? 'Suspended by Intellidon Admin' : isExpired ? 'Expired' : ev.is_active ? 'Active' : 'Inactive'}
-                        </span>
-                        {/* Toggle only available if not expired and not suspended */}
-                        {!isExpired && !isSuspended && CAN.toggleEvent(userRole) && (
-                          <button
-                            onClick={() => toggleEvent(ev.id, ev.is_active)}
-                            className="text-xs text-gray-455 hover:text-white transition-colors"
-                          >
-                            {ev.is_active ? 'Deactivate' : 'Activate'}
-                          </button>
-                        )}
-                        {/* Edit only available if not expired and not suspended */}
-                        {!isExpired && !isSuspended && CAN.createEvent(userRole) && (
-                          <button
-                            onClick={() => startEditingEvent(ev)}
-                            className="text-xs text-orange-400 hover:text-orange-300 transition-colors ml-2"
-                          >
-                            Edit
-                          </button>
-                        )}
-                        {isExpired && (
-                          <span className="text-xs text-gray-600">Permanently off</span>
-                        )}
-                      </div>
-                    </div>
-                    {CAN.manageExpenses(userRole) && (
-                      <div className="mt-3 pt-3 border-t border-gray-700">
-                        <button
-                          onClick={() => setExpenseManagerEvent(ev)}
-                          className="text-xs bg-gray-700/60 hover:bg-gray-700 text-gray-200 px-3 py-1.5 rounded-lg transition-colors font-medium"
-                        >
-                          💰 Manage Expenses
-                        </button>
-                      </div>
-                    )}
-                  </div>
-                )
-              })
-            )}
-          </div>
           )
         )}
 
@@ -2713,80 +2738,80 @@ export default function DashboardPage() {
         {tab === 'team' && CAN.seeTeamTab(userRole) && (
           <div className="flex flex-col gap-4">
             <div className="flex items-center justify-between">
-              <p className="text-sm text-gray-400">{members.length} member{members.length !== 1 ? 's' : ''}</p>
+              <p className="text-sm text-[#7a6a55] dark:text-gray-400 font-bold">{members.length} member{members.length !== 1 ? 's' : ''}</p>
               <button
                 onClick={() => setShowMemberForm(!showMemberForm)}
-                className="text-sm bg-orange-500 hover:bg-orange-600 text-white px-4 py-2 rounded-lg"
+                className="text-xs bg-gradient-to-r from-[#E8650A] to-[#f97316] hover:from-[#d05807] hover:to-[#ea580c] text-white px-4 py-2.5 rounded-xl font-bold transition-all shadow-md shadow-[#E8650A]/20 cursor-pointer"
               >
                 + Add Member
               </button>
             </div>
 
             {/* Role guide */}
-            <div className="bg-gray-800 border border-gray-700 rounded-xl p-4 text-xs text-gray-400 leading-relaxed">
-              <p className="font-medium text-white text-sm mb-2">Role guide</p>
-              <p><span className="text-orange-400 font-medium">Adhyaksha (Admin)</span> — full access. Manages team, events, and sees all data.</p>
-              <p className="mt-1"><span className="text-blue-400 font-medium">Khajindar (Manager)</span> — can view donations and verify cash. Cannot manage team or events.</p>
-              <p className="mt-1"><span className="text-gray-300 font-medium">Sevak (Collector)</span> — can only enter new donations from their phone. Cannot see reports.</p>
+            <div className="bg-[#F5EDE2] dark:bg-gray-800 border border-[#1A1208]/10 dark:border-gray-700 rounded-xl p-4 text-xs text-[#7a6a55] dark:text-gray-400 leading-relaxed shadow-sm">
+              <p className="font-bold text-[#1A1208] dark:text-white text-sm mb-2">Role guide</p>
+              <p><span className="text-[#E8650A] dark:text-orange-400 font-bold">Adhyaksha (Admin)</span> — full access. Manages team, events, and sees all data.</p>
+              <p className="mt-1"><span className="text-blue-600 dark:text-blue-400 font-bold">Khajindar (Manager)</span> — can view donations and verify cash. Cannot manage team or events.</p>
+              <p className="mt-1"><span className="text-[#1A1208] dark:text-gray-300 font-bold">Sevak (Collector)</span> — can only enter new donations from their phone. Cannot see reports.</p>
             </div>
 
             {/* Add member form */}
             {showMemberForm && (
-              <div className="bg-gray-800 border border-gray-700 rounded-xl p-4 flex flex-col gap-3">
-                <p className="text-sm font-medium">Add Team Member</p>
-                <div className="grid grid-cols-3 gap-2">
+              <div className="bg-[#F5EDE2] dark:bg-gray-800 border border-[#1A1208]/10 dark:border-gray-700 rounded-xl p-4 flex flex-col gap-3 shadow-sm">
+                <p className="text-sm font-bold text-[#1A1208] dark:text-white">Add Team Member</p>
+                <div className="grid grid-cols-2 gap-2">
                   {(['collector', 'manager'] as const).map(r => (
                     <button
                       key={r}
                       onClick={() => setMemberRole(r)}
-                      className={`py-2 rounded-lg text-xs font-medium border capitalize transition-colors
-                        ${memberRole === r ? 'bg-orange-500 border-orange-500 text-white' : 'bg-gray-900 border-gray-700 text-gray-400'}`}
+                      className={`py-2 rounded-xl text-xs font-bold border capitalize transition-all cursor-pointer
+                        ${memberRole === r ? 'bg-gradient-to-r from-[#E8650A] to-[#f97316] border-[#E8650A] text-white shadow-md shadow-[#E8650A]/20' : 'bg-white dark:bg-gray-900 border-[#1A1208]/15 dark:border-gray-700 text-[#7a6a55] dark:text-gray-400'}`}
                     >
                       {r === 'collector' ? 'Sevak' : 'Khajindar'}
-                      <span className="block text-gray-500 font-normal capitalize">{r}</span>
+                      <span className="block text-[10px] opacity-80 font-normal capitalize">{r}</span>
                     </button>
                   ))}
                 </div>
                 <input value={memberName} onChange={e => setMemberName(e.target.value)} placeholder="Full name"
-                  className="bg-gray-900 border border-gray-700 rounded-lg px-3 py-2.5 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-orange-500" />
+                  className="bg-white dark:bg-gray-900 border border-[#1A1208]/15 dark:border-gray-700 rounded-lg px-3 py-2.5 text-sm text-[#1A1208] dark:text-white placeholder-[#9e8c76] dark:placeholder-gray-500 font-medium focus:outline-none focus:border-[#E8650A]" />
                 <input value={memberPhone} onChange={e => setMemberPhone(e.target.value.replace(/[^0-9]/g, "").slice(0, 10))} placeholder="Phone number (10 digits)" type="tel"
                   maxLength={10}
-                  className="bg-gray-900 border border-gray-700 rounded-lg px-3 py-2.5 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-orange-500" />
+                  className="bg-white dark:bg-gray-900 border border-[#1A1208]/15 dark:border-gray-700 rounded-lg px-3 py-2.5 text-sm text-[#1A1208] dark:text-white placeholder-[#9e8c76] dark:placeholder-gray-500 font-medium focus:outline-none focus:border-[#E8650A]" />
                 <input value={memberEmail} onChange={e => setMemberEmail(e.target.value)} placeholder="Email (used to login)" type="email"
-                  className="bg-gray-900 border border-gray-700 rounded-lg px-3 py-2.5 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-orange-500" />
+                  className="bg-white dark:bg-gray-900 border border-[#1A1208]/15 dark:border-gray-700 rounded-lg px-3 py-2.5 text-sm text-[#1A1208] dark:text-white placeholder-[#9e8c76] dark:placeholder-gray-500 font-medium focus:outline-none focus:border-[#E8650A]" />
                 <input value={memberPassword} onChange={e => setMemberPassword(e.target.value)} placeholder="Password (min 8 characters)" type="password"
-                  className="bg-gray-900 border border-gray-700 rounded-lg px-3 py-2.5 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-orange-500" />
+                  className="bg-white dark:bg-gray-900 border border-[#1A1208]/15 dark:border-gray-700 rounded-lg px-3 py-2.5 text-sm text-[#1A1208] dark:text-white placeholder-[#9e8c76] dark:placeholder-gray-500 font-medium focus:outline-none focus:border-[#E8650A]" />
 
                 {memberPassword && (
-                  <div className="space-y-1 bg-gray-950/45 border border-gray-800/80 rounded-lg p-2.5">
-                    <p className="text-[9px] text-gray-500 font-bold mb-1.5 uppercase tracking-wider">Password Requirements:</p>
-                    
+                  <div className="space-y-1 bg-white/60 dark:bg-gray-950/45 border border-[#1A1208]/10 dark:border-gray-800/80 rounded-lg p-2.5">
+                    <p className="text-[9px] text-[#7a6a55] dark:text-gray-500 font-bold mb-1.5 uppercase tracking-wider">Password Requirements:</p>
+
                     <div className="flex items-center gap-1.5 text-[10px] transition-colors">
-                      <span className={memberPassword ? (memberPassLength ? 'text-emerald-400 font-medium' : 'text-red-400') : 'text-gray-500'}>
+                      <span className={memberPassword ? (memberPassLength ? 'text-emerald-600 dark:text-emerald-400 font-bold' : 'text-rose-600 dark:text-red-400') : 'text-[#7a6a55] dark:text-gray-500'}>
                         {memberPassword ? (memberPassLength ? '✓' : '✗') : '•'} At least 8 characters
                       </span>
                     </div>
 
                     <div className="flex items-center gap-1.5 text-[10px] transition-colors">
-                      <span className={memberPassword ? (memberPassUpper ? 'text-emerald-400 font-medium' : 'text-red-400') : 'text-gray-500'}>
+                      <span className={memberPassword ? (memberPassUpper ? 'text-emerald-600 dark:text-emerald-400 font-bold' : 'text-rose-600 dark:text-red-400') : 'text-[#7a6a55] dark:text-gray-500'}>
                         {memberPassword ? (memberPassUpper ? '✓' : '✗') : '•'} Uppercase letter (A-Z)
                       </span>
                     </div>
 
                     <div className="flex items-center gap-1.5 text-[10px] transition-colors">
-                      <span className={memberPassword ? (memberPassLower ? 'text-emerald-400 font-medium' : 'text-red-400') : 'text-gray-500'}>
+                      <span className={memberPassword ? (memberPassLower ? 'text-emerald-600 dark:text-emerald-400 font-bold' : 'text-rose-600 dark:text-red-400') : 'text-[#7a6a55] dark:text-gray-500'}>
                         {memberPassword ? (memberPassLower ? '✓' : '✗') : '•'} Lowercase letter (a-z)
                       </span>
                     </div>
 
                     <div className="flex items-center gap-1.5 text-[10px] transition-colors">
-                      <span className={memberPassword ? (memberPassNumber ? 'text-emerald-400 font-medium' : 'text-red-400') : 'text-gray-500'}>
+                      <span className={memberPassword ? (memberPassNumber ? 'text-emerald-600 dark:text-emerald-400 font-bold' : 'text-rose-600 dark:text-red-400') : 'text-[#7a6a55] dark:text-gray-500'}>
                         {memberPassword ? (memberPassNumber ? '✓' : '✗') : '•'} A number (0-9)
                       </span>
                     </div>
 
                     <div className="flex items-center gap-1.5 text-[10px] transition-colors">
-                      <span className={memberPassword ? (memberPassSpecial ? 'text-emerald-400 font-medium' : 'text-red-400') : 'text-gray-500'}>
+                      <span className={memberPassword ? (memberPassSpecial ? 'text-emerald-600 dark:text-emerald-400 font-bold' : 'text-rose-600 dark:text-red-400') : 'text-[#7a6a55] dark:text-gray-500'}>
                         {memberPassword ? (memberPassSpecial ? '✓' : '✗') : '•'} Special character (e.g. #, @, $, !, %, &, *)
                       </span>
                     </div>
@@ -2795,35 +2820,35 @@ export default function DashboardPage() {
 
                 {/* Event access */}
                 <div>
-                  <label className="block text-[10px] uppercase font-bold text-gray-500 tracking-wider mb-1.5">Event Access</label>
+                  <label className="block text-[10px] uppercase font-bold text-[#7a6a55] dark:text-gray-400 tracking-wider mb-1.5">Event Access</label>
                   <div className="grid grid-cols-2 gap-2 mb-2">
                     <button type="button" onClick={() => setMemberEventScope('all')}
-                      className={`py-2 rounded-lg text-xs font-medium border transition-colors
-                        ${memberEventScope === 'all' ? 'bg-orange-500 border-orange-500 text-white' : 'bg-gray-900 border-gray-700 text-gray-400'}`}>
+                      className={`py-2 rounded-xl text-xs font-bold border transition-all cursor-pointer
+                        ${memberEventScope === 'all' ? 'bg-gradient-to-r from-[#E8650A] to-[#f97316] border-[#E8650A] text-white shadow-md shadow-[#E8650A]/20' : 'bg-white dark:bg-gray-900 border-[#1A1208]/15 dark:border-gray-700 text-[#7a6a55] dark:text-gray-400'}`}>
                       All events
                     </button>
                     <button type="button" onClick={() => setMemberEventScope('specific')}
-                      className={`py-2 rounded-lg text-xs font-medium border transition-colors
-                        ${memberEventScope === 'specific' ? 'bg-orange-500 border-orange-500 text-white' : 'bg-gray-900 border-gray-700 text-gray-400'}`}>
+                      className={`py-2 rounded-xl text-xs font-bold border transition-all cursor-pointer
+                        ${memberEventScope === 'specific' ? 'bg-gradient-to-r from-[#E8650A] to-[#f97316] border-[#E8650A] text-white shadow-md shadow-[#E8650A]/20' : 'bg-white dark:bg-gray-900 border-[#1A1208]/15 dark:border-gray-700 text-[#7a6a55] dark:text-gray-400'}`}>
                       Specific event(s)
                     </button>
                   </div>
                   {memberEventScope === 'specific' && (
                     events.length === 0 ? (
-                      <p className="text-xs text-gray-500">No events created yet.</p>
+                      <p className="text-xs text-[#7a6a55] dark:text-gray-500 font-medium">No events created yet.</p>
                     ) : (
-                      <div className="max-h-36 overflow-y-auto flex flex-col gap-1.5 bg-gray-900 border border-gray-700 rounded-lg p-2.5">
+                      <div className="max-h-36 overflow-y-auto flex flex-col gap-1.5 bg-white dark:bg-gray-900 border border-[#1A1208]/15 dark:border-gray-700 rounded-lg p-2.5">
                         {events.map(ev => (
-                          <label key={ev.id} className="flex items-center gap-2 text-xs text-gray-300 cursor-pointer">
+                          <label key={ev.id} className="flex items-center gap-2 text-xs text-[#1A1208] dark:text-gray-300 font-medium cursor-pointer">
                             <input
                               type="checkbox"
                               checked={memberEventIds.includes(ev.id)}
                               onChange={() => setMemberEventIds(prev =>
                                 prev.includes(ev.id) ? prev.filter(id => id !== ev.id) : [...prev, ev.id]
                               )}
-                              className="accent-orange-500"
+                              className="accent-[#E8650A]"
                             />
-                            {ev.name} <span className="text-gray-500">({ev.year})</span>
+                            {ev.name} <span className="text-[#7a6a55] dark:text-gray-500">({ev.year})</span>
                           </label>
                         ))}
                       </div>
@@ -2831,50 +2856,48 @@ export default function DashboardPage() {
                   )}
                 </div>
 
-                <div className="flex gap-2">
+                <div className="flex gap-2 pt-1">
                   <button onClick={addMember} disabled={memberSubmitting || !memberName || memberPhone.length !== 10 || !memberEmail || !isMemberPasswordStrong}
-                    className="flex-1 bg-orange-500 hover:bg-orange-600 disabled:opacity-50 text-white text-sm font-medium py-2.5 rounded-lg">
+                    className="flex-1 bg-gradient-to-r from-[#E8650A] to-[#f97316] hover:from-[#d05807] hover:to-[#ea580c] disabled:opacity-50 text-white text-xs font-bold py-2.5 rounded-xl transition-all cursor-pointer shadow-md shadow-[#E8650A]/20">
                     {memberSubmitting ? 'Adding...' : `Add ${memberRole === 'collector' ? 'Sevak' : 'Khajindar'}`}
                   </button>
-                  <button onClick={() => setShowMemberForm(false)} className="px-4 bg-gray-700 text-gray-300 text-sm rounded-lg">Cancel</button>
+                  <button onClick={() => setShowMemberForm(false)} className="px-4 bg-[#F5EDE2] dark:bg-gray-700 hover:bg-[#ebdcc9] dark:hover:bg-gray-600 text-[#1A1208] dark:text-gray-300 border border-[#1A1208]/10 dark:border-gray-600 text-xs font-bold rounded-xl transition-colors cursor-pointer">Cancel</button>
                 </div>
               </div>
             )}
 
             {members.length === 0 ? (
-              <p className="text-gray-500 text-sm text-center py-8">No team members yet.</p>
+              <p className="text-[#7a6a55] dark:text-gray-500 text-sm text-center py-8 font-medium">No team members yet.</p>
             ) : (
               members.map(m => (
-                <div key={m.id} className={`bg-gray-800 border rounded-xl p-4 flex items-center justify-between flex-wrap gap-3 transition-colors ${
-                  m.is_active === false ? 'border-gray-800 bg-gray-900/40 opacity-75' : 'border-gray-700'
-                }`}>
+                <div key={m.id} className={`bg-white dark:bg-gray-800 border rounded-xl p-4 flex items-center justify-between flex-wrap gap-3 transition-colors shadow-sm ${m.is_active === false ? 'border-[#1A1208]/10 dark:border-gray-800 bg-[#F5EDE2]/50 dark:bg-gray-900/40 opacity-75' : 'border-[#1A1208]/15 dark:border-gray-700'
+                  }`}>
                   <div>
                     <div className="flex items-center gap-2 flex-wrap">
-                      <p className={`font-medium text-sm ${m.is_active === false ? 'text-gray-500 line-through' : 'text-white'}`}>{m.full_name}</p>
-                      <span className={`text-xs px-2 py-0.5 rounded-full font-medium
-                        ${m.role === 'admin' ? 'bg-orange-900/50 text-orange-400'
-                        : m.role === 'manager' ? 'bg-blue-900/50 text-blue-400'
-                        : m.role === 'super_admin' ? 'bg-purple-900/50 text-purple-400'
-                        : 'bg-gray-700 text-gray-300'}`}>
+                      <p className={`font-bold text-sm ${m.is_active === false ? 'text-[#7a6a55] dark:text-gray-500 line-through' : 'text-[#1A1208] dark:text-white'}`}>{m.full_name}</p>
+                      <span className={`text-xs px-2.5 py-0.5 rounded-full font-bold uppercase tracking-wider
+                        ${m.role === 'admin' ? 'bg-[#E8650A]/10 text-[#E8650A] dark:text-orange-400 border border-[#E8650A]/20'
+                          : m.role === 'manager' ? 'bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20'
+                            : m.role === 'super_admin' ? 'bg-purple-500/10 text-purple-600 dark:text-purple-400 border border-purple-500/20'
+                              : 'bg-[#F5EDE2] dark:bg-gray-700 text-[#7a6a55] dark:text-gray-300 border border-[#1A1208]/10 dark:border-gray-600'}`}>
                         {m.role === 'admin' ? 'Adhyaksha'
-                        : m.role === 'manager' ? 'Khajindar'
-                        : m.role === 'collector' ? 'Sevak'
-                        : m.role}
+                          : m.role === 'manager' ? 'Khajindar'
+                            : m.role === 'collector' ? 'Sevak'
+                              : m.role}
                       </span>
                       {m.is_active === false && (
-                        <span className="text-[10px] px-2 py-0.5 rounded-full font-semibold bg-gray-900/60 text-gray-400 border border-gray-800">
+                        <span className="text-[10px] px-2 py-0.5 rounded-full font-bold bg-[#F5EDE2] dark:bg-gray-900/60 text-[#7a6a55] dark:text-gray-400 border border-[#1A1208]/10 dark:border-gray-800">
                           Deactivated
                         </span>
                       )}
                     </div>
-                    <p className="text-xs text-gray-400 mt-1">{m.phone}</p>
+                    <p className="text-xs text-[#7a6a55] dark:text-gray-400 mt-1 font-mono font-medium">{m.phone}</p>
                     {m.role !== 'admin' && (
-                      <p className="text-[11px] text-gray-500 mt-0.5">
+                      <p className="text-[11px] text-[#7a6a55] dark:text-gray-400 mt-0.5 font-medium">
                         {(!m.event_ids || m.event_ids.length === 0)
                           ? 'Access: all events'
-                          : `Access: ${m.event_ids.length} event${m.event_ids.length !== 1 ? 's' : ''} — ${
-                              m.event_ids.map(id => events.find(e => e.id === id)?.name || '?').join(', ')
-                            }`}
+                          : `Access: ${m.event_ids.length} event${m.event_ids.length !== 1 ? 's' : ''} — ${m.event_ids.map(id => events.find(e => e.id === id)?.name || '?').join(', ')
+                          }`}
                       </p>
                     )}
                   </div>
@@ -2883,7 +2906,7 @@ export default function DashboardPage() {
                     <div className="flex items-center gap-2 flex-wrap">
                       <button
                         onClick={() => openEditModal(m)}
-                        className="text-xs bg-gray-700/60 hover:bg-gray-700 text-gray-200 px-2.5 py-1.5 rounded-lg transition-colors font-medium cursor-pointer"
+                        className="text-xs bg-[#F5EDE2] dark:bg-gray-700/60 hover:bg-[#ebdcc9] dark:hover:bg-gray-700 text-[#1A1208] dark:text-gray-200 border border-[#1A1208]/10 dark:border-gray-600 px-2.5 py-1.5 rounded-lg transition-colors font-bold cursor-pointer"
                       >
                         Edit
                       </button>
@@ -2895,11 +2918,10 @@ export default function DashboardPage() {
                       </button>
                       <button
                         onClick={() => toggleMemberStatus(m)}
-                        className={`text-xs px-2.5 py-1.5 rounded-lg transition-colors font-medium cursor-pointer ${
-                          m.is_active === false
+                        className={`text-xs px-2.5 py-1.5 rounded-lg transition-colors font-medium cursor-pointer ${m.is_active === false
                             ? 'bg-emerald-600/80 hover:bg-emerald-600 text-white'
                             : 'bg-red-950/60 hover:bg-red-900/65 text-red-200 border border-red-900/30'
-                        }`}
+                          }`}
                       >
                         {m.is_active === false ? 'Activate' : 'Deactivate'}
                       </button>
@@ -2920,7 +2942,7 @@ export default function DashboardPage() {
 
         {/* Drawer Backdrop */}
         {isSelfDrawerOpen && (
-          <div 
+          <div
             className="fixed inset-0 z-35 bg-black/60 backdrop-blur-xs transition-opacity duration-300"
             onClick={() => {
               setIsSelfDrawerOpen(false)
@@ -2931,21 +2953,21 @@ export default function DashboardPage() {
         )}
 
         {/* ── Self Donation Verification Drawer (Sliding Panel) ── */}
-        <div className={`fixed inset-y-0 right-0 z-40 w-full max-w-md bg-gray-900 border-l border-gray-800 shadow-2xl flex flex-col transition-transform duration-305 ease-in-out transform
+        <div className={`fixed inset-y-0 right-0 z-40 w-full max-w-md bg-[#FDF8F3] dark:bg-gray-900 border-l border-[#1A1208]/15 dark:border-gray-800 shadow-2xl flex flex-col transition-transform duration-305 ease-in-out transform text-[#1A1208] dark:text-white
           ${isSelfDrawerOpen ? 'translate-x-0' : 'translate-x-full'}`}>
-          
-          <div className="p-4 border-b border-gray-800 flex items-center justify-between bg-gray-900/50 backdrop-blur">
+
+          <div className="p-4 border-b border-[#1A1208]/10 dark:border-gray-800 flex items-center justify-between bg-[#F5EDE2] dark:bg-gray-900/50 backdrop-blur">
             <div>
-              <h3 className="font-semibold text-white">Self-Donations Verification</h3>
-              <p className="text-xs text-gray-400">Direct online payment uploads</p>
+              <h3 className="font-bold text-[#1A1208] dark:text-white">Self-Donations Verification</h3>
+              <p className="text-xs text-[#7a6a55] dark:text-gray-400 font-medium">Direct online payment uploads</p>
             </div>
-            <button 
+            <button
               onClick={() => {
                 setIsSelfDrawerOpen(false)
                 setReviewingId(null)
                 setScreenshotChecked(false)
               }}
-              className="text-gray-400 hover:text-white p-1 rounded-lg hover:bg-gray-800 transition-colors"
+              className="text-[#7a6a55] dark:text-gray-400 hover:text-[#1A1208] dark:hover:text-white p-1 rounded-lg hover:bg-black/5 dark:hover:bg-gray-800 transition-colors font-bold cursor-pointer"
             >
               ✕ Close
             </button>
@@ -2953,53 +2975,53 @@ export default function DashboardPage() {
 
           <div className="flex-1 overflow-y-auto p-4 space-y-4">
             {selfDonations.length === 0 ? (
-              <p className="text-gray-500 text-sm text-center py-12">No self-donations recorded yet.</p>
+              <p className="text-[#7a6a55] dark:text-gray-500 text-sm text-center py-12 font-medium">No self-donations recorded yet.</p>
             ) : (
               <div className="flex flex-col gap-3">
                 {selfDonations.map(d => {
                   const isReviewing = reviewingId === d.id
                   return (
-                    <div 
-                      key={d.id} 
-                      className={`bg-gray-850 border rounded-xl overflow-hidden transition-all
-                        ${isReviewing ? 'border-orange-500 bg-gray-900' : 'border-gray-800'}
-                        ${d.status === 'rejected' ? 'border-red-900/30 bg-red-950/5' : ''}`}
+                    <div
+                      key={d.id}
+                      className={`bg-white dark:bg-gray-800 border rounded-xl overflow-hidden transition-all shadow-sm
+                        ${isReviewing ? 'border-[#E8650A] ring-1 ring-[#E8650A]/30 bg-white dark:bg-gray-800' : 'border-[#1A1208]/10 dark:border-gray-700'}
+                        ${d.status === 'rejected' ? 'border-rose-500/30 bg-rose-500/5 dark:bg-rose-950/20' : ''}`}
                     >
                       <div className="p-4 flex items-start justify-between gap-3">
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2 flex-wrap">
-                            <p className="font-medium text-white text-sm">{d.donor_name}</p>
-                            <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full uppercase tracking-wide
-                              ${d.status === 'verified' ? 'bg-green-950 text-green-400 border border-green-900/20'
-                              : d.status === 'rejected' ? 'bg-red-950 text-red-400 border border-red-900/20'
-                              : 'bg-yellow-950 text-yellow-400 border border-yellow-900/20'}`}>
+                            <p className="font-bold text-[#1A1208] dark:text-white text-sm">{d.donor_name || 'Anonymous Donor'}</p>
+                            <span className={`text-[10px] font-bold px-2.5 py-0.5 rounded-full uppercase tracking-wide
+                              ${d.status === 'verified' ? 'bg-emerald-500/10 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30 dark:border-emerald-800/50'
+                                : d.status === 'rejected' ? 'bg-rose-500/10 dark:bg-rose-950/60 text-rose-700 dark:text-rose-300 border border-rose-500/30 dark:border-rose-800/50'
+                                  : 'bg-amber-500/10 dark:bg-amber-950/60 text-amber-700 dark:text-amber-300 border border-amber-500/30 dark:border-amber-800/50'}`}>
                               {d.status}
                             </span>
                           </div>
-                          <p className="text-xs text-gray-400 mt-1">
+                          <p className="text-xs text-[#7a6a55] dark:text-gray-300 mt-1 font-medium">
                             {d.donor_phone}{d.donor_address ? ` · ${d.donor_address}` : ''}
                           </p>
-                          <p className="text-xs text-gray-500 mt-1">
+                          <p className="text-xs text-[#9e8c76] dark:text-gray-400 mt-1 font-medium">
                             {formatDate(d.created_at)}
                           </p>
                           {d.status === 'rejected' && d.rejection_reason && (
-                            <p className="text-xs text-red-400 bg-red-950/20 border border-red-900/20 rounded px-2 py-1 mt-2">
+                            <p className="text-xs text-rose-700 dark:text-rose-300 bg-rose-500/10 dark:bg-rose-950/50 border border-rose-500/30 dark:border-rose-900/50 rounded-lg px-2.5 py-1.5 mt-2 font-medium">
                               Reason: {d.rejection_reason}
                             </p>
                           )}
-                          <p className="text-xs font-mono text-gray-600 mt-1">{d.receipt_number}</p>
+                          <p className="text-xs font-mono text-[#9e8c76] dark:text-gray-400 mt-1">{d.receipt_number}</p>
                         </div>
 
                         <div className="text-right shrink-0 flex flex-col items-end gap-2">
-                          <p className="text-lg font-bold text-white">{formatAmount(d.amount)}</p>
-                          
+                          <p className="text-lg font-extrabold text-[#1A1208] dark:text-white">{formatAmount(d.amount)}</p>
+
                           {d.status === 'pending' && CAN.verifyDonation(userRole) && !isReviewing && (
                             <button
                               onClick={() => {
                                 setReviewingId(d.id)
                                 setScreenshotChecked(false)
                               }}
-                              className="text-xs bg-orange-500 hover:bg-orange-600 text-white px-3 py-1.5 rounded-lg transition-colors"
+                              className="text-xs bg-gradient-to-r from-[#E8650A] to-[#f97316] hover:from-[#d05807] hover:to-[#ea580c] text-white font-bold px-3 py-1.5 rounded-lg shadow-sm transition-all cursor-pointer"
                             >
                               Review
                             </button>
@@ -3009,13 +3031,13 @@ export default function DashboardPage() {
                             <div className="flex gap-1.5">
                               <button
                                 onClick={() => downloadReceipt(d.receipt_data!)}
-                                className="text-xs bg-gray-800 hover:bg-gray-700 text-gray-300 px-2 py-1 rounded transition-colors cursor-pointer"
+                                className="text-xs bg-[#F5EDE2] dark:bg-gray-700 hover:bg-[#ebdcc9] dark:hover:bg-gray-600 text-[#1A1208] dark:text-white border border-[#1A1208]/10 dark:border-gray-600 font-bold px-2 py-1 rounded transition-colors cursor-pointer"
                               >
                                 ↓ Receipt
                               </button>
                               <button
                                 onClick={() => shareReceipt(d.receipt_data!)}
-                                className="text-xs bg-gray-800 hover:bg-gray-700 text-gray-300 px-2 py-1 rounded transition-colors cursor-pointer"
+                                className="text-xs bg-[#F5EDE2] dark:bg-gray-700 hover:bg-[#ebdcc9] dark:hover:bg-gray-600 text-[#1A1208] dark:text-white border border-[#1A1208]/10 dark:border-gray-600 font-bold px-2 py-1 rounded transition-colors cursor-pointer"
                               >
                                 Share
                               </button>
@@ -3025,28 +3047,28 @@ export default function DashboardPage() {
                       </div>
 
                       {isReviewing && (
-                        <div className="border-t border-orange-500/20 bg-gray-950/50 p-4 flex flex-col gap-4">
+                        <div className="border-t border-[#E8650A]/20 bg-[#F5EDE2]/50 dark:bg-gray-950/50 p-4 flex flex-col gap-4">
                           {d.screenshot_url ? (
                             <div className="flex flex-col gap-2">
-                              <p className="text-xs font-medium text-gray-300">Payment Screenshot</p>
+                              <p className="text-xs font-bold text-[#1A1208] dark:text-gray-300">Payment Screenshot</p>
                               <img
                                 src={d.screenshot_url}
                                 alt="Payment screenshot"
-                                className="w-full max-w-xs rounded-xl border border-gray-850 object-contain cursor-pointer"
+                                className="w-full max-w-xs rounded-xl border border-[#1A1208]/15 dark:border-gray-800 object-contain cursor-pointer shadow-xs"
                                 onClick={() => setActiveScreenshot(d.screenshot_url)}
                               />
                               <a
                                 href={d.screenshot_url}
                                 target="_blank"
                                 rel="noopener noreferrer"
-                                className="text-xs text-blue-400 hover:text-blue-300"
+                                className="text-xs text-[#E8650A] dark:text-blue-400 hover:underline font-bold"
                               >
                                 Open full size ↗
                               </a>
                             </div>
                           ) : (
-                            <div className="bg-gray-900 border border-gray-800 rounded-xl p-3 text-center">
-                              <p className="text-gray-500 text-xs">No screenshot uploaded</p>
+                            <div className="bg-white dark:bg-gray-900 border border-[#1A1208]/10 dark:border-gray-800 rounded-xl p-3 text-center">
+                              <p className="text-[#7a6a55] dark:text-gray-500 text-xs font-medium">No screenshot uploaded</p>
                             </div>
                           )}
 
@@ -3059,7 +3081,7 @@ export default function DashboardPage() {
                                 className="sr-only"
                               />
                               <div className={`w-5 h-5 rounded border-2 flex items-center justify-center transition-colors
-                                ${screenshotChecked ? 'bg-green-600 border-green-600' : 'border-gray-500 bg-gray-900 group-hover:border-gray-400'}`}>
+                                ${screenshotChecked ? 'bg-emerald-600 border-emerald-600' : 'border-[#1A1208]/30 dark:border-gray-500 bg-white dark:bg-gray-900 group-hover:border-[#E8650A]'}`}>
                                 {screenshotChecked && (
                                   <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
                                     <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
@@ -3067,15 +3089,15 @@ export default function DashboardPage() {
                                 )}
                               </div>
                             </div>
-                            <span className="text-xs text-gray-300 leading-relaxed">
-                              I confirm receipt of <span className="text-white font-semibold">{formatAmount(d.amount)}</span> from {d.donor_name}.
+                            <span className="text-xs text-[#1A1208] dark:text-gray-300 leading-relaxed font-medium">
+                              I confirm receipt of <span className="text-[#1A1208] dark:text-white font-bold">{formatAmount(d.amount)}</span> from {d.donor_name}.
                             </span>
                           </label>
 
                           <div className="flex gap-2">
                             <button
                               onClick={() => setRejectionModalId(d.id)}
-                              className="flex-1 bg-red-900/40 hover:bg-red-900/60 text-red-350 border border-red-900/30 font-medium py-2 rounded-lg text-xs transition-colors"
+                              className="flex-1 bg-rose-500/10 hover:bg-rose-500/20 text-rose-700 dark:text-red-400 border border-rose-500/20 font-bold py-2 rounded-lg text-xs transition-colors cursor-pointer"
                             >
                               ✗ Reject
                             </button>
@@ -3083,7 +3105,7 @@ export default function DashboardPage() {
                               <button
                                 onClick={() => verifyDonation(d.id)}
                                 disabled={verifyingId === d.id}
-                                className="flex-1 bg-green-600 hover:bg-green-700 text-white font-medium py-2 rounded-lg text-xs disabled:opacity-50 transition-colors"
+                                className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2 rounded-lg text-xs disabled:opacity-50 transition-colors cursor-pointer shadow-md"
                               >
                                 {verifyingId === d.id ? 'Approving...' : '✓ Approve'}
                               </button>
@@ -3101,17 +3123,17 @@ export default function DashboardPage() {
 
         {/* ── Rejection Reason Modal Popup ── */}
         {rejectionModalId && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm">
-            <div className="bg-gray-900 border border-gray-800 rounded-2xl w-full max-w-sm p-5 shadow-2xl">
-              <h3 className="text-sm font-semibold text-white mb-1">Reject Self-Donation</h3>
-              <p className="text-xs text-gray-400 mb-3">Provide a reason for rejection (visible to the mandal audit):</p>
-              
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs">
+            <div className="bg-[#F5EDE2] dark:bg-gray-900 border border-[#1A1208]/15 dark:border-gray-800 rounded-2xl w-full max-w-sm p-5 shadow-2xl text-[#1A1208] dark:text-white">
+              <h3 className="text-sm font-bold text-[#1A1208] dark:text-white mb-1">Reject Self-Donation</h3>
+              <p className="text-xs text-[#7a6a55] dark:text-gray-400 mb-3 font-medium">Provide a reason for rejection (visible to the mandal audit):</p>
+
               <textarea
                 value={rejectionReason}
                 onChange={e => setRejectionReason(e.target.value)}
                 placeholder="e.g. Screenshot mismatch, payment not received, duplicate entry..."
                 rows={3}
-                className="w-full bg-gray-950 border border-gray-805 rounded-lg p-2.5 text-xs text-white placeholder-gray-600 focus:outline-none focus:border-red-500 mb-4 resize-none"
+                className="w-full bg-white dark:bg-gray-950 border border-[#1A1208]/15 dark:border-gray-800 rounded-lg p-2.5 text-xs text-[#1A1208] dark:text-white placeholder-[#9e8c76] dark:placeholder-gray-600 focus:outline-none focus:border-red-500 mb-4 resize-none font-medium"
               />
 
               <div className="flex gap-2 justify-end">
@@ -3121,7 +3143,7 @@ export default function DashboardPage() {
                     setRejectionReason('')
                   }}
                   disabled={submittingRejection}
-                  className="px-3 py-1.5 bg-gray-800 hover:bg-gray-700 text-gray-300 rounded-lg text-xs font-medium transition-colors"
+                  className="px-3 py-1.5 bg-[#F5EDE2] dark:bg-gray-800 hover:bg-[#ebdcc9] dark:hover:bg-gray-700 text-[#1A1208] dark:text-gray-300 border border-[#1A1208]/10 dark:border-gray-700 rounded-lg text-xs font-bold transition-colors cursor-pointer"
                 >
                   Cancel
                 </button>
@@ -3146,76 +3168,76 @@ export default function DashboardPage() {
         {/* ── Reset Password Modal Popup ── */}
         {resetPasswordUser && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm animate-fade-in">
-            <div className="bg-gray-900 border border-gray-800 rounded-2xl w-full max-w-sm p-5 shadow-2xl">
-              <h3 className="text-sm font-semibold text-white mb-4">Reset Password</h3>
-              
+            <div className="bg-[#F5EDE2] dark:bg-gray-900 border border-[#1A1208]/15 dark:border-gray-800 rounded-2xl w-full max-w-sm p-5 shadow-2xl">
+              <h3 className="text-sm font-bold text-[#1A1208] dark:text-white mb-4">Reset Password</h3>
+
               <div className="mb-4 space-y-2">
                 <div>
-                  <label className="text-[10px] uppercase font-bold text-gray-500 tracking-wider">User:</label>
-                  <p className="text-sm font-medium text-white">{resetPasswordUser.full_name}</p>
+                  <label className="text-[10px] uppercase font-bold text-[#7a6a55] dark:text-gray-400 tracking-wider">User:</label>
+                  <p className="text-sm font-bold text-[#1A1208] dark:text-white">{resetPasswordUser.full_name}</p>
                 </div>
                 <div>
-                  <label className="text-[10px] uppercase font-bold text-gray-500 tracking-wider">Role:</label>
-                  <p className="text-xs font-medium text-gray-300 capitalize">
+                  <label className="text-[10px] uppercase font-bold text-[#7a6a55] dark:text-gray-400 tracking-wider">Role:</label>
+                  <p className="text-xs font-bold text-[#7a6a55] dark:text-gray-300 capitalize">
                     {resetPasswordUser.role === 'manager' ? 'Khajindar (Manager)' : resetPasswordUser.role === 'collector' ? 'Sevak (Collector)' : resetPasswordUser.role}
                   </p>
                 </div>
               </div>
 
               <div className="mb-5">
-                <label className="block text-[10px] uppercase font-bold text-gray-500 tracking-wider mb-2">New Temporary Password:</label>
+                <label className="block text-[10px] uppercase font-bold text-[#7a6a55] dark:text-gray-400 tracking-wider mb-2">New Temporary Password:</label>
                 <div className="flex gap-2">
                   <input
                     type="text"
                     value={tempPassword}
                     onChange={e => setTempPassword(e.target.value)}
                     placeholder="Enter password (min 8 chars)"
-                    className="flex-1 bg-gray-950 border border-gray-800 rounded-lg px-3 py-2 text-xs text-white placeholder-gray-600 focus:outline-none focus:border-orange-500"
+                    className="flex-1 bg-white dark:bg-gray-950 border border-[#1A1208]/15 dark:border-gray-800 rounded-lg px-3 py-2 text-xs text-[#1A1208] dark:text-white placeholder-[#9e8c76] dark:placeholder-gray-600 font-medium focus:outline-none focus:border-[#E8650A]"
                   />
                   <button
                     type="button"
                     onClick={handleGeneratePassword}
-                    className="px-2.5 py-2 bg-gray-800 hover:bg-gray-700 text-gray-200 text-xs font-medium rounded-lg transition-colors border border-gray-700 cursor-pointer"
+                    className="px-2.5 py-2 bg-[#ebdcc9] dark:bg-gray-800 hover:bg-[#dfcdb7] dark:hover:bg-gray-700 text-[#1A1208] dark:text-gray-200 text-xs font-bold rounded-lg transition-colors border border-[#1A1208]/10 dark:border-gray-700 cursor-pointer"
                   >
                     Generate Random
                   </button>
                 </div>
-                <div className="mt-3 space-y-1 bg-gray-950/45 border border-gray-800/80 rounded-lg p-2.5">
-                  <p className="text-[9px] text-gray-500 font-bold mb-1.5 uppercase tracking-wider">Password Requirements:</p>
-                  
+                <div className="mt-3 space-y-1 bg-white/60 dark:bg-gray-950/45 border border-[#1A1208]/10 dark:border-gray-800/80 rounded-lg p-2.5">
+                  <p className="text-[9px] text-[#7a6a55] dark:text-gray-500 font-bold mb-1.5 uppercase tracking-wider">Password Requirements:</p>
+
                   <div className="flex items-center gap-1.5 text-[10px] transition-colors">
-                    <span className={tempPassword ? (passLength ? 'text-emerald-400 font-medium' : 'text-red-400') : 'text-gray-500'}>
+                    <span className={tempPassword ? (passLength ? 'text-emerald-600 dark:text-emerald-400 font-bold' : 'text-rose-600 dark:text-red-400') : 'text-[#7a6a55] dark:text-gray-500'}>
                       {tempPassword ? (passLength ? '✓' : '✗') : '•'} At least 8 characters
                     </span>
                   </div>
 
                   <div className="flex items-center gap-1.5 text-[10px] transition-colors">
-                    <span className={tempPassword ? (passUpper ? 'text-emerald-400 font-medium' : 'text-red-400') : 'text-gray-500'}>
+                    <span className={tempPassword ? (passUpper ? 'text-emerald-600 dark:text-emerald-400 font-bold' : 'text-rose-600 dark:text-red-400') : 'text-[#7a6a55] dark:text-gray-500'}>
                       {tempPassword ? (passUpper ? '✓' : '✗') : '•'} Uppercase letter (A-Z)
                     </span>
                   </div>
 
                   <div className="flex items-center gap-1.5 text-[10px] transition-colors">
-                    <span className={tempPassword ? (passLower ? 'text-emerald-400 font-medium' : 'text-red-400') : 'text-gray-500'}>
+                    <span className={tempPassword ? (passLower ? 'text-emerald-600 dark:text-emerald-400 font-bold' : 'text-rose-600 dark:text-red-400') : 'text-[#7a6a55] dark:text-gray-500'}>
                       {tempPassword ? (passLower ? '✓' : '✗') : '•'} Lowercase letter (a-z)
                     </span>
                   </div>
 
                   <div className="flex items-center gap-1.5 text-[10px] transition-colors">
-                    <span className={tempPassword ? (passNumber ? 'text-emerald-400 font-medium' : 'text-red-400') : 'text-gray-500'}>
+                    <span className={tempPassword ? (passNumber ? 'text-emerald-600 dark:text-emerald-400 font-bold' : 'text-rose-600 dark:text-red-400') : 'text-[#7a6a55] dark:text-gray-500'}>
                       {tempPassword ? (passNumber ? '✓' : '✗') : '•'} A number (0-9)
                     </span>
                   </div>
 
                   <div className="flex items-center gap-1.5 text-[10px] transition-colors">
-                    <span className={tempPassword ? (passSpecial ? 'text-emerald-400 font-medium' : 'text-red-400') : 'text-gray-500'}>
+                    <span className={tempPassword ? (passSpecial ? 'text-emerald-600 dark:text-emerald-400 font-bold' : 'text-rose-600 dark:text-red-400') : 'text-[#7a6a55] dark:text-gray-500'}>
                       {tempPassword ? (passSpecial ? '✓' : '✗') : '•'} Special character (e.g. #, @, $, !, %, &, *)
                     </span>
                   </div>
                 </div>
               </div>
 
-              <div className="flex gap-2 justify-end">
+              <div className="flex gap-2 justify-end pt-1">
                 <button
                   type="button"
                   onClick={() => {
@@ -3223,7 +3245,7 @@ export default function DashboardPage() {
                     setTempPassword('')
                   }}
                   disabled={resetPasswordSubmitting}
-                  className="px-4 py-2 bg-gray-800 hover:bg-gray-700 text-gray-300 hover:text-gray-200 rounded-lg text-xs font-semibold transition-colors cursor-pointer"
+                  className="px-4 py-2.5 bg-[#ebdcc9] dark:bg-gray-800 hover:bg-[#dfcdb7] dark:hover:bg-gray-700 text-[#1A1208] dark:text-gray-300 border border-[#1A1208]/10 dark:border-gray-700 rounded-xl text-xs font-bold transition-colors cursor-pointer"
                 >
                   Cancel
                 </button>
@@ -3231,7 +3253,7 @@ export default function DashboardPage() {
                   type="button"
                   onClick={resetPassword}
                   disabled={resetPasswordSubmitting || !isPasswordStrong}
-                  className="px-4 py-2 bg-orange-600 hover:bg-orange-500 disabled:opacity-50 text-white rounded-lg text-xs font-semibold transition-colors cursor-pointer"
+                  className="px-4 py-2.5 bg-gradient-to-r from-[#E8650A] to-[#f97316] hover:from-[#d05807] hover:to-[#ea580c] disabled:opacity-50 text-white rounded-xl text-xs font-bold transition-all shadow-md shadow-[#E8650A]/20 cursor-pointer"
                 >
                   {resetPasswordSubmitting ? 'Resetting...' : 'Reset Password'}
                 </button>
@@ -3251,7 +3273,7 @@ export default function DashboardPage() {
               </div>
               <h3 className="text-sm font-semibold text-white mb-1">Password Updated</h3>
               <p className="text-xs text-gray-400 mb-4">Please share this password securely with the team member.</p>
-              
+
               <div className="bg-gray-950 border border-gray-800 rounded-xl p-3 mb-5 flex items-center justify-between gap-2">
                 <span className="font-mono text-sm font-bold text-orange-400 select-all tracking-wider">{generatedPassword}</span>
                 <button
@@ -3283,41 +3305,41 @@ export default function DashboardPage() {
         {/* ── Edit Member Modal Popup ── */}
         {editUser && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm animate-fade-in">
-            <div className="bg-gray-900 border border-gray-800 rounded-2xl w-full max-w-sm p-5 shadow-2xl">
-              <h3 className="text-sm font-semibold text-white mb-4">Edit Team Member</h3>
-              
+            <div className="bg-[#F5EDE2] dark:bg-gray-900 border border-[#1A1208]/15 dark:border-gray-800 rounded-2xl w-full max-w-sm p-5 shadow-2xl">
+              <h3 className="text-sm font-bold text-[#1A1208] dark:text-white mb-4">Edit Team Member</h3>
+
               <div className="space-y-4 mb-5">
                 <div>
-                  <label className="block text-[10px] uppercase font-bold text-gray-500 tracking-wider mb-1.5">Full Name</label>
+                  <label className="block text-[10px] uppercase font-bold text-[#7a6a55] dark:text-gray-400 tracking-wider mb-1.5">Full Name</label>
                   <input
                     type="text"
                     value={editName}
                     onChange={e => setEditName(e.target.value)}
                     placeholder="Enter full name"
-                    className="w-full bg-gray-950 border border-gray-800 rounded-lg px-3 py-2 text-xs text-white placeholder-gray-600 focus:outline-none focus:border-orange-500"
+                    className="w-full bg-white dark:bg-gray-950 border border-[#1A1208]/15 dark:border-gray-800 rounded-lg px-3 py-2 text-xs text-[#1A1208] dark:text-white placeholder-[#9e8c76] dark:placeholder-gray-600 font-medium focus:outline-none focus:border-[#E8650A]"
                   />
                 </div>
                 <div>
-                  <label className="block text-[10px] uppercase font-bold text-gray-500 tracking-wider mb-1.5">Phone Number</label>
+                  <label className="block text-[10px] uppercase font-bold text-[#7a6a55] dark:text-gray-400 tracking-wider mb-1.5">Phone Number</label>
                   <input
                     type="tel"
                     value={editPhone}
                     onChange={e => setEditPhone(e.target.value.replace(/[^0-9]/g, "").slice(0, 10))}
                     placeholder="Enter phone number"
                     maxLength={10}
-                    className="w-full bg-gray-950 border border-gray-800 rounded-lg px-3 py-2 text-xs text-white placeholder-gray-600 focus:outline-none focus:border-orange-500"
+                    className="w-full bg-white dark:bg-gray-950 border border-[#1A1208]/15 dark:border-gray-800 rounded-lg px-3 py-2 text-xs text-[#1A1208] dark:text-white placeholder-[#9e8c76] dark:placeholder-gray-600 font-medium focus:outline-none focus:border-[#E8650A]"
                   />
                 </div>
                 <div>
-                  <label className="block text-[10px] uppercase font-bold text-gray-500 tracking-wider mb-1.5">Role</label>
+                  <label className="block text-[10px] uppercase font-bold text-[#7a6a55] dark:text-gray-400 tracking-wider mb-1.5">Role</label>
                   <div className="grid grid-cols-2 gap-2">
                     {(['collector', 'manager'] as const).map(r => (
                       <button
                         key={r}
                         type="button"
                         onClick={() => setEditRole(r)}
-                        className={`py-2 rounded-lg text-xs font-semibold border capitalize transition-colors cursor-pointer
-                          ${editRole === r ? 'bg-orange-500 border-orange-500 text-white' : 'bg-gray-950 border-gray-800 text-gray-400 hover:border-gray-700'}`}
+                        className={`py-2 rounded-xl text-xs font-bold border capitalize transition-all cursor-pointer
+                          ${editRole === r ? 'bg-gradient-to-r from-[#E8650A] to-[#f97316] border-[#E8650A] text-white shadow-md shadow-[#E8650A]/20' : 'bg-white dark:bg-gray-950 border-[#1A1208]/15 dark:border-gray-800 text-[#7a6a55] dark:text-gray-400 hover:border-[#E8650A]'}`}
                       >
                         {r === 'collector' ? 'Sevak (Collector)' : 'Khajindar (Manager)'}
                       </button>
@@ -3325,35 +3347,35 @@ export default function DashboardPage() {
                   </div>
                 </div>
                 <div>
-                  <label className="block text-[10px] uppercase font-bold text-gray-500 tracking-wider mb-1.5">Event Access</label>
+                  <label className="block text-[10px] uppercase font-bold text-[#7a6a55] dark:text-gray-400 tracking-wider mb-1.5">Event Access</label>
                   <div className="grid grid-cols-2 gap-2 mb-2">
                     <button type="button" onClick={() => setEditEventScope('all')}
-                      className={`py-2 rounded-lg text-xs font-semibold border transition-colors cursor-pointer
-                        ${editEventScope === 'all' ? 'bg-orange-500 border-orange-500 text-white' : 'bg-gray-950 border-gray-800 text-gray-400 hover:border-gray-700'}`}>
+                      className={`py-2 rounded-xl text-xs font-bold border transition-all cursor-pointer
+                        ${editEventScope === 'all' ? 'bg-gradient-to-r from-[#E8650A] to-[#f97316] border-[#E8650A] text-white shadow-md shadow-[#E8650A]/20' : 'bg-white dark:bg-gray-950 border-[#1A1208]/15 dark:border-gray-800 text-[#7a6a55] dark:text-gray-400 hover:border-[#E8650A]'}`}>
                       All events
                     </button>
                     <button type="button" onClick={() => setEditEventScope('specific')}
-                      className={`py-2 rounded-lg text-xs font-semibold border transition-colors cursor-pointer
-                        ${editEventScope === 'specific' ? 'bg-orange-500 border-orange-500 text-white' : 'bg-gray-950 border-gray-800 text-gray-400 hover:border-gray-700'}`}>
+                      className={`py-2 rounded-xl text-xs font-bold border transition-all cursor-pointer
+                        ${editEventScope === 'specific' ? 'bg-gradient-to-r from-[#E8650A] to-[#f97316] border-[#E8650A] text-white shadow-md shadow-[#E8650A]/20' : 'bg-white dark:bg-gray-950 border-[#1A1208]/15 dark:border-gray-800 text-[#7a6a55] dark:text-gray-400 hover:border-[#E8650A]'}`}>
                       Specific event(s)
                     </button>
                   </div>
                   {editEventScope === 'specific' && (
                     events.length === 0 ? (
-                      <p className="text-xs text-gray-500">No events created yet.</p>
+                      <p className="text-xs text-[#7a6a55] dark:text-gray-500 font-medium">No events created yet.</p>
                     ) : (
-                      <div className="max-h-36 overflow-y-auto flex flex-col gap-1.5 bg-gray-950 border border-gray-800 rounded-lg p-2.5">
+                      <div className="max-h-36 overflow-y-auto flex flex-col gap-1.5 bg-white dark:bg-gray-950 border border-[#1A1208]/15 dark:border-gray-800 rounded-lg p-2.5">
                         {events.map(ev => (
-                          <label key={ev.id} className="flex items-center gap-2 text-xs text-gray-300 cursor-pointer">
+                          <label key={ev.id} className="flex items-center gap-2 text-xs text-[#1A1208] dark:text-gray-300 font-medium cursor-pointer">
                             <input
                               type="checkbox"
                               checked={editEventIds.includes(ev.id)}
                               onChange={() => setEditEventIds(prev =>
                                 prev.includes(ev.id) ? prev.filter(id => id !== ev.id) : [...prev, ev.id]
                               )}
-                              className="accent-orange-500"
+                              className="accent-[#E8650A]"
                             />
-                            {ev.name} <span className="text-gray-500">({ev.year})</span>
+                            {ev.name} <span className="text-[#7a6a55] dark:text-gray-500">({ev.year})</span>
                           </label>
                         ))}
                       </div>
@@ -3362,12 +3384,12 @@ export default function DashboardPage() {
                 </div>
               </div>
 
-              <div className="flex gap-2 justify-end">
+              <div className="flex gap-2 justify-end pt-1">
                 <button
                   type="button"
                   onClick={() => setEditUser(null)}
                   disabled={editSubmitting}
-                  className="px-4 py-2 bg-gray-800 hover:bg-gray-700 text-gray-300 hover:text-gray-200 rounded-lg text-xs font-semibold transition-colors cursor-pointer"
+                  className="px-4 py-2.5 bg-[#ebdcc9] dark:bg-gray-800 hover:bg-[#dfcdb7] dark:hover:bg-gray-700 text-[#1A1208] dark:text-gray-300 border border-[#1A1208]/10 dark:border-gray-700 rounded-xl text-xs font-bold transition-colors cursor-pointer"
                 >
                   Cancel
                 </button>
@@ -3375,7 +3397,7 @@ export default function DashboardPage() {
                   type="button"
                   onClick={updateMember}
                   disabled={editSubmitting || !editName.trim() || editPhone.length !== 10}
-                  className="px-4 py-2 bg-orange-500 hover:bg-orange-600 disabled:opacity-50 text-white rounded-lg text-xs font-semibold transition-colors cursor-pointer"
+                  className="px-4 py-2.5 bg-gradient-to-r from-[#E8650A] to-[#f97316] hover:from-[#d05807] hover:to-[#ea580c] disabled:opacity-50 text-white rounded-xl text-xs font-bold transition-all shadow-md shadow-[#E8650A]/20 cursor-pointer"
                 >
                   {editSubmitting ? 'Saving...' : 'Save Changes'}
                 </button>

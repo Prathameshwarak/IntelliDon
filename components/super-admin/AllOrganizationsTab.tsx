@@ -450,31 +450,31 @@ export default function AllOrganizationsTab({ showToast }: AllOrganizationsTabPr
       
       {/* Title Header */}
       <div>
-        <h2 className="text-xl font-black text-white">All Registered Organizations</h2>
-        <p className="text-xs text-gray-400 mt-1">List of all communities registered on Intellidon sorted alphabetically by name.</p>
+        <h2 className="text-xl font-extrabold text-[#1A1208] dark:text-white">All Registered Organizations</h2>
+        <p className="text-xs text-[#7a6a55] dark:text-gray-400 mt-1">List of all communities registered on Intellidon sorted alphabetically by name.</p>
       </div>
 
       {/* Grid Stats Overview */}
       <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-        <div className="bg-gray-900 border border-gray-800 rounded-2xl p-4 space-y-1">
-          <p className="text-[10px] text-gray-500 font-bold uppercase tracking-wider">Total Orgs</p>
-          <p className="text-xl font-black text-white">{totalCount}</p>
+        <div className="bg-[#F5EDE2] dark:bg-gray-900 border border-[#1A1208]/10 dark:border-gray-800 rounded-2xl p-4 space-y-1 shadow-sm">
+          <p className="text-[10px] text-[#7a6a55] dark:text-gray-500 font-bold uppercase tracking-wider">Total Orgs</p>
+          <p className="text-xl font-black text-[#1A1208] dark:text-white">{totalCount}</p>
         </div>
-        <div className="bg-gray-900 border border-gray-800 rounded-2xl p-4 space-y-1">
-          <p className="text-[10px] text-emerald-500 font-bold uppercase tracking-wider">Active Orgs</p>
-          <p className="text-xl font-black text-emerald-450">{activeCount}</p>
+        <div className="bg-[#F5EDE2] dark:bg-gray-900 border border-[#1A1208]/10 dark:border-gray-800 rounded-2xl p-4 space-y-1 shadow-sm">
+          <p className="text-[10px] text-emerald-600 dark:text-emerald-500 font-bold uppercase tracking-wider">Active Orgs</p>
+          <p className="text-xl font-black text-emerald-600 dark:text-emerald-450">{activeCount}</p>
         </div>
-        <div className="bg-gray-900 border border-gray-800 rounded-2xl p-4 space-y-1">
-          <p className="text-[10px] text-amber-500 font-bold uppercase tracking-wider">Pending KYC</p>
-          <p className="text-xl font-black text-amber-450">{pendingCount}</p>
+        <div className="bg-[#F5EDE2] dark:bg-gray-900 border border-[#1A1208]/10 dark:border-gray-800 rounded-2xl p-4 space-y-1 shadow-sm">
+          <p className="text-[10px] text-[#E8650A] dark:text-amber-500 font-bold uppercase tracking-wider">Pending KYC</p>
+          <p className="text-xl font-black text-[#E8650A] dark:text-amber-450">{pendingCount}</p>
         </div>
-        <div className="bg-gray-900 border border-gray-800 rounded-2xl p-4 space-y-1">
-          <p className="text-[10px] text-rose-500 font-bold uppercase tracking-wider">Rejected</p>
-          <p className="text-xl font-black text-rose-455">{rejectedCount}</p>
+        <div className="bg-[#F5EDE2] dark:bg-gray-900 border border-[#1A1208]/10 dark:border-gray-800 rounded-2xl p-4 space-y-1 shadow-sm">
+          <p className="text-[10px] text-rose-600 dark:text-rose-500 font-bold uppercase tracking-wider">Rejected</p>
+          <p className="text-xl font-black text-rose-600 dark:text-rose-455">{rejectedCount}</p>
         </div>
-        <div className="bg-gray-900 border border-gray-800 rounded-2xl p-4 space-y-1">
-          <p className="text-[10px] text-gray-500 font-bold uppercase tracking-wider">Suspended</p>
-          <p className="text-xl font-black text-gray-400">{suspendedCount}</p>
+        <div className="bg-[#F5EDE2] dark:bg-gray-900 border border-[#1A1208]/10 dark:border-gray-800 rounded-2xl p-4 space-y-1 shadow-sm">
+          <p className="text-[10px] text-[#7a6a55] dark:text-gray-500 font-bold uppercase tracking-wider">Suspended</p>
+          <p className="text-xl font-black text-[#7a6a55] dark:text-gray-400">{suspendedCount}</p>
         </div>
       </div>
 
@@ -486,27 +486,28 @@ export default function AllOrganizationsTab({ showToast }: AllOrganizationsTabPr
             placeholder="Search by name, city, phone, or admin..."
             value={searchQuery}
             onChange={e => setSearchQuery(e.target.value)}
-            className="w-full bg-gray-900 border border-gray-800 focus:border-orange-500 rounded-xl px-4 py-2.5 text-xs text-white placeholder-gray-500 focus:outline-none transition-colors"
+            className="w-full bg-white dark:bg-gray-900 border border-[#1A1208]/15 dark:border-gray-800 focus:border-[#E8650A] rounded-xl px-4 py-2.5 text-xs text-[#1A1208] dark:text-white placeholder-[#9e8c76] dark:placeholder-gray-500 focus:outline-none transition-colors"
           />
           {searchQuery && (
             <button 
               onClick={() => setSearchQuery('')}
-              className="absolute right-3.5 top-3.5 text-[10px] text-gray-500 hover:text-white"
+              className="absolute right-3.5 top-3.5 text-[10px] text-[#7a6a55] dark:text-gray-500 hover:text-[#1A1208] dark:hover:text-white"
             >
               ✕ Clear
             </button>
           )}
-        </div>        <div className="flex gap-2 w-full sm:w-auto">
+        </div>
+        <div className="flex gap-2 w-full sm:w-auto">
           <button 
             onClick={() => setShowCreateModal(true)}
-            className="flex-1 sm:flex-none px-4 py-2.5 bg-orange-500 hover:bg-orange-600 font-bold rounded-xl text-xs text-white cursor-pointer transition-colors flex items-center justify-center gap-1.5 shadow-lg shadow-orange-500/10"
+            className="flex-1 sm:flex-none px-4 py-2.5 bg-gradient-to-r from-[#E8650A] to-[#f97316] hover:from-[#d05807] hover:to-[#ea580c] font-bold rounded-xl text-xs text-white cursor-pointer transition-colors flex items-center justify-center gap-1.5 shadow-lg shadow-[#E8650A]/20"
           >
             ➕ Add Organization
           </button>
           <button 
             onClick={fetchAllOrganizations}
             disabled={loading}
-            className="flex-1 sm:flex-none px-4 py-2.5 bg-gray-900 hover:bg-gray-800 border border-gray-800 hover:border-gray-700 font-bold rounded-xl text-xs text-gray-300 hover:text-white cursor-pointer transition-colors flex items-center justify-center gap-1.5"
+            className="flex-1 sm:flex-none px-4 py-2.5 bg-[#F5EDE2] dark:bg-gray-900 hover:bg-[#ebdcc9] dark:hover:bg-gray-800 border border-[#1A1208]/10 dark:border-gray-800 font-bold rounded-xl text-xs text-[#1A1208] dark:text-gray-300 transition-colors flex items-center justify-center gap-1.5"
           >
             🔄 Refresh List
           </button>
@@ -516,62 +517,62 @@ export default function AllOrganizationsTab({ showToast }: AllOrganizationsTabPr
       {/* Main List Layout */}
       {loading ? (
         <div className="flex flex-col items-center justify-center py-20 space-y-3">
-          <div className="w-8 h-8 rounded-full border-2 border-t-orange-500 border-r-transparent border-b-orange-500 border-l-transparent animate-spin" />
-          <p className="text-[10px] text-gray-500 font-mono animate-pulse">Loading records...</p>
+          <div className="w-8 h-8 rounded-full border-2 border-t-[#E8650A] border-r-transparent border-b-[#E8650A] border-l-transparent animate-spin" />
+          <p className="text-[10px] text-[#7a6a55] dark:text-gray-500 font-mono animate-pulse">Loading records...</p>
         </div>
       ) : filteredOrgs.length === 0 ? (
-        <div className="bg-gray-900 border border-gray-800 rounded-2xl p-12 text-center space-y-3">
-          <p className="text-xs text-gray-550">No organizations found matching your search criteria.</p>
+        <div className="bg-white dark:bg-gray-900 border border-[#1A1208]/10 dark:border-gray-800 rounded-2xl p-12 text-center space-y-3 shadow-sm">
+          <p className="text-xs text-[#7a6a55] dark:text-gray-550">No organizations found matching your search criteria.</p>
         </div>
       ) : (
-        <div className="bg-gray-900 border border-gray-800 rounded-2xl overflow-hidden">
+        <div className="bg-white dark:bg-gray-900 border border-[#1A1208]/10 dark:border-gray-800 rounded-2xl overflow-hidden shadow-sm">
           <div 
             className="overflow-x-auto max-h-[600px] overflow-y-auto scrollbar-thin scrollbar-thumb-gray-800 scrollbar-track-transparent"
             onScroll={handleScroll}
           >
             <table className="w-full border-collapse text-left">
-              <thead className="sticky top-0 bg-gray-900 z-10 border-b border-gray-800">
-                <tr className="border-b border-gray-800 text-[10px] text-gray-550 uppercase tracking-wider font-bold bg-gray-950/20">
-                  <th className="py-3.5 px-5 bg-gray-900">Organization Name</th>
-                  <th className="py-3.5 px-5 bg-gray-900">Location</th>
-                  <th className="py-3.5 px-5 bg-gray-900">Contacts</th>
-                  <th className="py-3.5 px-5 bg-gray-900 text-center">Status</th>
-                  <th className="py-3.5 px-5 bg-gray-900 text-center">KYC Status</th>
-                  <th className="py-3.5 px-5 bg-gray-900">Subscription</th>
-                  <th className="py-3.5 px-5 bg-gray-900">Created At</th>
-                  <th className="py-3.5 px-5 bg-gray-900 text-right">Actions</th>
+              <thead className="sticky top-0 bg-[#F5EDE2] dark:bg-gray-900 z-10 border-b border-[#1A1208]/10 dark:border-gray-800">
+                <tr className="border-b border-[#1A1208]/10 dark:border-gray-800 text-[10px] text-[#7a6a55] dark:text-gray-400 uppercase tracking-wider font-bold">
+                  <th className="py-3.5 px-5">Organization Name</th>
+                  <th className="py-3.5 px-5">Location</th>
+                  <th className="py-3.5 px-5">Contacts</th>
+                  <th className="py-3.5 px-5 text-center">Status</th>
+                  <th className="py-3.5 px-5 text-center">KYC Status</th>
+                  <th className="py-3.5 px-5">Subscription</th>
+                  <th className="py-3.5 px-5">Created At</th>
+                  <th className="py-3.5 px-5 text-right">Actions</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-850 text-xs">
+              <tbody className="divide-y divide-[#1A1208]/10 dark:divide-gray-800 text-xs">
                 {filteredOrgs.slice(0, visibleCount).map(org => {
                   const sub = org.subscriptions?.[0]
                   return (
-                    <tr key={org.id} className="hover:bg-gray-850/20 transition-colors">
+                    <tr key={org.id} className="hover:bg-[#F5EDE2]/50 dark:hover:bg-gray-800/30 transition-colors">
                       {/* Name */}
-                      <td className="py-3.5 px-5 font-bold text-white">
+                      <td className="py-3.5 px-5 font-bold text-[#1A1208] dark:text-white">
                         {org.name}
                       </td>
 
                       {/* Location */}
-                      <td className="py-3.5 px-5 text-gray-300">
+                      <td className="py-3.5 px-5 text-[#1A1208] dark:text-gray-300 font-bold">
                         {org.city || '—'}
-                        {org.pincode && <span className="text-[10px] text-gray-500 block">{org.pincode}</span>}
+                        {org.pincode && <span className="text-[10px] text-[#7a6a55] dark:text-gray-500 block font-normal">{org.pincode}</span>}
                       </td>
 
                       {/* Contacts */}
-                      <td className="py-3.5 px-5 text-gray-300 space-y-0.5">
-                        <div className="text-[11px]">{org.phone || '—'}</div>
-                        <div className="text-[10px] text-gray-550">Admin: {org.admin_full_name || '—'}</div>
+                      <td className="py-3.5 px-5 text-[#1A1208] dark:text-gray-300 space-y-0.5 font-medium">
+                        <div className="text-[11px] font-bold">{org.phone || '—'}</div>
+                        <div className="text-[10px] text-[#7a6a55] dark:text-gray-400">Admin: {org.admin_full_name || '—'}</div>
                       </td>
 
                       {/* Mandal Status */}
                       <td className="py-3.5 px-5 text-center">
                         <span className={`px-2.5 py-0.5 rounded-full text-[9px] font-bold uppercase border
                           ${org.status === 'active' 
-                            ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
+                            ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20'
                             : org.status === 'suspended'
-                            ? 'bg-rose-500/10 text-rose-455 border-rose-500/20'
-                            : 'bg-amber-500/10 text-amber-400 border-amber-500/20'}`}>
+                            ? 'bg-rose-500/10 text-rose-600 dark:text-rose-455 border-rose-500/20'
+                            : 'bg-amber-500/10 text-[#E8650A] dark:text-amber-400 border-amber-500/20'}`}>
                           {org.status}
                         </span>
                       </td>
@@ -580,10 +581,10 @@ export default function AllOrganizationsTab({ showToast }: AllOrganizationsTabPr
                       <td className="py-3.5 px-5 text-center">
                         <span className={`px-2.5 py-0.5 rounded-full text-[9px] font-bold uppercase border
                           ${org.kyc_status === 'approved' 
-                            ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
+                            ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20'
                             : org.kyc_status === 'rejected'
-                            ? 'bg-rose-500/10 text-rose-455 border-rose-500/20'
-                            : 'bg-amber-500/10 text-amber-400 border-amber-500/20'}`}>
+                            ? 'bg-rose-500/10 text-rose-600 dark:text-rose-455 border-rose-500/20'
+                            : 'bg-amber-500/10 text-[#E8650A] dark:text-amber-400 border-amber-500/20'}`}>
                           {org.kyc_status || 'pending'}
                         </span>
                       </td>
@@ -592,18 +593,18 @@ export default function AllOrganizationsTab({ showToast }: AllOrganizationsTabPr
                       <td className="py-3.5 px-5">
                         {sub ? (
                           <div className="space-y-0.5">
-                            <span className="font-semibold text-gray-200 capitalize">{sub.plan} Plan</span>
+                            <span className="font-bold text-[#1A1208] dark:text-gray-200 capitalize">{sub.plan} Plan</span>
                             {sub.ends_at && (
-                              <span className="text-[9px] text-gray-500 block">Expires {formatDate(sub.ends_at)}</span>
+                              <span className="text-[9px] text-[#7a6a55] dark:text-gray-500 block font-medium">Expires {formatDate(sub.ends_at)}</span>
                             )}
                           </div>
                         ) : (
-                          <span className="text-gray-500 italic">No active plan</span>
+                          <span className="text-[#7a6a55] dark:text-gray-500 italic">No active plan</span>
                         )}
                       </td>
 
                       {/* Created At */}
-                      <td className="py-3.5 px-5 text-gray-400">
+                      <td className="py-3.5 px-5 text-[#1A1208] dark:text-gray-400 font-bold">
                         {formatDate(org.created_at)}
                       </td>
 
@@ -611,7 +612,7 @@ export default function AllOrganizationsTab({ showToast }: AllOrganizationsTabPr
                       <td className="py-3.5 px-5 text-right">
                         <button
                           onClick={() => setViewingOrg(org)}
-                          className="px-3.5 py-1.5 bg-gray-800 hover:bg-gray-700 hover:text-white border border-gray-700 hover:border-gray-600 text-gray-305 font-bold rounded-xl text-[10px] transition-colors cursor-pointer"
+                          className="px-3.5 py-1.5 bg-[#F5EDE2] dark:bg-gray-800 hover:bg-[#ebdcc9] dark:hover:bg-gray-700 text-[#1A1208] dark:text-gray-300 border border-[#1A1208]/10 dark:border-gray-700 font-bold rounded-xl text-[10px] transition-colors cursor-pointer"
                         >
                           View Details
                         </button>
@@ -628,16 +629,16 @@ export default function AllOrganizationsTab({ showToast }: AllOrganizationsTabPr
       {/* Create Organization Modal Pop-up Dialog */}
       {showCreateModal && (
         <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-gray-900 border border-gray-800 rounded-2xl w-full max-w-2xl overflow-hidden shadow-2xl flex flex-col max-h-[90vh]">
+          <div className="bg-white dark:bg-gray-900 border border-[#1A1208]/15 dark:border-gray-800 rounded-2xl w-full max-w-2xl overflow-hidden shadow-2xl flex flex-col max-h-[90vh] transition-colors duration-300">
             {/* Header */}
-            <div className="p-6 border-b border-gray-800 flex justify-between items-center bg-gray-950/20">
+            <div className="p-6 border-b border-[#1A1208]/10 dark:border-gray-800 flex justify-between items-center bg-[#F5EDE2] dark:bg-gray-950/20">
               <div>
-                <h3 className="text-base font-bold text-white">Create New Organization</h3>
-                <p className="text-xs text-gray-400 mt-0.5">Fill in details to instantly register and configure a new mandal profile.</p>
+                <h3 className="text-base font-extrabold text-[#1A1208] dark:text-white">Create New Organization</h3>
+                <p className="text-xs text-[#7a6a55] dark:text-gray-400 mt-0.5 font-medium">Fill in details to instantly register and configure a new mandal profile.</p>
               </div>
               <button 
                 onClick={() => setShowCreateModal(false)}
-                className="text-gray-400 hover:text-white text-xs p-1"
+                className="text-[#7a6a55] dark:text-gray-400 hover:text-[#1A1208] dark:hover:text-white text-xs p-1 font-bold"
               >
                 ✕ Close
               </button>
@@ -648,136 +649,136 @@ export default function AllOrganizationsTab({ showToast }: AllOrganizationsTabPr
               
               {/* Section 1: Mandal Profile Details */}
               <div className="space-y-4">
-                <h4 className="text-xs font-bold text-orange-400 uppercase tracking-wider block">1. Organization Details</h4>
+                <h4 className="text-xs font-extrabold text-[#E8650A] dark:text-orange-400 uppercase tracking-wider block">1. Organization Details</h4>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="sm:col-span-2">
-                    <label className="block text-xs font-semibold text-gray-300 mb-1">Organization Name *</label>
+                    <label className="block text-xs font-bold text-[#7a6a55] dark:text-gray-300 mb-1">Organization Name *</label>
                     <input 
                       type="text" 
                       value={mandalName} 
                       onChange={e => setMandalName(e.target.value)}
                       required
                       placeholder="e.g. Shree Ganesh Mitra Mandal"
-                      className="w-full bg-gray-950 border border-gray-800 rounded-lg px-3 py-2 text-xs text-white placeholder-gray-600 focus:outline-none focus:border-orange-500"
+                      className="w-full bg-white dark:bg-gray-950 border border-[#1A1208]/15 dark:border-gray-800 rounded-lg px-3 py-2 text-xs text-[#1A1208] dark:text-white placeholder-[#9e8c76] dark:placeholder-gray-600 focus:outline-none focus:border-[#E8650A] font-medium"
                     />
                   </div>
                   
                   <div>
-                    <label className="block text-xs font-semibold text-gray-300 mb-1">Mandal Phone *</label>
+                    <label className="block text-xs font-bold text-[#7a6a55] dark:text-gray-300 mb-1">Mandal Phone *</label>
                     <input 
                       type="text" 
                       value={mandalPhone} 
                       onChange={e => setMandalPhone(e.target.value)}
                       required
                       placeholder="10-digit number"
-                      className="w-full bg-gray-950 border border-gray-800 rounded-lg px-3 py-2 text-xs text-white placeholder-gray-605 focus:outline-none focus:border-orange-500"
+                      className="w-full bg-white dark:bg-gray-950 border border-[#1A1208]/15 dark:border-gray-800 rounded-lg px-3 py-2 text-xs text-[#1A1208] dark:text-white placeholder-[#9e8c76] dark:placeholder-gray-500 focus:outline-none focus:border-[#E8650A] font-medium"
                     />
                   </div>
 
                   <div>
-                    <label className="block text-xs font-semibold text-gray-300 mb-1">UPI ID (optional)</label>
+                    <label className="block text-xs font-bold text-[#7a6a55] dark:text-gray-300 mb-1">UPI ID (optional)</label>
                     <input 
                       type="text" 
                       value={mandalUpiId} 
                       onChange={e => setMandalUpiId(e.target.value)}
                       placeholder="e.g. mandal@upi"
-                      className="w-full bg-gray-950 border border-gray-800 rounded-lg px-3 py-2 text-xs text-white placeholder-gray-605 focus:outline-none focus:border-orange-500"
+                      className="w-full bg-white dark:bg-gray-950 border border-[#1A1208]/15 dark:border-gray-800 rounded-lg px-3 py-2 text-xs text-[#1A1208] dark:text-white placeholder-[#9e8c76] dark:placeholder-gray-500 focus:outline-none focus:border-[#E8650A] font-medium"
                     />
                   </div>
 
                   <div className="sm:col-span-2">
-                    <label className="block text-xs font-semibold text-gray-300 mb-1">Address *</label>
+                    <label className="block text-xs font-bold text-[#7a6a55] dark:text-gray-300 mb-1">Address *</label>
                     <input 
                       type="text" 
                       value={mandalAddress} 
                       onChange={e => setMandalAddress(e.target.value)}
                       required
                       placeholder="Street, area details"
-                      className="w-full bg-gray-955 border border-gray-800 rounded-lg px-3 py-2 text-xs text-white placeholder-gray-600 focus:outline-none focus:border-orange-500"
+                      className="w-full bg-white dark:bg-gray-950 border border-[#1A1208]/15 dark:border-gray-800 rounded-lg px-3 py-2 text-xs text-[#1A1208] dark:text-white placeholder-[#9e8c76] dark:placeholder-gray-500 focus:outline-none focus:border-[#E8650A] font-medium"
                     />
                   </div>
 
                   <div>
-                    <label className="block text-xs font-semibold text-gray-300 mb-1">City *</label>
+                    <label className="block text-xs font-bold text-[#7a6a55] dark:text-gray-300 mb-1">City *</label>
                     <input 
                       type="text" 
                       value={mandalCity} 
                       onChange={e => setMandalCity(e.target.value)}
                       required
                       placeholder="e.g. Mumbai"
-                      className="w-full bg-gray-955 border border-gray-800 rounded-lg px-3 py-2 text-xs text-white placeholder-gray-600 focus:outline-none focus:border-orange-500"
+                      className="w-full bg-white dark:bg-gray-950 border border-[#1A1208]/15 dark:border-gray-800 rounded-lg px-3 py-2 text-xs text-[#1A1208] dark:text-white placeholder-[#9e8c76] dark:placeholder-gray-500 focus:outline-none focus:border-[#E8650A] font-medium"
                     />
                   </div>
 
                   <div>
-                    <label className="block text-xs font-semibold text-gray-300 mb-1">Pincode *</label>
+                    <label className="block text-xs font-bold text-[#7a6a55] dark:text-gray-300 mb-1">Pincode *</label>
                     <input 
                       type="text" 
                       value={mandalPincode} 
                       onChange={e => setMandalPincode(e.target.value)}
                       required
                       placeholder="6-digit pincode"
-                      className="w-full bg-gray-955 border border-gray-800 rounded-lg px-3 py-2 text-xs text-white placeholder-gray-600 focus:outline-none focus:border-orange-500"
+                      className="w-full bg-white dark:bg-gray-950 border border-[#1A1208]/15 dark:border-gray-800 rounded-lg px-3 py-2 text-xs text-[#1A1208] dark:text-white placeholder-[#9e8c76] dark:placeholder-gray-500 focus:outline-none focus:border-[#E8650A] font-medium"
                     />
                   </div>
                 </div>
               </div>
 
               {/* Section 2: Administrator Credentials */}
-              <div className="space-y-4 border-t border-gray-800 pt-5">
-                <h4 className="text-xs font-bold text-orange-400 uppercase tracking-wider block">2. Admin User Details</h4>
+              <div className="space-y-4 border-t border-[#1A1208]/10 dark:border-gray-800 pt-5">
+                <h4 className="text-xs font-extrabold text-[#E8650A] dark:text-orange-400 uppercase tracking-wider block">2. Admin User Details</h4>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-xs font-semibold text-gray-300 mb-1">Admin Full Name *</label>
+                    <label className="block text-xs font-bold text-[#7a6a55] dark:text-gray-300 mb-1">Admin Full Name *</label>
                     <input 
                       type="text" 
                       value={adminName} 
                       onChange={e => setAdminName(e.target.value)}
                       required
                       placeholder="Full Name"
-                      className="w-full bg-gray-955 border border-gray-800 rounded-lg px-3 py-2 text-xs text-white placeholder-gray-600 focus:outline-none focus:border-orange-500"
+                      className="w-full bg-white dark:bg-gray-950 border border-[#1A1208]/15 dark:border-gray-800 rounded-lg px-3 py-2 text-xs text-[#1A1208] dark:text-white placeholder-[#9e8c76] dark:placeholder-gray-500 focus:outline-none focus:border-[#E8650A] font-medium"
                     />
                   </div>
 
                   <div>
-                    <label className="block text-xs font-semibold text-gray-300 mb-1">Admin Email *</label>
+                    <label className="block text-xs font-bold text-[#7a6a55] dark:text-gray-300 mb-1">Admin Email *</label>
                     <input 
                       type="email" 
                       value={adminEmail} 
                       onChange={e => setAdminEmail(e.target.value)}
                       required
                       placeholder="admin@email.com"
-                      className="w-full bg-gray-955 border border-gray-800 rounded-lg px-3 py-2 text-xs text-white placeholder-gray-600 focus:outline-none focus:border-orange-500"
+                      className="w-full bg-white dark:bg-gray-950 border border-[#1A1208]/15 dark:border-gray-800 rounded-lg px-3 py-2 text-xs text-[#1A1208] dark:text-white placeholder-[#9e8c76] dark:placeholder-gray-500 focus:outline-none focus:border-[#E8650A] font-medium"
                     />
                   </div>
 
                   <div className="sm:col-span-2">
-                    <label className="block text-xs font-semibold text-gray-300 mb-1">Admin Password *</label>
+                    <label className="block text-xs font-bold text-[#7a6a55] dark:text-gray-300 mb-1">Admin Password *</label>
                     <input 
                       type="text" 
                       value={adminPassword} 
                       onChange={e => setAdminPassword(e.target.value)}
                       required
                       placeholder="Min 8 characters"
-                      className="w-full bg-gray-955 border border-gray-800 rounded-lg px-3 py-2 text-xs text-white placeholder-gray-600 focus:outline-none focus:border-orange-500 font-mono"
+                      className="w-full bg-white dark:bg-gray-950 border border-[#1A1208]/15 dark:border-gray-800 rounded-lg px-3 py-2 text-xs text-[#1A1208] dark:text-white placeholder-[#9e8c76] dark:placeholder-gray-500 focus:outline-none focus:border-[#E8650A] font-mono font-medium"
                     />
                   </div>
                 </div>
               </div>
 
               {/* Section 3: Activation Preferences */}
-              <div className="space-y-3 border-t border-gray-800 pt-5">
-                <h4 className="text-xs font-bold text-orange-400 uppercase tracking-wider block">3. Activation Settings</h4>
-                <label className="flex items-start gap-3 bg-gray-955/60 p-4 border border-gray-850 rounded-xl cursor-pointer hover:bg-gray-955/80 transition-colors">
+              <div className="space-y-3 border-t border-[#1A1208]/10 dark:border-gray-800 pt-5">
+                <h4 className="text-xs font-extrabold text-[#E8650A] dark:text-orange-400 uppercase tracking-wider block">3. Activation Settings</h4>
+                <label className="flex items-start gap-3 bg-[#F5EDE2]/60 dark:bg-gray-950/60 p-4 border border-[#1A1208]/10 dark:border-gray-800 rounded-xl cursor-pointer hover:bg-[#F5EDE2] dark:hover:bg-gray-950/80 transition-colors">
                   <input 
                     type="checkbox"
                     checked={autoApprove}
                     onChange={e => setAutoApprove(e.target.checked)}
-                    className="mt-1 cursor-pointer accent-orange-500"
+                    className="mt-1 cursor-pointer accent-[#E8650A]"
                   />
                   <div>
-                    <p className="text-xs font-bold text-white">Auto-Approve KYC & Activate immediately</p>
-                    <p className="text-[10px] text-gray-400 mt-0.5">
+                    <p className="text-xs font-bold text-[#1A1208] dark:text-white">Auto-Approve KYC & Activate immediately</p>
+                    <p className="text-[10px] text-[#7a6a55] dark:text-gray-400 mt-0.5 font-medium">
                       Bypasses document uploads and activates the account with a 30-day trial subscription immediately.
                     </p>
                   </div>
@@ -785,23 +786,22 @@ export default function AllOrganizationsTab({ showToast }: AllOrganizationsTabPr
               </div>
 
               {/* Action Buttons */}
-              <div className="border-t border-gray-800 pt-5 flex gap-3 justify-end">
+              <div className="border-t border-[#1A1208]/10 dark:border-gray-800 pt-5 flex gap-3 justify-end">
                 <button
                   type="button"
                   onClick={() => setShowCreateModal(false)}
-                  className="px-4 py-2.5 bg-gray-805 hover:bg-gray-700 text-gray-300 font-semibold rounded-xl text-xs transition-colors cursor-pointer"
+                  className="px-4 py-2.5 bg-[#F5EDE2] dark:bg-gray-800 hover:bg-[#ebdcc9] dark:hover:bg-gray-700 text-[#1A1208] dark:text-gray-300 font-bold border border-[#1A1208]/10 dark:border-gray-700 rounded-xl text-xs transition-colors cursor-pointer"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={creating}
-                  className="px-5 py-2.5 bg-orange-500 hover:bg-orange-600 text-white font-bold rounded-xl text-xs transition-colors cursor-pointer disabled:opacity-50"
+                  className="px-5 py-2.5 bg-gradient-to-r from-[#E8650A] to-[#f97316] hover:from-[#d05807] hover:to-[#ea580c] text-white font-bold rounded-xl text-xs transition-colors cursor-pointer disabled:opacity-50 shadow-md shadow-[#E8650A]/20"
                 >
                   {creating ? 'Creating Organization...' : 'Create Organization'}
                 </button>
               </div>
-
             </form>
           </div>
         </div>
@@ -810,16 +810,16 @@ export default function AllOrganizationsTab({ showToast }: AllOrganizationsTabPr
       {/* View Details Modal */}
       {viewingOrg && (
         <div className="fixed inset-0 z-40 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-gray-900 border border-gray-800 rounded-2xl w-full max-w-3xl overflow-hidden shadow-2xl flex flex-col max-h-[90vh]">
+          <div className="bg-white dark:bg-gray-900 border border-[#1A1208]/15 dark:border-gray-800 rounded-2xl w-full max-w-3xl overflow-hidden shadow-2xl flex flex-col max-h-[90vh] transition-colors duration-300">
             {/* Header */}
-            <div className="p-6 border-b border-gray-800 flex justify-between items-center bg-gray-950/20">
+            <div className="p-6 border-b border-[#1A1208]/10 dark:border-gray-800 flex justify-between items-center bg-[#F5EDE2] dark:bg-gray-950/20">
               <div>
-                <h3 className="text-base font-bold text-white">{viewingOrg.name}</h3>
-                <p className="text-xs text-gray-400 mt-0.5">Organization Details, Admins, Team Users, and KYC documents.</p>
+                <h3 className="text-base font-extrabold text-[#1A1208] dark:text-white">{viewingOrg.name}</h3>
+                <p className="text-xs text-[#7a6a55] dark:text-gray-400 mt-0.5 font-medium">Organization Details, Admins, Team Users, and KYC documents.</p>
               </div>
               <button 
                 onClick={() => setViewingOrg(null)}
-                className="text-gray-400 hover:text-white text-xs p-1"
+                className="text-[#7a6a55] dark:text-gray-400 hover:text-[#1A1208] dark:hover:text-white text-xs p-1 font-bold"
               >
                 ✕ Close
               </button>
@@ -829,40 +829,40 @@ export default function AllOrganizationsTab({ showToast }: AllOrganizationsTabPr
             <div className="flex-1 overflow-y-auto p-6 space-y-6">
               
               {/* Grid 1: Basic Registration Info */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-gray-950/30 p-4 border border-gray-850 rounded-xl text-xs">
-                <div className="md:col-span-2 pb-2 border-b border-gray-800 flex justify-between items-center">
-                  <h4 className="text-xs font-bold text-orange-400 uppercase tracking-wider">1. Profile & Registration Details</h4>
-                  <span className="text-[10px] text-gray-500 font-mono">Registered on {formatDate(viewingOrg.created_at)}</span>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-[#F5EDE2]/60 dark:bg-gray-950/30 p-4 border border-[#1A1208]/10 dark:border-gray-800 rounded-xl text-xs">
+                <div className="md:col-span-2 pb-2 border-b border-[#1A1208]/10 dark:border-gray-800 flex justify-between items-center">
+                  <h4 className="text-xs font-extrabold text-[#E8650A] dark:text-orange-400 uppercase tracking-wider">1. Profile & Registration Details</h4>
+                  <span className="text-[10px] text-[#7a6a55] dark:text-gray-500 font-mono font-medium">Registered on {formatDate(viewingOrg.created_at)}</span>
                 </div>
-                <div><span className="text-gray-500">Mandal Name: </span><span className="text-white font-semibold">{viewingOrg.name}</span></div>
-                <div><span className="text-gray-500">Slug URL: </span><span className="text-gray-300 font-mono">/donate/{viewingOrg.slug}</span></div>
-                <div><span className="text-gray-500">Mandal Phone: </span><span className="text-gray-300 font-mono">{viewingOrg.phone || '—'}</span></div>
-                <div><span className="text-gray-500">UPI ID for Donations: </span><span className="text-gray-300 font-mono">{viewingOrg.upi_id || '—'}</span></div>
-                <div className="md:col-span-2"><span className="text-gray-500">Address: </span><span className="text-gray-300">{viewingOrg.address || '—'}, {viewingOrg.city || '—'} - {viewingOrg.pincode || '—'}</span></div>
+                <div><span className="text-[#7a6a55] dark:text-gray-500 font-medium">Mandal Name: </span><span className="text-[#1A1208] dark:text-white font-bold">{viewingOrg.name}</span></div>
+                <div><span className="text-[#7a6a55] dark:text-gray-500 font-medium">Slug URL: </span><span className="text-[#1A1208] dark:text-gray-300 font-mono font-medium">/donate/{viewingOrg.slug}</span></div>
+                <div><span className="text-[#7a6a55] dark:text-gray-500 font-medium">Mandal Phone: </span><span className="text-[#1A1208] dark:text-gray-300 font-mono font-medium">{viewingOrg.phone || '—'}</span></div>
+                <div><span className="text-[#7a6a55] dark:text-gray-500 font-medium">UPI ID for Donations: </span><span className="text-[#1A1208] dark:text-gray-300 font-mono font-medium">{viewingOrg.upi_id || '—'}</span></div>
+                <div className="md:col-span-2"><span className="text-[#7a6a55] dark:text-gray-500 font-medium">Address: </span><span className="text-[#1A1208] dark:text-gray-300 font-bold">{viewingOrg.address || '—'}, {viewingOrg.city || '—'} - {viewingOrg.pincode || '—'}</span></div>
               </div>
 
               {/* Grid 2: Account Administrator */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 bg-gray-955/30 p-4 border border-gray-850 rounded-xl text-xs">
-                <div className="md:col-span-3 pb-2 border-b border-gray-800 flex justify-between items-center">
-                  <h4 className="text-xs font-bold text-orange-400 uppercase tracking-wider">2. Account Administrator</h4>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 bg-[#F5EDE2]/60 dark:bg-gray-950/30 p-4 border border-[#1A1208]/10 dark:border-gray-800 rounded-xl text-xs">
+                <div className="md:col-span-3 pb-2 border-b border-[#1A1208]/10 dark:border-gray-800 flex justify-between items-center">
+                  <h4 className="text-xs font-extrabold text-[#E8650A] dark:text-orange-400 uppercase tracking-wider">2. Account Administrator</h4>
                   {viewingOrg.users?.find(u => u.role === 'admin') && (
                     <button
                       type="button"
                       onClick={() => setResetPasswordUserId(viewingOrg.users?.find(u => u.role === 'admin')?.id || null)}
-                      className="px-2.5 py-1 bg-gray-850 hover:bg-gray-800 hover:text-white border border-gray-750 hover:border-gray-700 text-orange-400 font-bold rounded-lg text-[10px] transition-colors cursor-pointer"
+                      className="px-2.5 py-1 bg-white dark:bg-gray-800 hover:bg-[#F5EDE2] dark:hover:bg-gray-700 text-[#E8650A] dark:text-orange-400 border border-[#E8650A]/20 dark:border-gray-700 font-bold rounded-lg text-[10px] transition-colors cursor-pointer"
                     >
                       Change Password
                     </button>
                   )}
                 </div>
-                <div><span className="text-gray-500">Admin Name: </span><span className="text-white font-semibold">{viewingOrg.admin_full_name || '—'}</span></div>
-                <div><span className="text-gray-500">Login Email: </span><span className="text-gray-300 font-mono">{viewingOrg.admin_email || '—'}</span></div>
-                <div><span className="text-gray-500">Admin Phone: </span><span className="text-gray-300 font-mono">{viewingOrg.admin_phone || '—'}</span></div>
+                <div><span className="text-[#7a6a55] dark:text-gray-500 font-medium">Admin Name: </span><span className="text-[#1A1208] dark:text-white font-bold">{viewingOrg.admin_full_name || '—'}</span></div>
+                <div><span className="text-[#7a6a55] dark:text-gray-500 font-medium">Login Email: </span><span className="text-[#1A1208] dark:text-gray-300 font-mono font-medium">{viewingOrg.admin_email || '—'}</span></div>
+                <div><span className="text-[#7a6a55] dark:text-gray-500 font-medium">Admin Phone: </span><span className="text-[#1A1208] dark:text-gray-300 font-mono font-medium">{viewingOrg.admin_phone || '—'}</span></div>
               </div>
 
               {/* Section 3: Documents (New layout with inline viewer and row buttons) */}
-              <div className="space-y-3 bg-gray-950/20 border border-gray-850 rounded-xl p-4">
-                <h4 className="text-xs font-bold text-orange-400 uppercase tracking-wider block">3. Documents</h4>
+              <div className="space-y-3 bg-[#F5EDE2]/60 dark:bg-gray-950/20 border border-[#1A1208]/10 dark:border-gray-800 rounded-xl p-4">
+                <h4 className="text-xs font-extrabold text-[#E8650A] dark:text-orange-400 uppercase tracking-wider block">3. Documents</h4>
                 
                 <div className="flex flex-wrap gap-2.5 items-center">
                   {[
@@ -879,13 +879,13 @@ export default function AllOrganizationsTab({ showToast }: AllOrganizationsTabPr
 
                     if (isMissing) {
                       return (
-                        <div key={doc.key} className="flex items-center gap-1.5 bg-gray-955/40 px-2.5 py-1.5 border border-dashed border-gray-800 rounded-xl text-[11px]">
-                          <span className="text-gray-500 font-semibold">{doc.label} (No attachment)</span>
+                        <div key={doc.key} className="flex items-center gap-1.5 bg-white/60 dark:bg-gray-950/40 px-2.5 py-1.5 border border-dashed border-[#1A1208]/20 dark:border-gray-800 rounded-xl text-[11px]">
+                          <span className="text-[#7a6a55] dark:text-gray-500 font-bold">{doc.label} (No attachment)</span>
                           <button
                             type="button"
                             onClick={() => triggerUpload(doc.key)}
                             disabled={uploadingFile && uploadingDocKey === doc.key}
-                            className="px-2 py-0.5 bg-orange-500/10 hover:bg-orange-500/20 text-orange-400 font-bold rounded text-[9px] border border-orange-500/20 transition-colors cursor-pointer disabled:opacity-50"
+                            className="px-2 py-0.5 bg-[#E8650A]/10 hover:bg-[#E8650A]/20 text-[#E8650A] dark:text-orange-400 font-bold rounded text-[9px] border border-[#E8650A]/20 transition-colors cursor-pointer disabled:opacity-50"
                           >
                             {uploadingFile && uploadingDocKey === doc.key ? 'Uploading...' : 'Upload Now'}
                           </button>
@@ -900,8 +900,8 @@ export default function AllOrganizationsTab({ showToast }: AllOrganizationsTabPr
                         onClick={() => selectDocument(doc.key, doc.label, path)}
                         className={`px-3 py-1.5 font-bold rounded-xl text-xs border transition-colors cursor-pointer
                           ${selectedDocKey === doc.key
-                            ? 'bg-orange-500 border-orange-400 text-white shadow-lg shadow-orange-500/10'
-                            : 'bg-gray-800 border-gray-750 hover:bg-gray-750 hover:border-gray-700 text-gray-300 hover:text-white'}`}
+                            ? 'bg-gradient-to-r from-[#E8650A] to-[#f97316] text-white shadow-md shadow-[#E8650A]/20 border-transparent'
+                            : 'bg-white dark:bg-gray-800 border-[#1A1208]/15 dark:border-gray-700 hover:bg-[#F5EDE2] dark:hover:bg-gray-700 text-[#1A1208] dark:text-gray-300'}`}
                       >
                         📄 {doc.label}
                       </button>
@@ -911,12 +911,12 @@ export default function AllOrganizationsTab({ showToast }: AllOrganizationsTabPr
 
                 {/* Inline document preview box */}
                 {selectedDocUrl ? (
-                  <div className="mt-4 border border-gray-800 rounded-xl overflow-hidden bg-gray-955 h-[350px] relative">
+                  <div className="mt-4 border border-[#1A1208]/10 dark:border-gray-800 rounded-xl overflow-hidden bg-white dark:bg-gray-950 h-[350px] relative">
                     <div className="absolute top-2 right-2 z-10 flex gap-2">
                       <button
                         type="button"
                         onClick={() => window.open(selectedDocUrl, '_blank')}
-                        className="px-2.5 py-1 bg-gray-900/80 hover:bg-gray-800/90 text-gray-300 rounded text-[9px] font-bold border border-gray-750 transition-colors cursor-pointer"
+                        className="px-2.5 py-1 bg-white/90 dark:bg-gray-900/80 hover:bg-[#F5EDE2] dark:hover:bg-gray-800/90 text-[#1A1208] dark:text-gray-300 rounded text-[9px] font-bold border border-[#1A1208]/10 dark:border-gray-700 transition-colors cursor-pointer"
                       >
                         External ↗
                       </button>
@@ -926,7 +926,7 @@ export default function AllOrganizationsTab({ showToast }: AllOrganizationsTabPr
                           setSelectedDocUrl('')
                           setSelectedDocKey('')
                         }}
-                        className="px-2.5 py-1 bg-gray-900/80 hover:bg-gray-800/90 text-gray-300 rounded text-[9px] font-bold border border-gray-750 transition-colors cursor-pointer"
+                        className="px-2.5 py-1 bg-white/90 dark:bg-gray-900/80 hover:bg-[#F5EDE2] dark:hover:bg-gray-800/90 text-[#1A1208] dark:text-gray-300 rounded text-[9px] font-bold border border-[#1A1208]/10 dark:border-gray-700 transition-colors cursor-pointer"
                       >
                         Close Preview ✕
                       </button>
@@ -949,39 +949,39 @@ export default function AllOrganizationsTab({ showToast }: AllOrganizationsTabPr
                     )}
                   </div>
                 ) : selectedDocKey ? (
-                  <div className="mt-4 border border-gray-850 rounded-xl bg-gray-950 h-[100px] flex items-center justify-center text-xs text-gray-550 font-mono">
-                    <div className="w-5 h-5 rounded-full border border-t-orange-500 border-r-transparent border-b-orange-500 border-l-transparent animate-spin mr-2" />
+                  <div className="mt-4 border border-[#1A1208]/10 dark:border-gray-800 rounded-xl bg-white dark:bg-gray-950 h-[100px] flex items-center justify-center text-xs text-[#7a6a55] dark:text-gray-500 font-mono font-medium">
+                    <div className="w-5 h-5 rounded-full border border-t-[#E8650A] border-r-transparent border-b-[#E8650A] border-l-transparent animate-spin mr-2" />
                     Generating preview link...
                   </div>
                 ) : null}
               </div>
 
               {/* Section 4: Team Members (moved after document section) */}
-              <div className="space-y-3 bg-gray-950/20 border border-gray-850 rounded-xl p-4">
-                <h4 className="text-xs font-bold text-orange-400 uppercase tracking-wider block">4. Team Members ({viewingOrg.users?.length || 0})</h4>
+              <div className="space-y-3 bg-[#F5EDE2]/60 dark:bg-gray-950/20 border border-[#1A1208]/10 dark:border-gray-800 rounded-xl p-4">
+                <h4 className="text-xs font-extrabold text-[#E8650A] dark:text-orange-400 uppercase tracking-wider block">4. Team Members ({viewingOrg.users?.length || 0})</h4>
                 {(!viewingOrg.users || viewingOrg.users.length === 0) ? (
-                  <p className="text-xs text-gray-550 italic">No registered team members found for this organization.</p>
+                  <p className="text-xs text-[#7a6a55] dark:text-gray-500 italic">No registered team members found for this organization.</p>
                 ) : (
                   <div className="overflow-x-auto">
                     <table className="w-full border-collapse text-left text-xs">
                       <thead>
-                        <tr className="border-b border-gray-800 text-[10px] text-gray-550 uppercase tracking-wider font-bold">
+                        <tr className="border-b border-[#1A1208]/10 dark:border-gray-800 text-[10px] text-[#7a6a55] dark:text-gray-400 uppercase tracking-wider font-bold">
                           <th className="py-2 px-3">Name</th>
                           <th className="py-2 px-3">Phone</th>
                           <th className="py-2 px-3">Role</th>
                           <th className="py-2 px-3 text-right">Actions</th>
                         </tr>
                       </thead>
-                      <tbody className="divide-y divide-gray-850 text-gray-300">
+                      <tbody className="divide-y divide-[#1A1208]/10 dark:divide-gray-800 text-[#1A1208] dark:text-gray-300 font-medium">
                         {viewingOrg.users.map(u => (
-                          <tr key={u.id} className="hover:bg-gray-955/20">
-                            <td className="py-2.5 px-3 font-semibold text-white">{u.full_name || '—'}</td>
+                          <tr key={u.id} className="hover:bg-[#F5EDE2]/50 dark:hover:bg-gray-900/30">
+                            <td className="py-2.5 px-3 font-bold text-[#1A1208] dark:text-white">{u.full_name || '—'}</td>
                             <td className="py-2.5 px-3 font-mono">{u.phone || '—'}</td>
                             <td className="py-2.5 px-3">
                               <span className={`px-2 py-0.5 rounded text-[9px] font-bold uppercase border
                                 ${u.role === 'admin' 
-                                  ? 'bg-amber-500/10 text-amber-450 border-amber-500/20'
-                                  : 'bg-indigo-500/10 text-indigo-400 border-indigo-500/20'}`}>
+                                  ? 'bg-amber-500/10 text-[#E8650A] dark:text-amber-450 border-amber-500/20'
+                                  : 'bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border-indigo-500/20'}`}>
                                 {u.role}
                               </span>
                             </td>
@@ -989,7 +989,7 @@ export default function AllOrganizationsTab({ showToast }: AllOrganizationsTabPr
                               <button
                                 type="button"
                                 onClick={() => fetchUserDetailedInfo(u.id)}
-                                className="px-2.5 py-1 bg-gray-800 hover:bg-gray-700 hover:text-white border border-gray-700 hover:border-gray-600 text-orange-400 hover:text-orange-500 font-bold rounded-xl text-[10px] transition-colors cursor-pointer"
+                                className="px-2.5 py-1 bg-white dark:bg-gray-800 hover:bg-[#F5EDE2] dark:hover:bg-gray-700 border border-[#1A1208]/15 dark:border-gray-700 text-[#E8650A] dark:text-orange-400 font-bold rounded-xl text-[10px] transition-colors cursor-pointer"
                               >
                                 View Details
                               </button>
@@ -1003,20 +1003,20 @@ export default function AllOrganizationsTab({ showToast }: AllOrganizationsTabPr
               </div>
 
               {/* Section 5: Events */}
-              <div className="space-y-3 bg-gray-950/20 border border-gray-850 rounded-xl p-4">
-                <h4 className="text-xs font-bold text-orange-400 uppercase tracking-wider block">5. Organization Events ({orgEvents.length})</h4>
+              <div className="space-y-3 bg-[#F5EDE2]/60 dark:bg-gray-950/20 border border-[#1A1208]/10 dark:border-gray-800 rounded-xl p-4">
+                <h4 className="text-xs font-extrabold text-[#E8650A] dark:text-orange-400 uppercase tracking-wider block">5. Organization Events ({orgEvents.length})</h4>
                 {loadingEvents ? (
                   <div className="flex flex-col items-center justify-center py-6 space-y-2">
-                    <div className="w-5 h-5 rounded-full border border-t-orange-500 border-r-transparent border-b-orange-500 border-l-transparent animate-spin" />
-                    <p className="text-[10px] text-gray-550 font-mono">Fetching events...</p>
+                    <div className="w-5 h-5 rounded-full border border-t-[#E8650A] border-r-transparent border-b-[#E8650A] border-l-transparent animate-spin" />
+                    <p className="text-[10px] text-[#7a6a55] dark:text-gray-500 font-mono">Fetching events...</p>
                   </div>
                 ) : orgEvents.length === 0 ? (
-                  <p className="text-xs text-gray-550 italic">No events found for this organization.</p>
+                  <p className="text-xs text-[#7a6a55] dark:text-gray-500 italic">No events found for this organization.</p>
                 ) : (
                   <div className="overflow-x-auto">
                     <table className="w-full border-collapse text-left text-xs">
                       <thead>
-                        <tr className="border-b border-gray-800 text-[10px] text-gray-550 uppercase tracking-wider font-bold">
+                        <tr className="border-b border-[#1A1208]/10 dark:border-gray-800 text-[10px] text-[#7a6a55] dark:text-gray-400 uppercase tracking-wider font-bold">
                           <th className="py-2 px-3">Event Name</th>
                           <th className="py-2 px-3">UPI ID</th>
                           <th className="py-2 px-3">Dates</th>
@@ -1024,30 +1024,30 @@ export default function AllOrganizationsTab({ showToast }: AllOrganizationsTabPr
                           <th className="py-2 px-3 text-right">Actions</th>
                         </tr>
                       </thead>
-                      <tbody className="divide-y divide-gray-850 text-gray-300">
+                      <tbody className="divide-y divide-[#1A1208]/10 dark:divide-gray-800 text-[#1A1208] dark:text-gray-300 font-medium">
                         {orgEvents.map(ev => {
                           const today = new Date().toISOString().split('T')[0]
                           const isExpired = ev.end_date < today
                           const isSuspended = ev.is_suspended
 
                           return (
-                            <tr key={ev.id} className="hover:bg-gray-955/20">
-                              <td className="py-2.5 px-3 font-semibold text-white">
+                            <tr key={ev.id} className="hover:bg-[#F5EDE2]/50 dark:hover:bg-gray-900/30">
+                              <td className="py-2.5 px-3 font-bold text-[#1A1208] dark:text-white">
                                 {ev.name} {ev.year}
                               </td>
                               <td className="py-2.5 px-3 font-mono">{ev.upi_id || '—'}</td>
-                              <td className="py-2.5 px-3 text-gray-400">
+                              <td className="py-2.5 px-3 text-[#7a6a55] dark:text-gray-400">
                                 {ev.start_date} to {ev.end_date}
                               </td>
                               <td className="py-2.5 px-3 text-center">
                                 <span className={`px-2 py-0.5 rounded text-[9px] font-bold uppercase border
                                   ${isSuspended
-                                    ? 'bg-rose-500/10 text-rose-455 border-rose-500/20'
+                                    ? 'bg-rose-500/10 text-rose-600 dark:text-rose-455 border-rose-500/20'
                                     : isExpired
-                                      ? 'bg-gray-550/10 text-gray-555 border-gray-550/20'
+                                      ? 'bg-gray-500/10 text-[#7a6a55] dark:text-gray-500 border-gray-500/20'
                                       : ev.is_active
-                                        ? 'bg-emerald-500/10 text-emerald-450 border-emerald-500/20'
-                                        : 'bg-amber-500/10 text-amber-400 border-amber-500/20'}`}>
+                                        ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-450 border-emerald-500/20'
+                                        : 'bg-amber-500/10 text-[#E8650A] dark:text-amber-400 border-amber-500/20'}`}>
                                   {isSuspended ? 'Suspended' : isExpired ? 'Expired' : ev.is_active ? 'Active' : 'Inactive'}
                                 </span>
                               </td>
@@ -1058,8 +1058,8 @@ export default function AllOrganizationsTab({ showToast }: AllOrganizationsTabPr
                                   disabled={togglingEventId === ev.id || isExpired}
                                   className={`px-3 py-1 font-bold rounded-lg text-[10px] transition-colors cursor-pointer border disabled:opacity-30 disabled:cursor-not-allowed
                                     ${isSuspended
-                                      ? 'bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border-emerald-500/20'
-                                      : 'bg-rose-500/10 hover:bg-rose-500/20 text-rose-455 border-rose-500/20'}`}
+                                      ? 'bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 border-emerald-500/20'
+                                      : 'bg-rose-500/10 hover:bg-rose-500/20 text-rose-600 dark:text-rose-455 border-rose-500/20'}`}
                                 >
                                   {togglingEventId === ev.id ? 'Updating...' : isSuspended ? 'Unsuspend' : 'Suspend'}
                                 </button>
@@ -1075,11 +1075,11 @@ export default function AllOrganizationsTab({ showToast }: AllOrganizationsTabPr
             </div>
 
             {/* Footer buttons */}
-            <div className="p-6 border-t border-gray-850 flex justify-end bg-gray-955/20">
+            <div className="p-6 border-t border-[#1A1208]/10 dark:border-gray-800 flex justify-end bg-[#F5EDE2] dark:bg-gray-950/20">
               <button
                 type="button"
                 onClick={() => setViewingOrg(null)}
-                className="px-5 py-2.5 bg-gray-800 hover:bg-gray-700 text-gray-300 font-bold rounded-xl text-xs transition-colors cursor-pointer"
+                className="px-5 py-2.5 bg-[#F5EDE2] dark:bg-gray-800 hover:bg-[#ebdcc9] dark:hover:bg-gray-700 text-[#1A1208] dark:text-gray-300 font-bold rounded-xl text-xs transition-colors cursor-pointer border border-[#1A1208]/10 dark:border-gray-700"
               >
                 Close View
               </button>
@@ -1090,25 +1090,25 @@ export default function AllOrganizationsTab({ showToast }: AllOrganizationsTabPr
 
       {/* Sub Window File Previewer Overlay */}
       {previewDoc && (
-        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-gray-900 border border-gray-800 rounded-2xl w-full max-w-4xl h-[85vh] shadow-2xl flex flex-col overflow-hidden">
+        <div className="fixed inset-0 z-50 bg-black/60 dark:bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-gray-900 border border-[#1A1208]/15 dark:border-gray-800 rounded-2xl w-full max-w-4xl h-[85vh] shadow-2xl flex flex-col overflow-hidden">
             {/* Modal Header */}
-            <div className="p-4 border-b border-gray-800 flex justify-between items-center bg-gray-955/20">
+            <div className="p-4 border-b border-[#1A1208]/10 dark:border-gray-800 flex justify-between items-center bg-[#F5EDE2] dark:bg-gray-950/20">
               <div>
-                <h3 className="text-sm font-bold text-white">KYC Document Preview</h3>
-                <p className="text-[10px] text-gray-500 font-mono tracking-wide mt-0.5">{previewDoc.label}</p>
+                <h3 className="text-sm font-bold text-[#1A1208] dark:text-white">KYC Document Preview</h3>
+                <p className="text-[10px] text-[#7a6a55] dark:text-gray-400 font-mono tracking-wide mt-0.5">{previewDoc.label}</p>
               </div>
               <button
                 type="button"
                 onClick={() => setPreviewDoc(null)}
-                className="px-3 py-1.5 bg-gray-800 hover:bg-gray-700 text-gray-300 rounded-lg text-xs font-bold transition-colors cursor-pointer"
+                className="px-3 py-1.5 bg-[#F5EDE2] dark:bg-gray-800 hover:bg-[#ebdcc9] dark:hover:bg-gray-700 text-[#1A1208] dark:text-gray-300 rounded-lg text-xs font-bold transition-colors cursor-pointer border border-[#1A1208]/10 dark:border-gray-700"
               >
                 ✕ Close
               </button>
             </div>
 
             {/* Modal Content - Iframe or Image */}
-            <div className="flex-1 bg-gray-950 flex items-center justify-center overflow-hidden p-2 relative">
+            <div className="flex-1 bg-[#F5EDE2]/40 dark:bg-gray-950 flex items-center justify-center overflow-hidden p-2 relative">
               {previewDoc.url ? (
                 previewDoc.url.includes('.pdf') || previewDoc.url.toLowerCase().indexOf('pdf') !== -1 ? (
                   <iframe 
@@ -1126,17 +1126,17 @@ export default function AllOrganizationsTab({ showToast }: AllOrganizationsTabPr
               ) : (
                 /* Falling back to Mock document view overlay */
                 <div className="text-center p-8 space-y-4 max-w-md">
-                  <div className="w-16 h-16 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-amber-500 flex items-center justify-center text-3xl mx-auto animate-bounce">
+                  <div className="w-16 h-16 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-[#E8650A] dark:text-amber-400 flex items-center justify-center text-3xl mx-auto animate-bounce">
                     📄
                   </div>
                   <div className="space-y-1.5">
-                    <p className="text-sm font-bold text-white">Demo File (Mock Preview Mode)</p>
-                    <p className="text-xs text-gray-400 leading-relaxed">
+                    <p className="text-sm font-bold text-[#1A1208] dark:text-white">Demo File (Mock Preview Mode)</p>
+                    <p className="text-xs text-[#7a6a55] dark:text-gray-400 leading-relaxed font-medium">
                       No document path was attached to this mock registration. Displaying dummy placeholder contents for Super Admin preview validation.
                     </p>
                   </div>
-                  <div className="p-4 bg-gray-900 border border-gray-850 rounded-xl text-left text-[11px] font-mono text-gray-400 space-y-1">
-                    <p className="text-[10px] font-bold text-gray-500 uppercase tracking-wide">System Metadata</p>
+                  <div className="p-4 bg-white dark:bg-gray-900 border border-[#1A1208]/10 dark:border-gray-800 rounded-xl text-left text-[11px] font-mono text-[#7a6a55] dark:text-gray-400 space-y-1">
+                    <p className="text-[10px] font-bold text-[#7a6a55] dark:text-gray-500 uppercase tracking-wide">System Metadata</p>
                     <p>Mandal ID: {previewDoc.mandalId}</p>
                     <p>Field Key: {previewDoc.key}</p>
                     <p>Preview Timestamp: {new Date().toLocaleTimeString()}</p>
@@ -1150,17 +1150,17 @@ export default function AllOrganizationsTab({ showToast }: AllOrganizationsTabPr
 
       {/* Detailed Team Member Modal */}
       {showDetailedUserModal && (
-        <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-gray-900 border border-gray-800 rounded-2xl w-full max-w-md overflow-hidden shadow-2xl flex flex-col max-h-[85vh]">
+        <div className="fixed inset-0 z-50 bg-black/60 dark:bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-gray-900 border border-[#1A1208]/15 dark:border-gray-800 rounded-2xl w-full max-w-md overflow-hidden shadow-2xl flex flex-col max-h-[85vh]">
             {/* Header */}
-            <div className="p-5 border-b border-gray-800 flex justify-between items-center bg-gray-955/20">
+            <div className="p-5 border-b border-[#1A1208]/10 dark:border-gray-800 flex justify-between items-center bg-[#F5EDE2] dark:bg-gray-950/20">
               <div>
-                <h3 className="text-sm font-bold text-white">Team Member Profile</h3>
-                <p className="text-[10px] text-gray-550 font-mono tracking-wide mt-0.5">Super Admin Audit View</p>
+                <h3 className="text-sm font-bold text-[#1A1208] dark:text-white">Team Member Profile</h3>
+                <p className="text-[10px] text-[#7a6a55] dark:text-gray-400 font-mono tracking-wide mt-0.5">Super Admin Audit View</p>
               </div>
               <button 
                 onClick={() => setShowDetailedUserModal(false)}
-                className="text-gray-400 hover:text-white text-xs p-1 cursor-pointer"
+                className="text-[#7a6a55] dark:text-gray-400 hover:text-[#1A1208] dark:hover:text-white text-xs p-1 cursor-pointer font-bold"
               >
                 ✕ Close
               </button>
@@ -1170,71 +1170,71 @@ export default function AllOrganizationsTab({ showToast }: AllOrganizationsTabPr
             <div className="p-5 space-y-4 overflow-y-auto text-xs">
               {loadingDetailedUser ? (
                 <div className="flex flex-col items-center justify-center py-12 space-y-2">
-                  <div className="w-6 h-6 rounded-full border border-t-orange-500 border-r-transparent border-b-orange-500 border-l-transparent animate-spin" />
-                  <p className="text-[10px] text-gray-500 font-mono">Fetching profile details...</p>
+                  <div className="w-6 h-6 rounded-full border border-t-[#E8650A] border-r-transparent border-b-[#E8650A] border-l-transparent animate-spin" />
+                  <p className="text-[10px] text-[#7a6a55] dark:text-gray-400 font-mono">Fetching profile details...</p>
                 </div>
               ) : detailedUser ? (
                 <div className="space-y-4">
                   {/* Basic Card */}
-                  <div className="bg-gray-955/50 border border-gray-850 p-4 rounded-xl space-y-2.5">
-                    <div className="flex justify-between items-center pb-2 border-b border-gray-800">
+                  <div className="bg-[#F5EDE2]/60 dark:bg-gray-950/40 border border-[#1A1208]/10 dark:border-gray-800 p-4 rounded-xl space-y-2.5">
+                    <div className="flex justify-between items-center pb-2 border-b border-[#1A1208]/10 dark:border-gray-800">
                       <div>
-                        <p className="text-sm font-bold text-white">{detailedUser.full_name}</p>
-                        <p className="text-[9px] text-orange-400 font-mono tracking-wider uppercase leading-none mt-0.5">
+                        <p className="text-sm font-bold text-[#1A1208] dark:text-white">{detailedUser.full_name}</p>
+                        <p className="text-[9px] text-[#E8650A] dark:text-orange-400 font-mono tracking-wider uppercase leading-none mt-0.5 font-bold">
                           {detailedUser.designation}
                         </p>
                       </div>
                       <span className={`px-2 py-0.5 rounded text-[9px] font-bold uppercase border
                         ${detailedUser.is_active 
-                          ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' 
-                          : 'bg-rose-500/10 text-rose-455 border-rose-500/20'}`}>
+                          ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20' 
+                          : 'bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/20'}`}>
                         {detailedUser.is_active ? 'Active' : 'Suspended'}
                       </span>
                     </div>
 
-                    <div className="grid grid-cols-2 gap-3 text-[11px] text-gray-300">
+                    <div className="grid grid-cols-2 gap-3 text-[11px] text-[#1A1208] dark:text-gray-300 font-medium">
                       <div>
-                        <span className="text-gray-550 block text-[9px] font-semibold uppercase tracking-wider">Email Address</span>
-                        <span className="font-mono text-white truncate block">{detailedUser.email}</span>
+                        <span className="text-[#7a6a55] dark:text-gray-400 block text-[9px] font-bold uppercase tracking-wider">Email Address</span>
+                        <span className="font-mono text-[#1A1208] dark:text-white truncate block">{detailedUser.email}</span>
                       </div>
                       <div>
-                        <span className="text-gray-550 block text-[9px] font-semibold uppercase tracking-wider">Phone Number</span>
-                        <span className="font-mono text-white block">{detailedUser.phone || '—'}</span>
+                        <span className="text-[#7a6a55] dark:text-gray-400 block text-[9px] font-bold uppercase tracking-wider">Phone Number</span>
+                        <span className="font-mono text-[#1A1208] dark:text-white block">{detailedUser.phone || '—'}</span>
                       </div>
                       <div>
-                        <span className="text-gray-550 block text-[9px] font-semibold uppercase tracking-wider">System Role</span>
-                        <span className="capitalize block">{detailedUser.role}</span>
+                        <span className="text-[#7a6a55] dark:text-gray-400 block text-[9px] font-bold uppercase tracking-wider">System Role</span>
+                        <span className="capitalize block font-bold">{detailedUser.role}</span>
                       </div>
                       <div>
-                        <span className="text-gray-550 block text-[9px] font-semibold uppercase tracking-wider">Joined Date</span>
+                        <span className="text-[#7a6a55] dark:text-gray-400 block text-[9px] font-bold uppercase tracking-wider">Joined Date</span>
                         <span>{detailedUser.created_at ? formatDate(detailedUser.created_at) : '—'}</span>
                       </div>
                     </div>
                   </div>
 
                   {/* Security / Logs Card */}
-                  <div className="bg-gray-955/50 border border-gray-850 p-4 rounded-xl space-y-2 text-[11px]">
-                    <h4 className="text-[9px] font-bold text-gray-400 uppercase tracking-wider border-b border-gray-800 pb-1.5 mb-2.5">
+                  <div className="bg-[#F5EDE2]/60 dark:bg-gray-950/40 border border-[#1A1208]/10 dark:border-gray-800 p-4 rounded-xl space-y-2 text-[11px]">
+                    <h4 className="text-[9px] font-extrabold text-[#E8650A] dark:text-orange-400 uppercase tracking-wider border-b border-[#1A1208]/10 dark:border-gray-800 pb-1.5 mb-2.5">
                       Security & Login Info
                     </h4>
-                    <div className="space-y-2">
+                    <div className="space-y-2 font-medium">
                       <div className="flex justify-between items-center">
-                        <span className="text-gray-555">Last Login:</span>
-                        <span className="font-mono text-white text-right">
+                        <span className="text-[#7a6a55] dark:text-gray-400">Last Login:</span>
+                        <span className="font-mono text-[#1A1208] dark:text-white text-right">
                           {detailedUser.last_login ? new Date(detailedUser.last_login).toLocaleString('en-IN') : 'Never logged in'}
                         </span>
                       </div>
                       <div className="flex justify-between items-center">
-                        <span className="text-gray-555">Profile / Password Update:</span>
-                        <span className="font-mono text-white text-right">
+                        <span className="text-[#7a6a55] dark:text-gray-400">Profile / Password Update:</span>
+                        <span className="font-mono text-[#1A1208] dark:text-white text-right">
                           {detailedUser.password_change ? new Date(detailedUser.password_change).toLocaleString('en-IN') : 'No password updates'}
                         </span>
                       </div>
-                      <div className="pt-2 border-t border-gray-800/40 flex justify-end">
+                      <div className="pt-2 border-t border-[#1A1208]/10 dark:border-gray-800 flex justify-end">
                         <button
                           type="button"
                           onClick={() => setResetPasswordUserId(detailedUser.id)}
-                          className="px-2.5 py-1.5 bg-gray-850 hover:bg-gray-800 hover:text-white border border-gray-750 text-orange-400 font-bold rounded-lg text-[9px] transition-colors cursor-pointer"
+                          className="px-2.5 py-1.5 bg-white dark:bg-gray-800 hover:bg-[#F5EDE2] dark:hover:bg-gray-700 border border-[#1A1208]/15 dark:border-gray-700 text-[#E8650A] dark:text-orange-400 font-bold rounded-lg text-[9px] transition-colors cursor-pointer"
                         >
                           Change Password
                         </button>
@@ -1243,35 +1243,35 @@ export default function AllOrganizationsTab({ showToast }: AllOrganizationsTabPr
                   </div>
 
                   {/* Collection Activity Card */}
-                  <div className="bg-gray-955/50 border border-gray-850 p-4 rounded-xl space-y-2 text-[11px]">
-                    <h4 className="text-[9px] font-bold text-gray-400 uppercase tracking-wider border-b border-gray-800 pb-1.5 mb-2.5">
+                  <div className="bg-[#F5EDE2]/60 dark:bg-gray-950/40 border border-[#1A1208]/10 dark:border-gray-800 p-4 rounded-xl space-y-2 text-[11px]">
+                    <h4 className="text-[9px] font-extrabold text-[#E8650A] dark:text-orange-400 uppercase tracking-wider border-b border-[#1A1208]/10 dark:border-gray-800 pb-1.5 mb-2.5">
                       Collection Activity
                     </h4>
                     <div className="grid grid-cols-2 gap-3 text-center">
-                      <div className="bg-gray-950/40 p-2.5 border border-gray-850 rounded-lg">
-                        <p className="text-[9px] text-gray-550 font-bold uppercase tracking-wider">Total Collected</p>
-                        <p className="text-xs font-black text-white mt-1">{detailedUser.activity.totalCount} donations</p>
-                        <p className="text-[10px] font-mono text-gray-405 mt-0.5">₹{detailedUser.activity.totalAmount}</p>
+                      <div className="bg-white dark:bg-gray-900 p-2.5 border border-[#1A1208]/10 dark:border-gray-800 rounded-lg">
+                        <p className="text-[9px] text-[#7a6a55] dark:text-gray-400 font-bold uppercase tracking-wider">Total Collected</p>
+                        <p className="text-xs font-black text-[#1A1208] dark:text-white mt-1">{detailedUser.activity.totalCount} donations</p>
+                        <p className="text-[10px] font-mono text-[#E8650A] dark:text-orange-400 mt-0.5 font-bold">₹{detailedUser.activity.totalAmount}</p>
                       </div>
-                      <div className="bg-gray-950/40 p-2.5 border border-gray-850 rounded-lg">
-                        <p className="text-[9px] text-emerald-500 font-bold uppercase tracking-wider">Verified Cash</p>
-                        <p className="text-xs font-black text-emerald-450 mt-1">{detailedUser.activity.verifiedCount} items</p>
-                        <p className="text-[10px] font-mono text-emerald-400 mt-0.5">₹{detailedUser.activity.verifiedAmount}</p>
+                      <div className="bg-white dark:bg-gray-900 p-2.5 border border-[#1A1208]/10 dark:border-gray-800 rounded-lg">
+                        <p className="text-[9px] text-emerald-600 dark:text-emerald-400 font-bold uppercase tracking-wider">Verified Cash</p>
+                        <p className="text-xs font-black text-emerald-600 dark:text-emerald-400 mt-1">{detailedUser.activity.verifiedCount} items</p>
+                        <p className="text-[10px] font-mono text-emerald-600 dark:text-emerald-400 mt-0.5 font-bold">₹{detailedUser.activity.verifiedAmount}</p>
                       </div>
                     </div>
                   </div>
                 </div>
               ) : (
-                <p className="text-gray-555 text-center py-6">Could not load profile info.</p>
+                <p className="text-[#7a6a55] dark:text-gray-400 text-center py-6">Could not load profile info.</p>
               )}
             </div>
 
             {/* Footer */}
-            <div className="p-4 border-t border-gray-850 bg-gray-955/20 flex justify-end">
+            <div className="p-4 border-t border-[#1A1208]/10 dark:border-gray-800 bg-[#F5EDE2] dark:bg-gray-950/20 flex justify-end">
               <button
                 type="button"
                 onClick={() => setShowDetailedUserModal(false)}
-                className="px-4 py-2 bg-gray-800 hover:bg-gray-700 text-gray-300 font-bold rounded-xl text-xs transition-colors cursor-pointer"
+                className="px-4 py-2 bg-[#F5EDE2] dark:bg-gray-800 hover:bg-[#ebdcc9] dark:hover:bg-gray-700 text-[#1A1208] dark:text-gray-300 font-bold rounded-xl text-xs transition-colors cursor-pointer border border-[#1A1208]/10 dark:border-gray-700"
               >
                 Close Profile
               </button>
@@ -1282,20 +1282,20 @@ export default function AllOrganizationsTab({ showToast }: AllOrganizationsTabPr
 
       {/* Change Password Modal */}
       {resetPasswordUserId && (
-        <div className="fixed inset-0 z-55 bg-black/75 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-gray-900 border border-gray-800 rounded-2xl w-full max-w-sm overflow-hidden shadow-2xl flex flex-col">
+        <div className="fixed inset-0 z-55 bg-black/60 dark:bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-gray-900 border border-[#1A1208]/15 dark:border-gray-800 rounded-2xl w-full max-w-sm overflow-hidden shadow-2xl flex flex-col">
             {/* Header */}
-            <div className="p-5 border-b border-gray-800 flex justify-between items-center bg-gray-955/20">
+            <div className="p-5 border-b border-[#1A1208]/10 dark:border-gray-800 flex justify-between items-center bg-[#F5EDE2] dark:bg-gray-950/20">
               <div>
-                <h3 className="text-sm font-bold text-white">Change User Password</h3>
-                <p className="text-[10px] text-gray-555 font-mono mt-0.5">Admin Security Credential Update</p>
+                <h3 className="text-sm font-bold text-[#1A1208] dark:text-white">Change User Password</h3>
+                <p className="text-[10px] text-[#7a6a55] dark:text-gray-400 font-mono mt-0.5">Admin Security Credential Update</p>
               </div>
               <button 
                 onClick={() => {
                   setResetPasswordUserId(null)
                   setNewPasswordValue('')
                 }}
-                className="text-gray-400 hover:text-white text-xs p-1 cursor-pointer"
+                className="text-[#7a6a55] dark:text-gray-400 hover:text-[#1A1208] dark:hover:text-white text-xs p-1 cursor-pointer font-bold"
               >
                 ✕
               </button>
@@ -1304,14 +1304,14 @@ export default function AllOrganizationsTab({ showToast }: AllOrganizationsTabPr
             {/* Form */}
             <form onSubmit={handlePasswordReset} className="p-5 space-y-4">
               <div>
-                <label className="block text-xs font-semibold text-gray-400 mb-1.5">New Password *</label>
+                <label className="block text-xs font-bold text-[#7a6a55] dark:text-gray-300 mb-1.5">New Password *</label>
                 <input
                   type="text"
                   required
                   placeholder="Min 8 characters"
                   value={newPasswordValue}
                   onChange={e => setNewPasswordValue(e.target.value)}
-                  className="w-full bg-gray-955 border border-gray-800 rounded-lg px-3 py-2 text-xs text-white placeholder-gray-600 focus:outline-none focus:border-orange-500 font-mono"
+                  className="w-full bg-white dark:bg-gray-800 border border-[#1A1208]/15 dark:border-gray-700 rounded-lg px-3 py-2 text-xs text-[#1A1208] dark:text-white placeholder-[#9e8c76] dark:placeholder-gray-500 focus:outline-none focus:border-[#E8650A] font-mono font-medium"
                 />
               </div>
 
@@ -1322,14 +1322,14 @@ export default function AllOrganizationsTab({ showToast }: AllOrganizationsTabPr
                     setResetPasswordUserId(null)
                     setNewPasswordValue('')
                   }}
-                  className="px-4 py-2 bg-gray-800 hover:bg-gray-700 text-gray-300 font-semibold rounded-xl text-xs transition-colors cursor-pointer"
+                  className="px-4 py-2 bg-[#F5EDE2] dark:bg-gray-800 hover:bg-[#ebdcc9] dark:hover:bg-gray-700 text-[#1A1208] dark:text-gray-300 font-bold rounded-xl text-xs transition-colors cursor-pointer border border-[#1A1208]/10 dark:border-gray-700"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={resettingPassword || newPasswordValue.length < 8}
-                  className="px-4 py-2 bg-orange-500 hover:bg-orange-600 text-white font-bold rounded-xl text-xs transition-colors cursor-pointer disabled:opacity-50"
+                  className="px-4 py-2 bg-gradient-to-r from-[#E8650A] to-[#f97316] hover:from-[#d05807] hover:to-[#ea580c] text-white font-bold rounded-xl text-xs transition-colors cursor-pointer disabled:opacity-50 shadow-md shadow-[#E8650A]/20"
                 >
                   {resettingPassword ? 'Updating...' : 'Update Password'}
                 </button>

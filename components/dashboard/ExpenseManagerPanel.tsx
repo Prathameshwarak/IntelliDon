@@ -172,54 +172,54 @@ export default function ExpenseManagerPanel({ mandalId, eventId, eventLabel, sho
     <div className="flex flex-col gap-4">
       <button
         onClick={onBack}
-        className="inline-flex items-center gap-2 text-gray-400 hover:text-white text-sm transition-colors self-start group cursor-pointer"
+        className="self-start text-xs text-[#E8650A] dark:text-orange-400 hover:underline font-bold transition-colors cursor-pointer flex items-center gap-1"
       >
-        <span className="group-hover:-translate-x-1 transition-transform">←</span> Back to Events List
+        ← Back to Events List
       </button>
 
       <div>
-        <h3 className="text-sm font-semibold text-white">Expense Management</h3>
-        <p className="text-xs text-gray-500 mt-0.5">{eventLabel}</p>
+        <h3 className="text-base font-bold text-[#1A1208] dark:text-white">Expense Management</h3>
+        <p className="text-xs text-[#7a6a55] dark:text-gray-400 mt-0.5 font-medium">{eventLabel}</p>
       </div>
 
       {/* Summary — 3 grid boxes */}
       <div className="grid grid-cols-3 gap-2">
-        <div className="bg-gray-800 border border-gray-700 rounded-lg p-3">
-          <p className="text-[10px] uppercase text-gray-500 font-bold">Entries</p>
-          <p className="text-sm font-semibold text-white mt-1">{summary.count}</p>
+        <div className="bg-[#F5EDE2] dark:bg-gray-800 border border-[#1A1208]/10 dark:border-gray-700 rounded-xl p-3 shadow-sm">
+          <p className="text-[10px] uppercase text-[#7a6a55] dark:text-gray-400 font-bold">Entries</p>
+          <p className="text-sm font-bold text-[#1A1208] dark:text-white mt-1">{summary.count}</p>
         </div>
-        <div className="bg-gray-800 border border-gray-700 rounded-lg p-3">
-          <p className="text-[10px] uppercase text-gray-500 font-bold">Total Expenses</p>
-          <p className="text-sm font-semibold text-white mt-1">{formatMoney(summary.total_amount)}</p>
+        <div className="bg-[#F5EDE2] dark:bg-gray-800 border border-[#1A1208]/10 dark:border-gray-700 rounded-xl p-3 shadow-sm">
+          <p className="text-[10px] uppercase text-[#7a6a55] dark:text-gray-400 font-bold">Total Expenses</p>
+          <p className="text-sm font-bold text-[#1A1208] dark:text-white mt-1">{formatMoney(summary.total_amount)}</p>
         </div>
-        <div ref={menuRef} className="relative bg-gray-800 border border-gray-700 rounded-lg p-2 flex flex-col gap-1.5 justify-center">
+        <div ref={menuRef} className="relative bg-[#F5EDE2] dark:bg-gray-800 border border-[#1A1208]/10 dark:border-gray-700 rounded-xl p-2 flex flex-col gap-1.5 justify-center shadow-sm">
           <button
             onClick={() => setOpenMenu(openMenu === 'download' ? null : 'download')}
             disabled={exporting}
-            className="text-[11px] bg-gray-700/70 hover:bg-gray-700 text-gray-200 py-1.5 rounded-md font-medium disabled:opacity-50 cursor-pointer"
+            className="text-[11px] bg-[#ebdcc9] dark:bg-gray-700/70 hover:bg-[#dfcdb7] dark:hover:bg-gray-700 text-[#1A1208] dark:text-gray-200 border border-[#1A1208]/10 dark:border-gray-600 py-1.5 rounded-lg font-bold disabled:opacity-50 cursor-pointer transition-colors"
           >
             ⬇ Download
           </button>
           <button
             onClick={() => setOpenMenu(openMenu === 'share' ? null : 'share')}
             disabled={exporting}
-            className="text-[11px] bg-gray-700/70 hover:bg-gray-700 text-gray-200 py-1.5 rounded-md font-medium disabled:opacity-50 cursor-pointer"
+            className="text-[11px] bg-[#ebdcc9] dark:bg-gray-700/70 hover:bg-[#dfcdb7] dark:hover:bg-gray-700 text-[#1A1208] dark:text-gray-200 border border-[#1A1208]/10 dark:border-gray-600 py-1.5 rounded-lg font-bold disabled:opacity-50 cursor-pointer transition-colors"
           >
             ↗ Share
           </button>
 
           {openMenu && (
-            <div className="absolute z-20 top-full mt-1 left-0 right-0 bg-gray-900 border border-gray-700 rounded-lg shadow-xl overflow-hidden">
-              <p className="text-[10px] uppercase text-gray-500 font-bold px-3 pt-2 pb-1">Choose format</p>
+            <div className="absolute z-20 top-full mt-1 left-0 right-0 bg-white dark:bg-gray-900 border border-[#1A1208]/15 dark:border-gray-700 rounded-xl shadow-2xl overflow-hidden">
+              <p className="text-[10px] uppercase text-[#7a6a55] dark:text-gray-500 font-bold px-3 pt-2 pb-1">Choose format</p>
               <button
                 onClick={() => handleExport(openMenu, 'pdf')}
-                className="w-full text-left text-xs text-gray-200 hover:bg-gray-800 px-3 py-2 cursor-pointer"
+                className="w-full text-left text-xs text-[#1A1208] dark:text-gray-200 hover:bg-[#F5EDE2] dark:hover:bg-gray-800 px-3 py-2 cursor-pointer font-bold"
               >
                 📄 PDF
               </button>
               <button
                 onClick={() => handleExport(openMenu, 'excel')}
-                className="w-full text-left text-xs text-gray-200 hover:bg-gray-800 px-3 py-2 cursor-pointer"
+                className="w-full text-left text-xs text-[#1A1208] dark:text-gray-200 hover:bg-[#F5EDE2] dark:hover:bg-gray-800 px-3 py-2 cursor-pointer font-bold"
               >
                 📊 Excel
               </button>
@@ -230,20 +230,19 @@ export default function ExpenseManagerPanel({ mandalId, eventId, eventLabel, sho
 
       <button
         onClick={() => (showForm ? resetForm() : setShowForm(true))}
-        className="w-full text-sm bg-orange-500 hover:bg-orange-600 text-white py-2.5 rounded-lg font-medium cursor-pointer"
+        className="w-full text-xs bg-gradient-to-r from-[#E8650A] to-[#f97316] hover:from-[#d05807] hover:to-[#ea580c] text-white py-2.5 rounded-xl font-bold cursor-pointer transition-all shadow-md shadow-[#E8650A]/20"
       >
         {showForm ? 'Close Form' : '+ Add Expense'}
       </button>
 
       {showForm && (
-        <div className="bg-gray-800 border border-gray-700 rounded-xl p-4 flex flex-col gap-3">
-          <p className="text-sm font-medium text-white">{editingId ? 'Edit Expense' : 'New Expense'}</p>
+        <div className="bg-[#F5EDE2] dark:bg-gray-800 border border-[#1A1208]/10 dark:border-gray-700 rounded-xl p-4 flex flex-col gap-3 shadow-sm">
+          <p className="text-sm font-bold text-[#1A1208] dark:text-white">{editingId ? 'Edit Expense' : 'New Expense'}</p>
 
           <FloatingInput
             id="expense-date"
             label="Expense Date"
             type="date"
-            style={{ colorScheme: 'dark' }}
             value={form.expense_date}
             onChange={e => setField('expense_date', e.target.value)}
           />
@@ -315,45 +314,45 @@ export default function ExpenseManagerPanel({ mandalId, eventId, eventLabel, sho
             <button
               onClick={submitExpenseForm}
               disabled={submitting}
-              className="flex-1 bg-orange-500 hover:bg-orange-600 disabled:opacity-50 text-white text-sm font-medium py-2.5 rounded-lg cursor-pointer"
+              className="flex-1 bg-gradient-to-r from-[#E8650A] to-[#f97316] hover:from-[#d05807] hover:to-[#ea580c] disabled:opacity-50 text-white text-xs font-bold py-2.5 rounded-xl transition-all cursor-pointer shadow-md shadow-[#E8650A]/20"
             >
               {submitting ? 'Saving...' : editingId ? 'Save Changes' : 'Add Expense'}
             </button>
-            <button onClick={resetForm} className="px-4 bg-gray-700 text-gray-300 text-sm rounded-lg cursor-pointer">Cancel</button>
+            <button onClick={resetForm} className="px-4 bg-[#F5EDE2] dark:bg-gray-700 hover:bg-[#ebdcc9] dark:hover:bg-gray-600 text-[#1A1208] dark:text-gray-300 border border-[#1A1208]/10 dark:border-gray-600 text-xs font-bold rounded-xl transition-colors cursor-pointer">Cancel</button>
           </div>
         </div>
       )}
 
       {loading ? (
-        <p className="text-gray-500 text-sm text-center py-8">Loading expenses...</p>
+        <p className="text-[#7a6a55] dark:text-gray-400 text-sm text-center py-8 font-medium">Loading expenses...</p>
       ) : expenses.length === 0 ? (
-        <p className="text-gray-500 text-sm text-center py-8">No expenses recorded for this event.</p>
+        <p className="text-[#7a6a55] dark:text-gray-400 text-sm text-center py-8 font-medium">No expenses recorded for this event.</p>
       ) : (
         <div className="flex flex-col gap-3">
           {expenses.map(exp => (
-            <div key={exp.id} className="bg-gray-800 border border-gray-700 rounded-xl p-4">
+            <div key={exp.id} className="bg-white dark:bg-gray-800 border border-[#1A1208]/15 dark:border-gray-700 rounded-xl p-4 shadow-sm">
               <div className="flex items-start justify-between gap-3">
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-white">{exp.title}</p>
-                  <p className="text-xs text-gray-400 mt-0.5">
+                  <p className="text-sm font-bold text-[#1A1208] dark:text-white">{exp.title}</p>
+                  <p className="text-xs text-[#7a6a55] dark:text-gray-400 mt-0.5 font-medium">
                     {exp.vendor_name}{exp.vendor_phone ? ` · ${exp.vendor_phone}` : ''}
                   </p>
-                  <p className="text-xs text-gray-500 mt-1">{formatDate(exp.expense_date)}</p>
-                  {exp.description && <p className="text-xs text-gray-500 mt-1 line-clamp-1 truncate">{exp.description}</p>}
-                  {exp.transaction_id && <p className="text-[11px] text-gray-600 mt-1">Txn: {exp.transaction_id}</p>}
+                  <p className="text-xs text-[#7a6a55] dark:text-gray-500 mt-1 font-medium">{formatDate(exp.expense_date)}</p>
+                  {exp.description && <p className="text-xs text-[#7a6a55] dark:text-gray-500 mt-1 line-clamp-1 truncate font-medium">{exp.description}</p>}
+                  {exp.transaction_id && <p className="text-[11px] text-[#7a6a55] dark:text-gray-600 mt-1 font-mono">Txn: {exp.transaction_id}</p>}
                 </div>
                 <div className="text-right shrink-0">
-                  <p className="text-sm font-semibold text-white">{formatMoney(exp.amount)}</p>
+                  <p className="text-sm font-bold text-[#1A1208] dark:text-white">{formatMoney(exp.amount)}</p>
                 </div>
               </div>
-              <div className="flex items-center justify-between mt-3 pt-2 border-t border-gray-700/50">
+              <div className="flex items-center justify-between mt-3 pt-2 border-t border-[#1A1208]/10 dark:border-gray-700/50">
                 <button
                   onClick={() => setViewingExpense(exp)}
-                  className="text-xs text-orange-400 hover:text-orange-300 font-medium cursor-pointer"
+                  className="text-xs text-[#E8650A] dark:text-orange-400 hover:underline font-bold cursor-pointer"
                 >
                   View
                 </button>
-                <span className="text-[11px] text-gray-600">
+                <span className="text-[11px] text-[#7a6a55] dark:text-gray-500 font-medium">
                   {exp.created_by_name ? `Added by ${exp.created_by_name}` : ''}
                 </span>
               </div>

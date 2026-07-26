@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
@@ -13,6 +13,28 @@ export default function LoginPage() {
   const [success, setSuccess] = useState(false);
   const [adminName, setAdminName] = useState("");
   const [mandalName, setMandalName] = useState("");
+
+  // Theme State (Syncs with Landing Page light/dark theme)
+  const [theme, setTheme] = useState<'light' | 'dark'>('light');
+
+  useEffect(() => {
+    const saved = localStorage.getItem('intellidon-theme') as 'light' | 'dark' | null;
+    if (saved) {
+      setTheme(saved);
+      document.documentElement.classList.toggle('dark', saved === 'dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+    }
+  }, []);
+
+  const toggleTheme = () => {
+    const next = theme === 'light' ? 'dark' : 'light';
+    setTheme(next);
+    localStorage.setItem('intellidon-theme', next);
+    document.documentElement.classList.toggle('dark', next === 'dark');
+  };
+
+  const isDark = theme === 'dark';
 
   // Form State
   const [email, setEmail] = useState("");
@@ -81,8 +103,7 @@ export default function LoginPage() {
         throw new Error("Could not log in. User details are missing.");
       }
 
-      // 2. Fetch the corresponding user profile & mandal details for personalization
-      // We implement a retry block to handle potential Supabase Auth session initialization race condition
+      // 2. Fetch corresponding user profile & mandal details
       let userProfile: any = null;
       let profileError: any = null;
 
@@ -108,7 +129,7 @@ export default function LoginPage() {
 
         profileError = error;
 
-        // Fallback: If is_active column doesn't exist yet, retry without it
+        // Fallback if is_active column does not exist
         if (error && error.message.includes("is_active")) {
           const { data: fallbackProfile, error: fallbackError } = await supabase
             .from("users")
@@ -179,7 +200,6 @@ export default function LoginPage() {
 
     } catch (err: unknown) {
       const error = err as { message?: string };
-      // Use console.warn instead of console.error to avoid popping up Next.js developer overlay
       console.warn("Login authentication warning:", error.message || error);
       setErrorMsg(error.message || "Invalid email or password.");
       setLoading(false);
@@ -187,31 +207,30 @@ export default function LoginPage() {
   };
 
   return (
-    <main className="min-h-screen w-full flex flex-col md:flex-row bg-[#f8fafc] dark:bg-[#07090e] transition-colors duration-300">
+    <main className="min-h-screen w-full flex flex-col md:flex-row bg-[#FDF8F3] dark:bg-[#07090e] text-[#1A1208] dark:text-[#f1f5f9] transition-colors duration-300">
 
       {/* SUCCESS REDIRECT OVERLAY */}
       {success && (
         <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-[#07090e]/95 p-6 text-center animate-fade-in-up">
           <div className="relative w-24 h-24 mb-6">
-            {/* Spinning Loader Rings */}
-            <div className="absolute inset-0 rounded-full border-4 border-t-amber-500 border-r-transparent border-b-indigo-500 border-l-transparent animate-spin" />
-            <div className="absolute inset-2 rounded-full border-4 border-t-transparent border-r-violet-500 border-b-transparent border-l-emerald-500 animate-spin [animation-direction:reverse] [animation-duration:1.5s]" />
-            <div className="absolute inset-0 bg-amber-500/10 rounded-full blur-xl animate-pulse-soft" />
+            <div className="absolute inset-0 rounded-full border-4 border-t-[#E8650A] border-r-transparent border-b-[#C49A3C] border-l-transparent animate-spin" />
+            <div className="absolute inset-2 rounded-full border-4 border-t-transparent border-r-orange-500 border-b-transparent border-l-emerald-500 animate-spin [animation-direction:reverse] [animation-duration:1.5s]" />
+            <div className="absolute inset-0 bg-[#E8650A]/10 rounded-full blur-xl animate-pulse-soft" />
           </div>
 
           <div className="max-w-md space-y-3">
             <h2 className="text-3xl font-extrabold text-white tracking-tight">
               Access Granted
             </h2>
-            <p className="text-slate-400 text-sm">
-              Welcome back, <span className="text-amber-400 font-semibold">{adminName || "Admin"}</span>!
+            <p className="text-slate-300 text-sm">
+              Welcome back, <span className="text-[#E8650A] font-semibold">{adminName || "Admin"}</span>!
             </p>
             {mandalName && (
-              <p className="text-xs text-indigo-400 font-mono tracking-wider uppercase">
+              <p className="text-xs text-[#C49A3C] font-mono tracking-wider uppercase font-semibold">
                 {mandalName}
               </p>
             )}
-            <p className="text-xs text-slate-500 pt-4 animate-pulse">
+            <p className="text-xs text-slate-400 pt-4 animate-pulse">
               Redirecting you to the portal home...
             </p>
           </div>
@@ -219,79 +238,90 @@ export default function LoginPage() {
       )}
 
       {/* LEFT PANEL - DYNAMIC PORTAL WELCOME & DASHBOARD PREVIEW */}
-      <section className="relative w-full md:w-[45%] lg:w-[40%] bg-gradient-to-b from-[#0b0f19] to-[#04060b] flex flex-col justify-between p-8 md:p-12 overflow-hidden border-b md:border-b-0 md:border-r border-white/5">
+      <section className="relative w-full md:w-[45%] lg:w-[40%] bg-[#F5EDE2] dark:bg-gradient-to-b dark:from-[#0b0f19] dark:to-[#04060b] flex flex-col justify-between p-8 md:p-12 overflow-hidden border-b md:border-b-0 md:border-r border-[#1A1208]/10 dark:border-white/5 transition-colors duration-300">
 
-        {/* Floating Ambient Orbs */}
-        <div className="absolute top-1/3 -left-1/4 w-80 h-80 rounded-full bg-amber-500/10 blur-3xl animate-float-slow animate-pulse-soft pointer-events-none" />
-        <div className="absolute bottom-1/3 -right-1/4 w-80 h-80 rounded-full bg-indigo-600/20 blur-3xl animate-float-medium animate-pulse-soft pointer-events-none" />
-        <div className="absolute top-10 right-10 w-40 h-40 rounded-full bg-violet-600/10 blur-3xl animate-float-fast pointer-events-none" />
+        {/* Ambient Orbs */}
+        {isDark ? (
+          <>
+            <div className="absolute top-1/3 -left-1/4 w-80 h-80 rounded-full bg-[#E8650A]/15 blur-3xl animate-float-slow pointer-events-none" />
+            <div className="absolute bottom-1/3 -right-1/4 w-80 h-80 rounded-full bg-indigo-600/20 blur-3xl animate-float-medium pointer-events-none" />
+            <div className="absolute inset-0 bg-[linear-gradient(to_right,#ffffff03_1px,transparent_1px),linear-gradient(to_bottom,#ffffff03_1px,transparent_1px)] bg-[size:24px_24px] pointer-events-none" />
+          </>
+        ) : (
+          <>
+            <div className="absolute top-1/3 -left-1/4 w-80 h-80 rounded-full bg-[#E8650A]/10 blur-3xl pointer-events-none" />
+            <div className="absolute bottom-1/3 -right-1/4 w-80 h-80 rounded-full bg-[#C49A3C]/15 blur-3xl pointer-events-none" />
+          </>
+        )}
 
-        {/* Fine SVG Tech Grid Overlay */}
-        <div className="absolute inset-0 bg-[linear-gradient(to_right,#ffffff03_1px,transparent_1px),linear-gradient(to_bottom,#ffffff03_1px,transparent_1px)] bg-[size:24px_24px] pointer-events-none" />
-
-        {/* Top Logo branding */}
+        {/* Top Logo Branding */}
         <div className="relative z-10 flex items-center space-x-3">
-          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-amber-400 to-orange-600 flex items-center justify-center shadow-lg shadow-amber-500/20">
+          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#E8650A] to-[#C49A3C] flex items-center justify-center shadow-md shadow-[#E8650A]/20">
             <span className="text-white font-black text-xl italic tracking-wider">i</span>
           </div>
           <div>
-            <h1 className="text-lg font-bold text-white tracking-wide">Intellidon</h1>
-            <p className="text-[10px] text-indigo-400 font-mono tracking-widest uppercase">Mandal Portal</p>
+            <h1 className="text-lg font-extrabold tracking-tight text-[#1A1208] dark:text-white">
+              Intelli<span className="text-[#E8650A]">don</span>
+            </h1>
+            <p className="text-[10px] text-[#C49A3C] dark:text-indigo-400 font-mono tracking-widest uppercase font-semibold">
+              Mandal Portal
+            </p>
           </div>
         </div>
 
         {/* Centerpiece: Admin Dashboard Preview Graphic */}
         <div className="relative z-10 my-12 flex flex-col items-center">
-          <p className="text-slate-400 font-mono text-xs uppercase tracking-widest mb-4">Administration Overview</p>
+          <p className="text-[#7a6a55] dark:text-slate-400 font-mono text-xs uppercase tracking-widest mb-4 font-medium">
+            Administration Overview
+          </p>
 
-          {/* Dashboard mockup card */}
-          <div className="w-full max-w-[340px] bg-white/5 border border-white/10 rounded-2xl p-5 shadow-2xl backdrop-blur-xl space-y-4 transition-all duration-300 hover:scale-[1.02]">
+          {/* Dashboard Mockup Card */}
+          <div className="w-full max-w-[340px] bg-[#FDF8F3] dark:bg-white/5 border border-[#1A1208]/10 dark:border-white/10 rounded-2xl p-5 shadow-xl dark:shadow-2xl backdrop-blur-xl space-y-4 transition-all duration-300 hover:scale-[1.02]">
 
-            {/* Header: Title and active user stats */}
-            <div className="flex justify-between items-center border-b border-white/10 pb-3">
+            {/* Header: Live Feed & Status */}
+            <div className="flex justify-between items-center border-b border-[#1A1208]/10 dark:border-white/10 pb-3">
               <div className="flex items-center space-x-2">
                 <div className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-ping" />
-                <span className="text-xs font-bold text-slate-200 tracking-wide">Live Feed</span>
+                <span className="text-xs font-bold text-[#1A1208] dark:text-slate-200 tracking-wide">Live Feed</span>
               </div>
-              <span className="text-[10px] font-mono text-indigo-400 bg-indigo-500/10 px-2 py-0.5 rounded-full border border-indigo-500/20">SYS OK</span>
+              <span className="text-[10px] font-mono text-[#E8650A] dark:text-indigo-400 bg-[#E8650A]/10 dark:bg-indigo-500/10 px-2 py-0.5 rounded-full border border-[#E8650A]/20 dark:border-indigo-500/20 font-semibold">
+                SYS OK
+              </span>
             </div>
 
-            {/* Simulated graph graphic */}
+            {/* Simulated Graph Graphic */}
             <div className="space-y-1">
-              <div className="flex justify-between text-[10px] text-slate-400 font-mono">
+              <div className="flex justify-between text-[10px] text-[#7a6a55] dark:text-slate-400 font-mono">
                 <span>Monthly Collections</span>
-                <span className="text-emerald-400 font-semibold">+24.8%</span>
+                <span className="text-emerald-600 dark:text-emerald-400 font-bold">+24.8%</span>
               </div>
 
-              {/* SVG Wave chart */}
-              <div className="w-full h-20 bg-slate-900/50 rounded-lg border border-white/5 relative overflow-hidden flex items-end">
-                <svg className="w-full h-full text-indigo-500/30" viewBox="0 0 100 100" preserveAspectRatio="none">
-                  {/* Background filled area */}
+              {/* Wave Chart SVG */}
+              <div className="w-full h-20 bg-[#F5EDE2] dark:bg-slate-900/50 rounded-lg border border-[#1A1208]/08 dark:border-white/5 relative overflow-hidden flex items-end">
+                <svg className="w-full h-full text-[#E8650A]/25 dark:text-indigo-500/30" viewBox="0 0 100 100" preserveAspectRatio="none">
                   <path d="M0,100 C20,70 40,85 60,40 C80,60 90,20 100,30 L100,100 L0,100 Z" fill="currentColor" />
-                  {/* Foreground stroke line */}
-                  <path d="M0,100 C20,70 40,85 60,40 C80,60 90,20 100,30" fill="none" stroke="#6366f1" strokeWidth="2.5" />
+                  <path d="M0,100 C20,70 40,85 60,40 C80,60 90,20 100,30" fill="none" stroke={isDark ? "#6366f1" : "#E8650A"} strokeWidth="2.5" />
                 </svg>
-                <svg className="w-full h-full text-amber-500/20 absolute inset-0" viewBox="0 0 100 100" preserveAspectRatio="none">
-                  {/* Secondary line */}
-                  <path d="M0,90 C15,80 30,50 50,65 C70,45 85,85 100,60" fill="none" stroke="#f59e0b" strokeWidth="1.5" strokeDasharray="3 3" />
+                <svg className="w-full h-full text-[#C49A3C]/30 dark:text-amber-500/20 absolute inset-0" viewBox="0 0 100 100" preserveAspectRatio="none">
+                  <path d="M0,90 C15,80 30,50 50,65 C70,45 85,85 100,60" fill="none" stroke="#C49A3C" strokeWidth="1.5" strokeDasharray="3 3" />
                 </svg>
-                {/* Floating data bubble */}
-                <div className="absolute top-3 right-6 bg-slate-950/80 border border-white/10 px-2 py-0.5 rounded text-[8px] font-mono text-white flex items-center space-x-1 shadow">
-                  <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
-                  <span>Peak: ₹4.8L</span>
+                {/* Data Bubble */}
+                <div className="absolute top-3 right-6 bg-[#FDF8F3] dark:bg-slate-950/80 border border-[#1A1208]/10 dark:border-white/10 px-2 py-0.5 rounded text-[8px] font-mono text-[#1A1208] dark:text-white flex items-center space-x-1 shadow-sm">
+                  <span className="w-1.5 h-1.5 rounded-full bg-[#E8650A]" />
+                  <span className="font-bold">Peak: ₹4.8L</span>
                 </div>
               </div>
             </div>
 
-            {/* Quick stats items */}
+            {/* Quick Stats Grid */}
             <div className="grid grid-cols-2 gap-3">
-              <div className="bg-slate-900/40 p-2.5 rounded-xl border border-white/5 space-y-1">
-                <span className="text-[8px] text-slate-400 uppercase font-mono tracking-wider">Donations</span>
-                <p className="text-sm font-black text-white">₹12,45,200</p>
+              <div className="bg-[#F5EDE2] dark:bg-slate-900/40 p-2.5 rounded-xl border border-[#1A1208]/08 dark:border-white/5 space-y-1">
+                <span className="text-[8px] text-[#7a6a55] dark:text-slate-400 uppercase font-mono tracking-wider">Donations</span>
+                <p className="text-sm font-black text-[#1A1208] dark:text-white">₹12,45,200</p>
               </div>
-              <div className="bg-slate-900/40 p-2.5 rounded-xl border border-white/5 space-y-1">
-                <span className="text-[8px] text-slate-400 uppercase font-mono tracking-wider">Members</span>
-                <p className="text-sm font-black text-white">184 Active</p>
+              <div className="bg-[#F5EDE2] dark:bg-slate-900/40 p-2.5 rounded-xl border border-[#1A1208]/08 dark:border-white/5 space-y-1">
+                <span className="text-[8px] text-[#7a6a55] dark:text-slate-400 uppercase font-mono tracking-wider">Members</span>
+                <p className="text-sm font-black text-[#1A1208] dark:text-white">184 Active</p>
               </div>
             </div>
 
@@ -300,28 +330,76 @@ export default function LoginPage() {
 
         {/* Footer Brand Info */}
         <div className="relative z-10 text-left">
-          <p className="text-xs text-slate-500">Secure Mandal Management Platform</p>
-          <p className="text-[10px] text-slate-600 mt-1">© 2026 Intellidon. All rights reserved.</p>
+          <p className="text-xs text-[#7a6a55] dark:text-slate-500 font-medium">Secure Mandal Management Platform</p>
+          <p className="text-[10px] text-[#9e8c76] dark:text-slate-600 mt-1">© 2026 Intellidon. All rights reserved.</p>
         </div>
       </section>
 
       {/* RIGHT PANEL - LOGIN FORM */}
-      <section className="flex-1 flex flex-col justify-center px-6 py-12 sm:px-12 lg:px-20 bg-white dark:bg-[#07090e] transition-colors duration-300">
-        <div className="w-full max-w-md mx-auto space-y-8">
+      <section className="flex-1 flex flex-col justify-between px-6 py-8 sm:px-12 lg:px-20 bg-[#FDF8F3] dark:bg-[#07090e] transition-colors duration-300">
+        
+        {/* Top Header Bar with Back Link & Theme Toggle */}
+        <div className="flex items-center justify-between mb-6">
+          <Link
+            href="/"
+            className="text-xs font-semibold text-[#7a6a55] dark:text-slate-400 hover:text-[#E8650A] dark:hover:text-[#E8650A] transition-colors flex items-center gap-1.5"
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <polyline points="15 18 9 12 15 6"/>
+            </svg>
+            Back to home
+          </Link>
+
+          {/* Theme Toggle Button */}
+          <button
+            id="theme-toggle"
+            aria-label={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
+            onClick={toggleTheme}
+            className="w-9 h-9 rounded-full flex items-center justify-center cursor-pointer transition-all duration-200"
+            style={{
+              background: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(26,18,8,0.08)',
+              border: `1px solid ${isDark ? 'rgba(255,255,255,0.1)' : 'rgba(26,18,8,0.12)'}`,
+              color: isDark ? '#e2e8f0' : '#4a3d2c',
+            }}
+          >
+            {isDark ? (
+              /* Sun Icon for Dark Mode */
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="12" cy="12" r="5" />
+                <line x1="12" y1="1" x2="12" y2="3" />
+                <line x1="12" y1="21" x2="12" y2="23" />
+                <line x1="4.22" y1="4.22" x2="5.64" y2="5.64" />
+                <line x1="18.36" y1="18.36" x2="19.78" y2="19.78" />
+                <line x1="1" y1="12" x2="3" y2="12" />
+                <line x1="21" y1="12" x2="23" y2="12" />
+                <line x1="4.22" y1="19.78" x2="5.64" y2="18.36" />
+                <line x1="18.36" y1="5.64" x2="19.78" y2="4.22" />
+              </svg>
+            ) : (
+              /* Moon Icon for Light Mode */
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
+              </svg>
+            )}
+          </button>
+        </div>
+
+        {/* Center Form Content */}
+        <div className="w-full max-w-md mx-auto space-y-8 my-auto">
 
           {/* Form Header */}
           <div className="space-y-2">
-            <h2 className="text-3xl font-extrabold text-slate-900 dark:text-white tracking-tight animate-fade-in-up">
+            <h2 className="text-3xl font-extrabold text-[#1A1208] dark:text-white tracking-tight">
               Sign In
             </h2>
-            <p className="text-slate-500 dark:text-slate-400 text-sm">
+            <p className="text-[#7a6a55] dark:text-slate-400 text-sm leading-relaxed">
               Log in to access your workspace and manage community operations.
             </p>
           </div>
 
           {/* Error Message Display */}
           {errorMsg && (
-            <div className="bg-rose-500/10 dark:bg-rose-500/5 border border-rose-500/20 text-rose-500 text-sm rounded-xl p-4 flex items-start space-x-2.5 animate-shake">
+            <div className="bg-rose-500/10 border border-rose-500/20 text-rose-600 dark:text-rose-400 text-sm rounded-xl p-4 flex items-start space-x-2.5 animate-shake">
               <svg className="w-5 h-5 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
               </svg>
@@ -332,13 +410,13 @@ export default function LoginPage() {
           {/* Form Content */}
           <form onSubmit={handleSubmit} className="space-y-6">
 
-            {/* Email Address */}
+            {/* Email Address Input */}
             <div className="space-y-1.5">
-              <label htmlFor="email" className="text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider">
+              <label htmlFor="email" className="text-xs font-bold text-[#1A1208] dark:text-slate-300 uppercase tracking-wider">
                 Email Address
               </label>
               <div className="relative">
-                <span className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
+                <span className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-[#7a6a55] dark:text-slate-400">
                   <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
                   </svg>
@@ -354,15 +432,15 @@ export default function LoginPage() {
                   }}
                   onBlur={(e) => validateEmail(e.target.value)}
                   placeholder="rajesh@mandalname.com"
-                  className={`w-full pl-11 pr-4 py-3 bg-slate-50 dark:bg-[#0b0f19] border rounded-xl text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 transition-all duration-200 ${emailError
-                      ? "border-rose-500 focus:ring-rose-500/20 focus:border-rose-500"
-                      : "border-slate-200 dark:border-slate-800 focus:ring-amber-500/20 focus:border-amber-500 dark:focus:border-amber-500"
+                  className={`w-full pl-11 pr-4 py-3 bg-white dark:bg-[#0b0f19] border rounded-xl text-[#1A1208] dark:text-white placeholder-[#9e8c76] dark:placeholder-slate-500 focus:outline-none focus:ring-2 transition-all duration-200 ${emailError
+                    ? "border-rose-500 focus:ring-rose-500/20 focus:border-rose-500"
+                    : "border-[#1A1208]/15 dark:border-slate-800 focus:ring-[#E8650A]/20 focus:border-[#E8650A]"
                     }`}
                   required
                 />
               </div>
               {emailError && (
-                <p className="text-xs text-rose-500 mt-1 font-medium flex items-center space-x-1 animate-fade-in-up">
+                <p className="text-xs text-rose-600 dark:text-rose-400 mt-1 font-medium flex items-center space-x-1">
                   <svg className="w-3.5 h-3.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
                     <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
                   </svg>
@@ -371,10 +449,10 @@ export default function LoginPage() {
               )}
             </div>
 
-            {/* Password */}
+            {/* Password Input */}
             <div className="space-y-1.5">
               <div className="flex justify-between items-center">
-                <label htmlFor="password" className="text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider">
+                <label htmlFor="password" className="text-xs font-bold text-[#1A1208] dark:text-slate-300 uppercase tracking-wider">
                   Password
                 </label>
                 <Link
@@ -383,13 +461,13 @@ export default function LoginPage() {
                     e.preventDefault();
                     setErrorMsg("Please contact your database administrator to reset your password.");
                   }}
-                  className="text-xs font-semibold text-amber-500 hover:text-amber-600 transition-colors"
+                  className="text-xs font-semibold text-[#E8650A] hover:text-[#d05807] transition-colors"
                 >
                   Forgot Password?
                 </Link>
               </div>
               <div className="relative">
-                <span className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
+                <span className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-[#7a6a55] dark:text-slate-400">
                   <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
                   </svg>
@@ -405,18 +483,18 @@ export default function LoginPage() {
                   }}
                   onBlur={(e) => validatePassword(e.target.value)}
                   placeholder="••••••••"
-                  className={`w-full pl-11 pr-11 py-3 bg-slate-50 dark:bg-[#0b0f19] border rounded-xl text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 transition-all duration-200 ${passwordError
-                      ? "border-rose-500 focus:ring-rose-500/20 focus:border-rose-500"
-                      : "border-slate-200 dark:border-slate-800 focus:ring-amber-500/20 focus:border-amber-500 dark:focus:border-amber-500"
+                  className={`w-full pl-11 pr-11 py-3 bg-white dark:bg-[#0b0f19] border rounded-xl text-[#1A1208] dark:text-white placeholder-[#9e8c76] dark:placeholder-slate-500 focus:outline-none focus:ring-2 transition-all duration-200 ${passwordError
+                    ? "border-rose-500 focus:ring-rose-500/20 focus:border-rose-500"
+                    : "border-[#1A1208]/15 dark:border-slate-800 focus:ring-[#E8650A]/20 focus:border-[#E8650A]"
                     }`}
                   required
                 />
 
-                {/* Reveal Password Eye Button */}
+                {/* Eye Button */}
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400 hover:text-slate-600 dark:hover:text-slate-350"
+                  className="absolute inset-y-0 right-0 pr-3 flex items-center text-[#7a6a55] dark:text-slate-400 hover:text-[#1A1208] dark:hover:text-slate-200"
                 >
                   {showPassword ? (
                     <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -431,7 +509,7 @@ export default function LoginPage() {
                 </button>
               </div>
               {passwordError && (
-                <p className="text-xs text-rose-500 mt-1 font-medium flex items-center space-x-1 animate-fade-in-up">
+                <p className="text-xs text-rose-600 dark:text-rose-400 mt-1 font-medium flex items-center space-x-1">
                   <svg className="w-3.5 h-3.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
                     <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
                   </svg>
@@ -448,18 +526,18 @@ export default function LoginPage() {
                 type="checkbox"
                 checked={rememberMe}
                 onChange={(e) => setRememberMe(e.target.checked)}
-                className="h-4.5 w-4.5 text-amber-500 border-slate-200 dark:border-slate-800 rounded focus:ring-amber-500/20 dark:bg-[#0b0f19] cursor-pointer accent-amber-500"
+                className="h-4.5 w-4.5 text-[#E8650A] border-[#1A1208]/20 dark:border-slate-800 rounded focus:ring-[#E8650A]/20 bg-white dark:bg-[#0b0f19] cursor-pointer accent-[#E8650A]"
               />
-              <label htmlFor="rememberMe" className="ml-2.5 text-sm font-semibold text-slate-700 dark:text-slate-300 cursor-pointer">
+              <label htmlFor="rememberMe" className="ml-2.5 text-sm font-semibold text-[#1A1208] dark:text-slate-300 cursor-pointer">
                 Remember me
               </label>
             </div>
 
-            {/* Login button */}
+            {/* Submit Button */}
             <button
               type="submit"
               disabled={loading}
-              className="w-full py-3.5 px-4 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white font-semibold rounded-xl shadow-lg transition-all duration-300 transform hover:scale-[1.01] active:scale-[0.99] flex items-center justify-center space-x-2 cursor-pointer disabled:opacity-50"
+              className="w-full py-3.5 px-4 bg-gradient-to-r from-[#E8650A] to-[#f97316] hover:from-[#d05807] hover:to-[#ea580c] text-white font-bold rounded-xl shadow-lg shadow-[#E8650A]/25 transition-all duration-300 transform hover:scale-[1.01] active:scale-[0.99] flex items-center justify-center space-x-2 cursor-pointer disabled:opacity-50"
             >
               {loading ? (
                 <>
@@ -475,13 +553,13 @@ export default function LoginPage() {
             </button>
           </form>
 
-          {/* Prompt Register */}
+          {/* Register Link Prompt */}
           <div className="text-center pt-2">
-            <p className="text-sm text-slate-500 dark:text-slate-400">
+            <p className="text-sm text-[#7a6a55] dark:text-slate-400">
               New Mandal?{" "}
               <Link
                 href="/register"
-                className="font-bold text-amber-500 hover:text-amber-600 transition-colors duration-200"
+                className="font-bold text-[#E8650A] hover:text-[#d05807] transition-colors duration-200"
               >
                 Register Your Mandal
               </Link>
@@ -489,6 +567,9 @@ export default function LoginPage() {
           </div>
 
         </div>
+
+        {/* Empty Spacer to balance layout */}
+        <div />
       </section>
 
     </main>

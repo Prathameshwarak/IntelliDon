@@ -107,16 +107,16 @@ export default function DashboardSubscriptionPage() {
 
   if (!authorized) {
     return (
-      <div className="min-h-screen bg-gray-950 flex items-center justify-center">
-        <p className="text-gray-400 text-sm">Checking access...</p>
+      <div className="min-h-screen bg-[#FDF8F3] dark:bg-gray-950 flex items-center justify-center transition-colors duration-300">
+        <p className="text-[#7a6a55] dark:text-gray-400 text-xs font-mono animate-pulse">Checking access...</p>
       </div>
     )
   }
 
   if (sub.loading) {
     return (
-      <div className="min-h-screen bg-gray-950 flex items-center justify-center">
-        <p className="text-gray-400 text-sm">Loading subscription details...</p>
+      <div className="min-h-screen bg-[#FDF8F3] dark:bg-gray-950 flex items-center justify-center transition-colors duration-300">
+        <p className="text-[#7a6a55] dark:text-gray-400 text-xs font-mono animate-pulse">Loading subscription details...</p>
       </div>
     )
   }
@@ -131,62 +131,62 @@ export default function DashboardSubscriptionPage() {
   const displayPlans = plans.filter(p => p.price > 0)
 
   return (
-    <div className="min-h-screen bg-gray-950 text-white p-4 sm:p-6 md:p-8">
+    <div className="min-h-screen bg-[#FDF8F3] dark:bg-gray-950 text-[#1A1208] dark:text-white p-4 sm:p-6 md:p-8 transition-colors duration-300">
       <div className="max-w-4xl mx-auto">
         {/* Back link */}
-        <Link href="/dashboard" className="inline-flex items-center gap-2 text-gray-400 hover:text-white text-sm transition-colors mb-6 group">
+        <Link href="/dashboard" className="inline-flex items-center gap-2 text-[#7a6a55] dark:text-gray-400 hover:text-[#1A1208] dark:hover:text-white text-xs font-bold transition-colors mb-6 group cursor-pointer">
           <span className="group-hover:-translate-x-1 transition-transform">←</span> Back to Dashboard
         </Link>
 
         {/* Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-gray-800 pb-6">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-[#1A1208]/10 dark:border-gray-800 pb-6">
           <div>
             <div className="flex items-center gap-3">
-              <h1 className="text-3xl font-bold tracking-tight bg-gradient-to-r from-white via-gray-100 to-gray-400 bg-clip-text text-transparent">
+              <h1 className="text-3xl font-bold tracking-tight text-[#1A1208] dark:text-white">
                 Subscription Plan
               </h1>
               {mandalName && (
-                <span className="text-xs bg-orange-500/10 border border-orange-500/30 text-orange-400 px-3 py-1 rounded-full font-medium mt-1">
+                <span className="text-xs bg-[#E8650A]/10 border border-[#E8650A]/30 text-[#E8650A] dark:text-orange-400 px-3 py-1 rounded-full font-bold mt-1">
                   {mandalName}
                 </span>
               )}
             </div>
-            <p className="text-gray-400 text-sm mt-1">View your mandal's active subscription and plans</p>
+            <p className="text-[#7a6a55] dark:text-gray-400 text-xs font-medium mt-1">View your mandal's active subscription and plans</p>
           </div>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-8">
           {/* Column 1: Current Status */}
           <div className="md:col-span-1 flex flex-col gap-6">
-            <div className="bg-gray-900 border border-gray-800 rounded-2xl p-6 relative overflow-hidden shadow-xl">
+            <div className="bg-[#F5EDE2] dark:bg-gray-900 border border-[#1A1208]/10 dark:border-gray-800 rounded-2xl p-6 relative overflow-hidden shadow-sm">
               {/* Subtle gradient background glow */}
-              <div className="absolute top-0 right-0 w-32 h-32 bg-orange-500/10 rounded-full blur-3xl pointer-events-none" />
+              <div className="absolute top-0 right-0 w-32 h-32 bg-[#E8650A]/10 rounded-full blur-3xl pointer-events-none" />
 
-              <h2 className="text-xs text-gray-500 font-semibold uppercase tracking-wider mb-4">
+              <h2 className="text-xs text-[#7a6a55] dark:text-gray-400 font-bold uppercase tracking-wider mb-4">
                 Current Status
               </h2>
 
               <div className="flex flex-col gap-4">
                 <div>
-                  <p className="text-xs text-gray-400">Plan</p>
-                  <p className="text-xl font-bold text-white mt-1 capitalize font-sans">
+                  <p className="text-xs text-[#7a6a55] dark:text-gray-400 font-medium">Plan</p>
+                  <p className="text-xl font-bold text-[#1A1208] dark:text-white mt-1 capitalize font-sans">
                     {sub.subscription?.plan || 'No Active Plan'}
                   </p>
                 </div>
 
                 <div>
-                  <p className="text-xs text-gray-400">Status</p>
+                  <p className="text-xs text-[#7a6a55] dark:text-gray-400 font-medium">Status</p>
                   <div className="flex items-center gap-2 mt-1.5">
-                    <span className={`h-2.5 w-2.5 rounded-full ${sub.isExpired ? 'bg-red-500' : 'bg-green-500 animate-pulse'}`} />
-                    <span className={`text-sm font-semibold capitalize ${sub.isExpired ? 'text-red-400' : 'text-green-400'}`}>
+                    <span className={`h-2.5 w-2.5 rounded-full ${sub.isExpired ? 'bg-rose-500' : 'bg-emerald-500 animate-pulse'}`} />
+                    <span className={`text-sm font-bold capitalize ${sub.isExpired ? 'text-rose-600 dark:text-red-400' : 'text-emerald-600 dark:text-green-400'}`}>
                       {sub.isExpired ? 'Expired' : 'Active'}
                     </span>
                   </div>
                 </div>
 
                 <div>
-                  <p className="text-xs text-gray-400">Validity</p>
-                  <p className="text-sm font-semibold text-white mt-1">
+                  <p className="text-xs text-[#7a6a55] dark:text-gray-400 font-medium">Validity</p>
+                  <p className="text-sm font-bold text-[#1A1208] dark:text-white mt-1">
                     {sub.subscription?.ends_at 
                       ? `${fmtDate(sub.subscription.ends_at)} (${sub.daysRemaining} days remaining)`
                       : 'N/A'}
@@ -194,9 +194,9 @@ export default function DashboardSubscriptionPage() {
                 </div>
 
                 {sub.subscription?.notes && (
-                  <div className="border-t border-gray-800 pt-3">
-                    <p className="text-xs text-gray-400 mb-1">Notes</p>
-                    <p className="text-xs text-gray-300 italic whitespace-pre-line bg-gray-950/40 p-2.5 rounded-lg border border-gray-800/50">
+                  <div className="border-t border-[#1A1208]/10 dark:border-gray-800 pt-3">
+                    <p className="text-xs text-[#7a6a55] dark:text-gray-400 mb-1 font-bold">Notes</p>
+                    <p className="text-xs text-[#1A1208] dark:text-gray-300 italic whitespace-pre-line bg-white/60 dark:bg-gray-950/40 p-2.5 rounded-lg border border-[#1A1208]/10 dark:border-gray-800/50 font-medium">
                       {sub.subscription.notes}
                     </p>
                   </div>
@@ -207,12 +207,12 @@ export default function DashboardSubscriptionPage() {
 
           {/* Column 2: Available Plans */}
           <div className="md:col-span-2 flex flex-col gap-6">
-            <div className="bg-gray-900 border border-gray-800 rounded-2xl p-6 shadow-xl">
-              <h2 className="text-lg font-bold text-white mb-2">Available Subscription Plans</h2>
-              <p className="text-xs text-gray-400 mb-6">Select a plan to upgrade or renew. Contact support to finalize payment.</p>
+            <div className="bg-[#F5EDE2] dark:bg-gray-900 border border-[#1A1208]/10 dark:border-gray-800 rounded-2xl p-6 shadow-sm">
+              <h2 className="text-lg font-bold text-[#1A1208] dark:text-white mb-2">Available Subscription Plans</h2>
+              <p className="text-xs text-[#7a6a55] dark:text-gray-400 mb-6 font-medium">Select a plan to upgrade or renew. Contact support to finalize payment.</p>
 
               {displayPlans.length === 0 ? (
-                <p className="text-sm text-gray-500 italic py-6">No upgrade plans currently configured.</p>
+                <p className="text-sm text-[#7a6a55] dark:text-gray-500 italic py-6 font-medium">No upgrade plans currently configured.</p>
               ) : (
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   {displayPlans.map(p => {
@@ -225,37 +225,37 @@ export default function DashboardSubscriptionPage() {
                       <div 
                         key={p.id} 
                         onClick={() => setSelectedPlan(p)}
-                        className={`rounded-2xl p-5 border relative flex flex-col justify-between transition-all duration-300 hover:scale-[1.01] cursor-pointer
+                        className={`rounded-2xl p-5 border relative flex flex-col justify-between transition-all duration-300 hover:scale-[1.01] cursor-pointer shadow-sm
                           ${isSelected
-                            ? 'border-orange-500 bg-orange-500/10 ring-2 ring-orange-500/30 shadow-orange-500/10 shadow-lg'
+                            ? 'border-[#E8650A] bg-white dark:bg-orange-500/10 ring-2 ring-[#E8650A]/30 shadow-[#E8650A]/10 shadow-lg'
                             : isCurrent 
-                              ? 'border-green-500/50 bg-green-950/10 shadow-green-950/20' 
+                              ? 'border-emerald-500/50 bg-emerald-500/10 dark:bg-green-950/10' 
                               : isPopular 
-                                ? 'border-orange-500/40 bg-orange-500/5 shadow-orange-950/10 shadow-md' 
-                                : 'border-gray-800 bg-gray-950 hover:border-gray-750'}`}
+                                ? 'border-[#E8650A]/40 bg-[#E8650A]/5 shadow-md' 
+                                : 'border-[#1A1208]/15 dark:border-gray-800 bg-white dark:bg-gray-950 hover:border-[#E8650A]'}`}
                       >
                         {isCurrent && (
-                          <span className="absolute top-3 right-3 text-[10px] bg-green-500/20 text-green-400 px-2 py-0.5 rounded-full font-bold uppercase tracking-wider border border-green-500/30">
+                          <span className="absolute top-3 right-3 text-[10px] bg-emerald-500/20 text-emerald-700 dark:text-green-400 px-2 py-0.5 rounded-full font-bold uppercase tracking-wider border border-emerald-500/30">
                             Current Plan
                           </span>
                         )}
                         {!isCurrent && isPopular && (
-                          <span className="absolute top-3 right-3 text-[10px] bg-orange-500/20 text-orange-400 px-2 py-0.5 rounded-full font-bold uppercase tracking-wider border border-orange-500/30">
+                          <span className="absolute top-3 right-3 text-[10px] bg-[#E8650A]/20 text-[#E8650A] dark:text-orange-400 px-2 py-0.5 rounded-full font-bold uppercase tracking-wider border border-[#E8650A]/30">
                             Popular
                           </span>
                         )}
 
                         <div>
-                          <p className="text-white font-bold text-sm capitalize">{p.name}</p>
-                          <p className={`text-base font-extrabold mt-1.5 ${isCurrent ? 'text-green-400' : isPopular ? 'text-orange-400' : 'text-white'}`}>
+                          <p className="text-[#1A1208] dark:text-white font-bold text-sm capitalize">{p.name}</p>
+                          <p className={`text-base font-extrabold mt-1.5 ${isCurrent ? 'text-emerald-700 dark:text-green-400' : isPopular ? 'text-[#E8650A] dark:text-orange-400' : 'text-[#1A1208] dark:text-white'}`}>
                             {p.price_label}
                           </p>
 
                           {p.features && p.features.length > 0 && (
                             <ul className="mt-5 space-y-2.5">
                               {p.features.map(f => (
-                                <li key={f} className="flex items-start gap-2 text-xs text-gray-300">
-                                  <span className="text-green-400 font-bold flex-shrink-0 mt-0.5">✓</span>
+                                <li key={f} className="flex items-start gap-2 text-xs text-[#7a6a55] dark:text-gray-300 font-medium">
+                                  <span className="text-emerald-600 dark:text-green-400 font-bold flex-shrink-0 mt-0.5">✓</span>
                                   <span>{f}</span>
                                 </li>
                               ))}
@@ -270,36 +270,36 @@ export default function DashboardSubscriptionPage() {
             </div>
 
             {/* Subscription Payment Details Card */}
-            <div className="bg-gray-900 border border-gray-800 rounded-2xl p-6 shadow-xl space-y-4">
-              <div className="border-b border-gray-800 pb-3">
-                <h3 className="text-lg font-bold text-white">How to Upgrade or Renew</h3>
-                <p className="text-xs text-gray-400 mt-1">
+            <div className="bg-[#F5EDE2] dark:bg-gray-900 border border-[#1A1208]/10 dark:border-gray-800 rounded-2xl p-6 shadow-sm space-y-4">
+              <div className="border-b border-[#1A1208]/10 dark:border-gray-800 pb-3">
+                <h3 className="text-lg font-bold text-[#1A1208] dark:text-white">How to Upgrade or Renew</h3>
+                <p className="text-xs text-[#7a6a55] dark:text-gray-400 mt-1 font-medium">
                   Follow the steps below to make subscription payment and activate your plan.
                 </p>
               </div>
 
               {!selectedPlan ? (
-                <div className="bg-gray-950/40 border border-dashed border-gray-805 rounded-xl p-8 text-center">
-                  <p className="text-xs text-gray-500">Please click and select one of the available subscription plans above to proceed with the payment.</p>
+                <div className="bg-white/60 dark:bg-gray-950/40 border border-dashed border-[#1A1208]/15 dark:border-gray-800 rounded-xl p-8 text-center">
+                  <p className="text-xs text-[#7a6a55] dark:text-gray-500 font-medium">Please click and select one of the available subscription plans above to proceed with the payment.</p>
                 </div>
               ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 animate-fade-in">
-                  <div className="bg-gray-950 border border-gray-850 rounded-xl p-4 space-y-3 flex flex-col justify-between">
+                  <div className="bg-white dark:bg-gray-950 border border-[#1A1208]/15 dark:border-gray-800 rounded-xl p-4 space-y-3 flex flex-col justify-between shadow-sm">
                     <div>
-                      <span className="text-[10px] bg-orange-500/10 text-orange-400 font-bold uppercase tracking-wider px-2 py-0.5 rounded-full">
+                      <span className="text-[10px] bg-[#E8650A]/10 text-[#E8650A] dark:text-orange-400 font-bold uppercase tracking-wider px-2 py-0.5 rounded-full border border-[#E8650A]/20">
                         Step 1: UPI Payment
                       </span>
                       
                       {/* Mobile View: Proceed Button */}
                       <div className="block md:hidden mt-3 space-y-3">
-                        <p className="text-xs text-gray-300">
+                        <p className="text-xs text-[#7a6a55] dark:text-gray-300 font-medium">
                           Click the button below to open your UPI app and pay for the <strong>{selectedPlan.name}</strong> plan.
                         </p>
                         <a 
                           href={`upi://pay?pa=${encodeURIComponent(subUpiId)}&pn=${encodeURIComponent('Intellidon Subscription')}&am=${selectedPlan.price.toFixed(2)}&cu=INR&tn=${encodeURIComponent(
                             `Plan: ${selectedPlan.name}, Price: Rs. ${selectedPlan.price}`
                           )}`}
-                          className="w-full bg-orange-500 hover:bg-orange-600 text-white font-bold py-2.5 rounded-xl shadow transition-all duration-300 flex items-center justify-center gap-2 text-xs cursor-pointer text-center"
+                          className="w-full bg-gradient-to-r from-[#E8650A] to-[#f97316] hover:from-[#d05807] hover:to-[#ea580c] text-white font-bold py-2.5 rounded-xl shadow transition-all flex items-center justify-center gap-2 text-xs cursor-pointer text-center"
                         >
                           <span>⚡</span>
                           <span>Proceed for Payment (Pay ₹{selectedPlan.price})</span>
@@ -309,15 +309,15 @@ export default function DashboardSubscriptionPage() {
                           <button
                             type="button"
                             onClick={() => setShowMobileQr(!showMobileQr)}
-                            className="text-xs text-orange-400 hover:text-orange-350 underline font-medium cursor-pointer"
+                            className="text-xs text-[#E8650A] dark:text-orange-400 hover:underline font-bold cursor-pointer"
                           >
                             {showMobileQr ? 'Hide QR Code' : "Don't have a UPI app? Show QR Code"}
                           </button>
                         </div>
 
                         {showMobileQr && (
-                          <div className="flex flex-col items-center gap-4 mt-3 bg-gray-900 border border-gray-805 p-4 rounded-xl animate-fade-in">
-                            <div className="p-1.5 bg-white rounded-lg">
+                          <div className="flex flex-col items-center gap-4 mt-3 bg-[#F5EDE2] dark:bg-gray-900 border border-[#1A1208]/10 dark:border-gray-800 p-4 rounded-xl animate-fade-in">
+                            <div className="p-1.5 bg-white rounded-lg shadow-sm">
                               <UpiQR 
                                 upiId={subUpiId}
                                 name="Intellidon Subscription"
@@ -327,8 +327,8 @@ export default function DashboardSubscriptionPage() {
                               />
                             </div>
                             
-                            <div className="flex items-center gap-2 bg-gray-950 p-2 rounded-lg border border-gray-850 w-full">
-                              <span className="text-[11px] text-orange-400 font-mono select-all font-bold flex-1 text-center truncate">
+                            <div className="flex items-center gap-2 bg-white dark:bg-gray-950 p-2 rounded-lg border border-[#1A1208]/10 dark:border-gray-800 w-full">
+                              <span className="text-[11px] text-[#E8650A] dark:text-orange-400 font-mono select-all font-bold flex-1 text-center truncate">
                                 {subUpiId}
                               </span>
                               <button
@@ -336,7 +336,7 @@ export default function DashboardSubscriptionPage() {
                                   navigator.clipboard.writeText(subUpiId)
                                   alert('UPI ID copied to clipboard!')
                                 }}
-                                className="text-[10px] bg-gray-800 hover:bg-gray-750 text-gray-350 px-2 py-1 rounded transition-colors cursor-pointer"
+                                className="text-[10px] bg-[#F5EDE2] dark:bg-gray-800 hover:bg-[#ebdcc9] dark:hover:bg-gray-700 text-[#1A1208] dark:text-gray-300 px-2 py-1 rounded font-bold cursor-pointer transition-colors"
                               >
                                 Copy
                               </button>
@@ -347,11 +347,11 @@ export default function DashboardSubscriptionPage() {
 
                       {/* Desktop View: QR Code & UPI ID only */}
                       <div className="hidden md:flex flex-col items-center gap-4 mt-3">
-                        <p className="text-xs text-gray-300 text-center">
+                        <p className="text-xs text-[#7a6a55] dark:text-gray-300 text-center font-medium">
                           Scan the QR code below or use the UPI ID to pay for the <strong>{selectedPlan.name}</strong> plan.
                         </p>
                         
-                        <div className="p-1.5 bg-white rounded-lg">
+                        <div className="p-1.5 bg-white rounded-lg shadow-sm">
                           <UpiQR 
                             upiId={subUpiId}
                             name="Intellidon Subscription"
@@ -361,8 +361,8 @@ export default function DashboardSubscriptionPage() {
                           />
                         </div>
 
-                        <div className="flex items-center gap-2 bg-gray-900 p-2 rounded-lg border border-gray-805 w-full">
-                          <span className="text-[11px] text-orange-400 font-mono select-all font-bold flex-1 text-center truncate">
+                        <div className="flex items-center gap-2 bg-[#F5EDE2] dark:bg-gray-900 p-2 rounded-lg border border-[#1A1208]/10 dark:border-gray-800 w-full">
+                          <span className="text-[11px] text-[#E8650A] dark:text-orange-400 font-mono select-all font-bold flex-1 text-center truncate">
                             {subUpiId}
                           </span>
                           <button
@@ -370,7 +370,7 @@ export default function DashboardSubscriptionPage() {
                               navigator.clipboard.writeText(subUpiId)
                               alert('UPI ID copied to clipboard!')
                             }}
-                            className="text-[10px] bg-gray-800 hover:bg-gray-750 text-gray-350 px-2 py-1 rounded transition-colors cursor-pointer"
+                            className="text-[10px] bg-white dark:bg-gray-800 hover:bg-[#ebdcc9] dark:hover:bg-gray-700 text-[#1A1208] dark:text-gray-300 px-2 py-1 rounded font-bold transition-colors cursor-pointer"
                           >
                             Copy
                           </button>
@@ -379,12 +379,12 @@ export default function DashboardSubscriptionPage() {
                     </div>
                   </div>
 
-                  <div className="bg-gray-950 border border-gray-850 rounded-xl p-4 space-y-3 flex flex-col justify-between">
+                  <div className="bg-white dark:bg-gray-950 border border-[#1A1208]/15 dark:border-gray-800 rounded-xl p-4 space-y-3 flex flex-col justify-between shadow-sm">
                     <div>
-                      <span className="text-[10px] bg-green-500/10 text-green-400 font-bold uppercase tracking-wider px-2 py-0.5 rounded-full">
+                      <span className="text-[10px] bg-emerald-500/10 text-emerald-700 dark:text-green-400 font-bold uppercase tracking-wider px-2 py-0.5 rounded-full border border-emerald-500/20">
                         Step 2: Submit Proof
                       </span>
-                      <p className="text-xs text-gray-300 mt-2">
+                      <p className="text-xs text-[#7a6a55] dark:text-gray-300 mt-2 font-medium">
                         After making the payment, send the screenshot on WhatsApp to get instant activation.
                       </p>
                     </div>
@@ -392,7 +392,7 @@ export default function DashboardSubscriptionPage() {
                       href={getWhatsAppUrl()}
                       target="_blank" 
                       rel="noopener noreferrer"
-                      className="w-full bg-gray-800 hover:bg-gray-750 text-gray-350 font-semibold py-2.5 rounded-xl shadow border border-gray-700 transition-all duration-300 flex items-center justify-center gap-2 text-xs cursor-pointer"
+                      className="w-full bg-[#F5EDE2] dark:bg-gray-800 hover:bg-[#ebdcc9] dark:hover:bg-gray-700 text-[#1A1208] dark:text-gray-200 font-bold py-2.5 rounded-xl shadow border border-[#1A1208]/10 dark:border-gray-700 transition-all flex items-center justify-center gap-2 text-xs cursor-pointer"
                     >
                       <span>💬</span>
                       <span>Send Proof on WhatsApp</span>
