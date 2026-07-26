@@ -188,15 +188,6 @@ export default function RegisterPage() {
     setErrorMsg("");
 
     try {
-      // Validate required documents before submitting
-      const requiredDocs = ['doc_admin_aadhaar', 'doc_bank_proof', 'doc_auth_letter', 'doc_address_proof'];
-      const missingDocs = requiredDocs.filter(k => !docs[k]);
-      if (missingDocs.length > 0) {
-        setErrorMsg('Please upload all required documents before submitting.');
-        setLoading(false);
-        return;
-      }
-
       if (!pincode.trim() || pincode.length < 6) {
         setErrorMsg('Please enter a valid 6-digit pincode.');
         setLoading(false);
@@ -1035,10 +1026,10 @@ export default function RegisterPage() {
                   </p>
 
                   {[
-                    { key: 'doc_admin_aadhaar', label: 'Admin Aadhaar', required: true, hint: 'Front and back in one file' },
-                    { key: 'doc_bank_proof', label: 'Bank Proof', required: true, hint: 'Cancelled cheque or passbook first page' },
-                    { key: 'doc_auth_letter', label: 'Authorisation Letter / Committee Resolution', required: true, hint: 'Signed by committee members' },
-                    { key: 'doc_address_proof', label: 'Address Proof', required: true, hint: 'Utility bill, rent agreement, or property document' },
+                    { key: 'doc_admin_aadhaar', label: 'Admin Aadhaar', required: false, hint: 'Front and back in one file' },
+                    { key: 'doc_bank_proof', label: 'Bank Proof', required: false, hint: 'Cancelled cheque or passbook first page' },
+                    { key: 'doc_auth_letter', label: 'Authorisation Letter / Committee Resolution', required: false, hint: 'Signed by committee members' },
+                    { key: 'doc_address_proof', label: 'Address Proof', required: false, hint: 'Utility bill, rent agreement, or property document' },
                     { key: 'doc_reg_cert', label: 'Registration Certificate', required: false, hint: 'If your organisation is registered' },
                     { key: 'doc_admin_pan', label: 'Admin PAN Card', required: false, hint: 'Recommended for faster verification' },
                     { key: 'doc_org_pan', label: 'Organisation PAN Card', required: false, hint: 'If organisation has a PAN' },
