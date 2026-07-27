@@ -1,37 +1,9 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useTheme } from '@/lib/theme'
 
 export default function ThemeToggle({ className = '' }: { className?: string }) {
-  const [isDark, setIsDark] = useState(false)
-  const [mounted, setMounted] = useState(false)
-
-  useEffect(() => {
-    setMounted(true)
-    // Check initial dark class on documentElement
-    const checkDark = () => {
-      setIsDark(document.documentElement.classList.contains('dark'))
-    }
-    checkDark()
-
-    // Observe changes to html class attribute
-    const observer = new MutationObserver(checkDark)
-    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] })
-
-    return () => observer.disconnect()
-  }, [])
-
-  const toggle = () => {
-    if (document.documentElement.classList.contains('dark')) {
-      document.documentElement.classList.remove('dark')
-      localStorage.setItem('theme', 'light')
-      setIsDark(false)
-    } else {
-      document.documentElement.classList.add('dark')
-      localStorage.setItem('theme', 'dark')
-      setIsDark(true)
-    }
-  }
+  const { isDark, toggleTheme, mounted } = useTheme()
 
   if (!mounted) {
     return (
@@ -41,7 +13,7 @@ export default function ThemeToggle({ className = '' }: { className?: string }) 
 
   return (
     <button
-      onClick={toggle}
+      onClick={toggleTheme}
       type="button"
       title={`Switch to ${isDark ? 'Light' : 'Dark'} Mode`}
       aria-label="Toggle theme"

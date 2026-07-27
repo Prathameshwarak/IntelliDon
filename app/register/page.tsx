@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
+import { useTheme } from "@/lib/theme";
 import { useRouter } from "next/navigation";
 
 // Generate random values for pure CSS/HTML confetti
@@ -20,27 +21,8 @@ const confettiParticles = Array.from({ length: 60 }).map((_, i) => ({
 export default function RegisterPage() {
   const router = useRouter();
 
-  // Theme State (Syncs with Landing Page light/dark theme)
-  const [theme, setTheme] = useState<'light' | 'dark'>('light');
-
-  useEffect(() => {
-    const saved = localStorage.getItem('intellidon-theme') as 'light' | 'dark' | null;
-    if (saved) {
-      setTheme(saved);
-      document.documentElement.classList.toggle('dark', saved === 'dark');
-    } else {
-      document.documentElement.classList.remove('dark');
-    }
-  }, []);
-
-  const toggleTheme = () => {
-    const next = theme === 'light' ? 'dark' : 'light';
-    setTheme(next);
-    localStorage.setItem('intellidon-theme', next);
-    document.documentElement.classList.toggle('dark', next === 'dark');
-  };
-
-  const isDark = theme === 'dark';
+  // Theme State (Syncs globally across all pages)
+  const { theme, isDark, toggleTheme } = useTheme();
 
   const [step, setStep] = useState(1);
   const [loading, setLoading] = useState(false);

@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Poppins, Inter } from 'next/font/google';
 import { supabase } from '@/lib/supabase';
+import { useTheme } from '@/lib/theme';
 
 const poppins = Poppins({
   subsets: ['latin'],
@@ -59,25 +60,7 @@ export default function LandingPage() {
   const router = useRouter();
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [dashboardPath, setDashboardPath] = useState('/dashboard');
-  const [theme, setTheme] = useState<'light' | 'dark'>('light');
-
-  useEffect(() => {
-    const saved = localStorage.getItem('theme') as 'light' | 'dark' | null;
-    if (saved === 'dark' || saved === 'light') {
-      setTheme(saved);
-      document.documentElement.classList.toggle('dark', saved === 'dark');
-    } else {
-      const isDarkClass = document.documentElement.classList.contains('dark');
-      setTheme(isDarkClass ? 'dark' : 'light');
-    }
-  }, []);
-
-  const toggleTheme = () => {
-    const next = theme === 'light' ? 'dark' : 'light';
-    setTheme(next);
-    localStorage.setItem('theme', next);
-    document.documentElement.classList.toggle('dark', next === 'dark');
-  };
+  const { theme, isDark, toggleTheme } = useTheme();
 
 
   useEffect(() => {
@@ -116,7 +99,6 @@ export default function LandingPage() {
   };
 
   // ─── Theme tokens ────────────────────────────────────────────────────────────
-  const isDark = theme === 'dark';
   const bg = isDark ? '#07090e' : '#FDF8F3';
   const fg = isDark ? '#f1f5f9' : '#1A1208';
   const navBg = isDark ? 'rgba(7,9,14,0.75)' : 'rgba(253,248,243,0.85)';

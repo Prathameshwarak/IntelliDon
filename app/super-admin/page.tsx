@@ -10,6 +10,7 @@ import EventsTab from '@/components/super-admin/EventsTab'
 import SubscriptionsTab from '@/components/super-admin/SubscriptionsTab'
 import PlansTab from '@/components/super-admin/PlansTab'
 import ThemeToggle from '@/components/ThemeToggle'
+import { useTheme } from '@/lib/theme'
 
 type PlanRow = {
   id: string
@@ -38,27 +39,8 @@ function SuperAdminDashboardContent() {
   const [plans, setPlans] = useState<PlanRow[]>([])
   const [toast, setToast] = useState<{ msg: string; type: 'success' | 'error' } | null>(null)
 
-  // Theme State (Syncs with Landing / Login / Register / Dashboard light/dark theme)
-  const [theme, setTheme] = useState<'light' | 'dark'>('light')
-
-  useEffect(() => {
-    const saved = localStorage.getItem('intellidon-theme') as 'light' | 'dark' | null
-    if (saved) {
-      setTheme(saved)
-      document.documentElement.classList.toggle('dark', saved === 'dark')
-    } else {
-      document.documentElement.classList.remove('dark')
-    }
-  }, [])
-
-  const toggleTheme = () => {
-    const next = theme === 'light' ? 'dark' : 'light'
-    setTheme(next)
-    localStorage.setItem('intellidon-theme', next)
-    document.documentElement.classList.toggle('dark', next === 'dark')
-  }
-
-  const isDark = theme === 'dark'
+  // Theme State (Syncs globally across all pages)
+  const { theme, isDark, toggleTheme } = useTheme()
 
   // ── Auth & Query Params ──────────────────────────────────────
   useEffect(() => {

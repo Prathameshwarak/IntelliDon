@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
+import { useTheme } from "@/lib/theme";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 
@@ -14,27 +15,8 @@ export default function LoginPage() {
   const [adminName, setAdminName] = useState("");
   const [mandalName, setMandalName] = useState("");
 
-  // Theme State (Syncs with Landing Page light/dark theme)
-  const [theme, setTheme] = useState<'light' | 'dark'>('light');
-
-  useEffect(() => {
-    const saved = localStorage.getItem('intellidon-theme') as 'light' | 'dark' | null;
-    if (saved) {
-      setTheme(saved);
-      document.documentElement.classList.toggle('dark', saved === 'dark');
-    } else {
-      document.documentElement.classList.remove('dark');
-    }
-  }, []);
-
-  const toggleTheme = () => {
-    const next = theme === 'light' ? 'dark' : 'light';
-    setTheme(next);
-    localStorage.setItem('intellidon-theme', next);
-    document.documentElement.classList.toggle('dark', next === 'dark');
-  };
-
-  const isDark = theme === 'dark';
+  // Theme State (Syncs globally across all pages)
+  const { theme, isDark, toggleTheme } = useTheme();
 
   // Form State
   const [email, setEmail] = useState("");

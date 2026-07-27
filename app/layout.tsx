@@ -35,11 +35,15 @@ export default function RootLayout({
             __html: `
               (function() {
                 try {
-                  var stored = localStorage.getItem('theme');
-                  if (stored === 'dark' || (!stored && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+                  var stored = localStorage.getItem('intellidon-theme') || localStorage.getItem('theme');
+                  if (stored === 'dark') {
                     document.documentElement.classList.add('dark');
                   } else {
                     document.documentElement.classList.remove('dark');
+                    if (!stored) {
+                      localStorage.setItem('intellidon-theme', 'light');
+                      localStorage.setItem('theme', 'light');
+                    }
                   }
                 } catch (e) {}
               })();
