@@ -3,12 +3,16 @@
 import { useEffect, useState, useRef } from 'react'
 import { useParams } from 'next/navigation'
 import UpiQR from '@/components/UpiQR'
+import { downloadReceipt, type ReceiptData } from '@/lib/downloadReceipt'
 
 type MandalInfo = {
   id: string
   name: string
   city: string
   address: string
+  phone?: string
+  admin_email?: string | null
+  doc_logo?: string | null
 }
 
 type EventInfo = {
@@ -49,6 +53,49 @@ export default function PublicDonatePage() {
   const [error, setError] = useState('')
   const [receiptNumber, setReceiptNumber] = useState('')
   const [donationId, setDonationId] = useState('')
+  const [downloadingReceipt, setDownloadingReceipt] = useState(false)
+
+  async function handleDownloadProvisionalReceipt() {
+    if (!mandal || !event || !receiptNumber) return
+    setDownloadingReceipt(true)
+    try {
+      let screenshotImageData: string | null = screenshotPreview || null
+      if (screenshot) {
+        screenshotImageData = await new Promise<string>((resolve) => {
+          const reader = new FileReader()
+          reader.onloadend = () => resolve(reader.result as string)
+          reader.onerror = () => resolve(screenshotPreview || '')
+          reader.readAsDataURL(screenshot)
+        })
+      }
+
+      const receiptData: ReceiptData = {
+        receiptNumber,
+        mandalName: mandal.name,
+        mandalAddress: [mandal.address, mandal.city].filter(Boolean).join(', '),
+        mandalPhone: mandal.phone || '',
+        mandalEmail: mandal.admin_email || null,
+        mandalLogo: mandal.doc_logo || null,
+        eventName: `${event.name} ${event.year}`,
+        donorName: donorName || 'Anonymous Donor',
+        donorPhone: donorPhone || '',
+        donorAddress: donorAddress || null,
+        amount: Number(amount),
+        paymentMode: 'upi_self',
+        createdAt: new Date().toISOString(),
+        collectedBy: null,
+        verified: false,
+        screenshotImage: screenshotImageData
+      }
+
+      await downloadReceipt(receiptData)
+    } catch (err) {
+      console.error('Error downloading provisional receipt:', err)
+      setError('Could not generate receipt PDF. Please try again.')
+    } finally {
+      setDownloadingReceipt(false)
+    }
+  }
 
   // ── Load mandal + event on mount ──────────────────────────────
   useEffect(() => {
@@ -554,6 +601,25 @@ export default function PublicDonatePage() {
                   </div>
                 </div>
               </div>
+
+              {/* Option to Download Receipt below "What happens next" */}
+              <button
+                onClick={handleDownloadProvisionalReceipt}
+                disabled={downloadingReceipt}
+                className="w-full mt-4 bg-[#E8650A] hover:bg-[#d55905] disabled:opacity-60 text-white font-bold py-3.5 px-4 rounded-xl text-sm transition-all flex items-center justify-center gap-2 cursor-pointer shadow-sm active:scale-[0.99]"
+              >
+                {downloadingReceipt ? (
+                  <>
+                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                    <span>Generating Provisional Receipt...</span>
+                  </>
+                ) : (
+                  <>
+                    <span className="text-base">📥</span>
+                    <span>Download Provisional Receipt (PDF)</span>
+                  </>
+                )}
+              </button>
             </div>
 
             {/* Verify link */}
