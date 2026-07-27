@@ -40,7 +40,28 @@ type SuccessData = {
 }
 
 type Step = 'form' | 'duplicate_warning' | 'cash_confirm' | 'upi_qr' | 'success'
-type Tab = 'dashboard' | 'collect' | 'history'
+type Tab = 'dashboard' | 'collect' | 'history' | 'ranking'
+
+type CollectorRankingItem = {
+  id: string
+  name: string
+  role: string
+  totalCash: number
+  totalUpi: number
+  totalAmount: number
+  donationsCount: number
+  rank: number
+  isSelf: boolean
+}
+
+type UserRankInfo = {
+  rank: number
+  totalCollectors: number
+  totalAmount: number
+  donationsCount: number
+  totalCash: number
+  totalUpi: number
+} | null
 
 export default function CollectPage() {
   const router = useRouter()
@@ -67,7 +88,7 @@ export default function CollectPage() {
   const [checkingPhone, setCheckingPhone] = useState(false)
   const [duplicateModalData, setDuplicateModalData] = useState<{ eventName: string; receiptId: string } | null>(null)
 
-  // Dashboard & History States
+  // Dashboard & History & Ranking States
   const [activeTab, setActiveTab] = useState<Tab>('dashboard')
   const [donations, setDonations] = useState<any[]>([])
   const [donationsLoading, setDonationsLoading] = useState(false)
@@ -76,6 +97,35 @@ export default function CollectPage() {
   const [historyStatusFilter, setHistoryStatusFilter] = useState('all')
   const [historyModeFilter, setHistoryModeFilter] = useState('all')
   const [copiedId, setCopiedId] = useState<string | null>(null)
+
+  // Ranking & Leaderboard States
+  const [rankings, setRankings] = useState<CollectorRankingItem[]>([])
+  const [userRank, setUserRank] = useState<UserRankInfo>(null)
+  const [rankingLoading, setRankingLoading] = useState(false)
+  const [rankingError, setRankingError] = useState('')
+  const [rankingEventFilter, setRankingEventFilter] = useState('all')
+
+  async function loadRankings(mId: string, eventId: string = 'all') {
+    setRankingLoading(true)
+    setRankingError('')
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      const token = session?.access_token
+      const headers: HeadersInit = token ? { 'Authorization': `Bearer ${token}` } : {}
+      const res = await fetch(`/api/collector/rankings?mandal_id=${mId}&event_id=${eventId}`, { headers })
+      const data = await res.json()
+      if (data.error) {
+        setRankingError(data.error)
+      } else {
+        setRankings(data.rankings || [])
+        setUserRank(data.userRank || null)
+      }
+    } catch (err) {
+      setRankingError('Failed to load collector rankings')
+    } finally {
+      setRankingLoading(false)
+    }
+  }
 
   async function loadDonations(mId: string, uId: string) {
     setDonationsLoading(true)
@@ -142,12 +192,17 @@ export default function CollectPage() {
     init()
   }, [router])
 
-  // Automatically refresh collections on tab switches to ensure fresh statistics/history
+  // Automatically refresh collections & rankings on tab switches to ensure fresh data
   useEffect(() => {
-    if (mandal?.id && userId && (activeTab === 'dashboard' || activeTab === 'history')) {
-      loadDonations(mandal.id, userId)
+    if (mandal?.id && userId) {
+      if (activeTab === 'dashboard' || activeTab === 'history') {
+        loadDonations(mandal.id, userId)
+      }
+      if (activeTab === 'dashboard' || activeTab === 'ranking') {
+        loadRankings(mandal.id, rankingEventFilter)
+      }
     }
-  }, [activeTab, mandal?.id, userId])
+  }, [activeTab, mandal?.id, userId, rankingEventFilter])
 
   async function submitDonation(payload: any) {
     setSubmitting(true)
@@ -557,7 +612,7 @@ export default function CollectPage() {
 
         {/* Tab Navigation (Consistent styling with primary dashboard tab bar) */}
         <div className="flex gap-1 bg-[#F5EDE2] dark:bg-gray-900 rounded-xl p-1 border border-[#1A1208]/10 dark:border-gray-800 mb-6 w-full overflow-x-auto shadow-xs">
-          {(['dashboard', 'collect', 'history'] as Tab[]).map(t => (
+          {(['dashboard', 'collect', 'history', 'ranking'] as Tab[]).map(t => (
             <button
               key={t}
               onClick={() => setActiveTab(t)}
@@ -566,7 +621,7 @@ export default function CollectPage() {
                   ? 'bg-gradient-to-r from-[#E8650A] to-[#f97316] text-white shadow-md'
                   : 'text-[#7a6a55] dark:text-gray-400 hover:text-[#1A1208] dark:hover:text-white'}`}
             >
-              {t === 'collect' ? '➕ Collect' : t === 'dashboard' ? '📊 Dashboard' : '📜 History'}
+              {t === 'collect' ? '➕ Collect' : t === 'dashboard' ? '📊 Dashboard' : t === 'ranking' ? '🏆 Ranking' : '📜 History'}
             </button>
           ))}
         </div>
@@ -614,6 +669,32 @@ export default function CollectPage() {
                   <span className="text-[10px] text-[#7a6a55] dark:text-gray-400 block mt-0.5 font-medium">₹{todayUpi.toLocaleString('en-IN')} collected</span>
                 </div>
               </div>
+            </div>
+
+            {/* Your Collector Rank Summary Card */}
+            <div className="bg-[#F5EDE2] dark:bg-gray-900 border border-[#1A1208]/10 dark:border-gray-800 rounded-xl p-4 flex items-center justify-between shadow-sm animate-fade-in">
+              <div className="flex items-center gap-3">
+                <div className="w-11 h-11 rounded-full bg-gradient-to-br from-[#E8650A] to-amber-500 text-white flex items-center justify-center font-black text-lg shadow-md shrink-0">
+                  {userRank ? (userRank.rank === 1 ? '🥇' : userRank.rank === 2 ? '🥈' : userRank.rank === 3 ? '🥉' : `#${userRank.rank}`) : '🏆'}
+                </div>
+                <div>
+                  <span className="text-[10px] text-[#7a6a55] dark:text-gray-400 uppercase tracking-wider font-bold block">Your Leaderboard Rank</span>
+                  <p className="text-sm font-extrabold text-[#1A1208] dark:text-white mt-0.5">
+                    {userRank ? `Rank #${userRank.rank} of ${userRank.totalCollectors} Collectors` : 'Calculating rank...'}
+                  </p>
+                  {userRank && (
+                    <span className="text-[11px] text-[#7a6a55] dark:text-gray-400 font-medium block">
+                      ₹{userRank.totalAmount.toLocaleString('en-IN')} verified collections
+                    </span>
+                  )}
+                </div>
+              </div>
+              <button
+                onClick={() => setActiveTab('ranking')}
+                className="text-xs bg-[#E8650A] hover:bg-[#d55905] text-white font-bold px-3 py-1.5 rounded-lg transition-colors cursor-pointer shrink-0 shadow-xs"
+              >
+                View Leaderboard 🏆
+              </button>
             </div>
 
             {/* Daily, Weekly, Monthly Collections Card */}
@@ -789,6 +870,123 @@ export default function CollectPage() {
                 </div>
               )}
             </div>
+          </div>
+        )}
+
+        {/* ======================================================== */}
+        {/* RANKING TAB */}
+        {/* ======================================================== */}
+        {activeTab === 'ranking' && (
+          <div className="flex flex-col gap-6 animate-fade-in">
+            <div className="flex items-center justify-between gap-2 flex-wrap">
+              <div>
+                <h1 className="text-xl font-bold text-[#1A1208] dark:text-white">Collector Leaderboard</h1>
+                <p className="text-xs text-[#7a6a55] dark:text-gray-400 mt-1 font-medium">Rankings by total verified collections</p>
+              </div>
+
+              {/* Event Filter */}
+              {events.length > 0 && (
+                <select
+                  value={rankingEventFilter}
+                  onChange={e => setRankingEventFilter(e.target.value)}
+                  className="text-xs bg-white dark:bg-gray-900 text-[#1A1208] dark:text-white border border-[#1A1208]/10 dark:border-gray-800 rounded-lg px-2.5 py-1.5 font-bold cursor-pointer outline-none shadow-xs"
+                >
+                  <option value="all">All Events</option>
+                  {events.map(ev => (
+                    <option key={ev.id} value={ev.id}>{ev.name} ({ev.year})</option>
+                  ))}
+                </select>
+              )}
+            </div>
+
+            {/* Your Position Banner */}
+            {userRank && (
+              <div className="bg-gradient-to-r from-[#E8650A]/10 via-amber-500/10 to-orange-500/10 dark:from-orange-950/40 dark:to-amber-950/30 border border-[#E8650A]/20 dark:border-orange-800/40 rounded-xl p-4 flex items-center justify-between shadow-xs">
+                <div className="flex items-center gap-3">
+                  <div className="w-12 h-12 rounded-full bg-gradient-to-br from-[#E8650A] to-amber-500 text-white flex items-center justify-center font-black text-xl shadow-md shrink-0">
+                    {userRank.rank === 1 ? '🥇' : userRank.rank === 2 ? '🥈' : userRank.rank === 3 ? '🥉' : `#${userRank.rank}`}
+                  </div>
+                  <div>
+                    <span className="text-[10px] text-[#E8650A] dark:text-orange-400 font-extrabold uppercase tracking-wider block">Your Position</span>
+                    <p className="text-base font-extrabold text-[#1A1208] dark:text-white">
+                      Rank #{userRank.rank} <span className="text-xs font-normal text-[#7a6a55] dark:text-gray-400">of {userRank.totalCollectors} collectors</span>
+                    </p>
+                    <span className="text-xs font-semibold text-[#1A1208] dark:text-gray-200">
+                      ₹{userRank.totalAmount.toLocaleString('en-IN')} verified ({userRank.donationsCount} donation{userRank.donationsCount !== 1 ? 's' : ''})
+                    </span>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Leaderboard List */}
+            {rankingLoading ? (
+              <div className="text-center py-12">
+                <div className="w-8 h-8 rounded-full border-2 border-t-[#E8650A] border-r-transparent border-b-[#E8650A] border-l-transparent animate-spin mx-auto mb-2" />
+                <p className="text-[#7a6a55] dark:text-gray-400 text-xs font-mono animate-pulse">Loading leaderboard...</p>
+              </div>
+            ) : rankingError ? (
+              <div className="text-center py-8 bg-rose-50 dark:bg-red-950/30 border border-rose-200 dark:border-red-900 rounded-xl p-4">
+                <p className="text-rose-600 dark:text-red-400 text-xs font-bold">{rankingError}</p>
+              </div>
+            ) : rankings.length === 0 ? (
+              <div className="text-center py-12 bg-[#F5EDE2]/60 dark:bg-gray-900/30 border border-[#1A1208]/10 dark:border-gray-800 rounded-xl">
+                <p className="text-[#7a6a55] dark:text-gray-400 text-sm font-bold">No collector activity recorded yet.</p>
+              </div>
+            ) : (
+              <div className="flex flex-col gap-3">
+                {rankings.map((c) => {
+                  const medal = c.rank === 1 ? '🥇' : c.rank === 2 ? '🥈' : c.rank === 3 ? '🥉' : null
+                  return (
+                    <div
+                      key={c.id}
+                      className={`border rounded-xl p-3.5 flex items-center gap-3.5 shadow-xs transition-all
+                        ${c.isSelf
+                          ? 'bg-amber-500/10 dark:bg-amber-950/30 border-[#E8650A] dark:border-orange-600/60 shadow-md ring-1 ring-[#E8650A]/30'
+                          : c.rank === 1
+                          ? 'bg-white dark:bg-gray-900 border-amber-500/50 dark:border-amber-500/40 shadow-sm'
+                          : 'bg-white dark:bg-gray-900 border-[#1A1208]/10 dark:border-gray-800'}`}
+                    >
+                      {/* Rank Icon / Number */}
+                      <div className={`w-9 h-9 shrink-0 rounded-full flex items-center justify-center text-xs font-bold shadow-xs
+                        ${c.rank <= 3
+                          ? 'bg-[#F5EDE2] dark:bg-gray-800 text-[#1A1208] dark:text-white border border-amber-500/30'
+                          : 'bg-[#F5EDE2] dark:bg-gray-800 text-[#7a6a55] dark:text-gray-400'}`}
+                      >
+                        {medal ? <span className="text-lg">{medal}</span> : <span>#{c.rank}</span>}
+                      </div>
+
+                      {/* Collector Details */}
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center justify-between gap-2 mb-1">
+                          <div className="flex items-center gap-1.5 min-w-0">
+                            <span className="text-sm font-bold text-[#1A1208] dark:text-white truncate">
+                              {c.name}
+                            </span>
+                            {c.isSelf && (
+                              <span className="text-[9px] font-black px-1.5 py-0.5 rounded bg-[#E8650A] text-white uppercase tracking-wider shrink-0">
+                                You
+                              </span>
+                            )}
+                          </div>
+                          <span className="text-sm font-extrabold text-[#1A1208] dark:text-white shrink-0">
+                            ₹{c.totalAmount.toLocaleString('en-IN')}
+                          </span>
+                        </div>
+
+                        <div className="flex items-center gap-3 text-[11px] text-[#7a6a55] dark:text-gray-400 font-medium flex-wrap">
+                          <span>💵 Cash: ₹{c.totalCash.toLocaleString('en-IN')}</span>
+                          <span>📱 UPI: ₹{c.totalUpi.toLocaleString('en-IN')}</span>
+                          <span className="text-xs font-semibold text-[#1A1208]/80 dark:text-gray-300">
+                            {c.donationsCount} donation{c.donationsCount !== 1 ? 's' : ''}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            )}
           </div>
         )}
 

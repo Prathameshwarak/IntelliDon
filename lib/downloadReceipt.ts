@@ -6,6 +6,7 @@ export type ReceiptData = {
   mandalName: string
   mandalAddress: string
   mandalPhone: string
+  mandalEmail?: string | null
   mandalLogo?: string | null
   eventName: string
   donorName: string
@@ -18,6 +19,18 @@ export type ReceiptData = {
   verified?: boolean
   verifiedByRole?: string | null
   verifiedAt?: string | null
+  screenshotUrl?: string | null
+  screenshotImage?: string | Uint8Array | null
+}
+
+export function formatLegalEmail(email?: string | null): string {
+  if (email && email.includes('@')) {
+    const parts = email.trim().split('@')
+    const user = parts[0]
+    const domain = parts.slice(1).join('@')
+    return `${user}+legal@${domain}`
+  }
+  return ''
 }
 
 async function buildPdfBlob(receiptData: ReceiptData): Promise<Blob> {

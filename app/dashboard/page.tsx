@@ -32,7 +32,7 @@ type Donation = {
   status: string
   screenshot_url: string | null
   created_at: string
-  users: { full_name: string } | null
+  users: { full_name: string; role?: string } | null
   receipt_data: ReceiptData | null
   collected_by: string | null
   rejection_reason: string | null
@@ -1305,9 +1305,15 @@ export default function DashboardPage() {
   }
 
   //line added by pratham
-  // Ranking: collectors sorted by total verified amount collected (cash + UPI), descending
+  // Ranking: collectors sorted by total verified amount collected (cash + UPI), descending (excluding admin/adhyaksha & manager)
   function buildRankingFromGroups(groups: Record<string, CollectorGroup>) {
     return Object.values(groups)
+      .filter(c => {
+        if (c.id === 'direct_or_unknown') return false
+        const role = c.donations[0]?.users?.role
+        if (role && ['admin', 'manager'].includes(role)) return false
+        return true
+      })
       .map(c => {
         const verifiedCash = c.donations
           .filter(d => d.status === 'verified' && d.payment_mode === 'cash')
