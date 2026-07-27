@@ -63,7 +63,7 @@ export async function POST(request) {
     // ── 2. Check mandal is active ─────────────────────────────
     const { data: mandal, error: mandalError } = await supabaseAdmin
       .from('mandals')
-      .select('id, name, address, city, phone, status')
+      .select('id, name, address, city, phone, status, doc_logo')
       .eq('id', mandal_id)
       .single()
 
@@ -76,9 +76,10 @@ export async function POST(request) {
     }
 
     // ── 3. Check event ────────────────────────────────────────
+    const today = new Date().toISOString().split('T')[0]
     const { data: event, error: eventError } = await supabaseAdmin
       .from('events')
-      .select('id, name, year, is_active, is_suspended')
+      .select('id, name, year, is_active, is_suspended, start_date, end_date')
       .eq('id', event_id)
       .eq('mandal_id', mandal_id)
       .single()
@@ -92,7 +93,15 @@ export async function POST(request) {
     }
 
     if (!event.is_active) {
-      return NextResponse.json({ error: 'This event is no longer active' }, { status: 403 })
+      return NextResponse.json({ error: 'This event is not live or active' }, { status: 403 })
+    }
+
+    if (event.start_date > today) {
+      return NextResponse.json({ error: `This event has not started yet (starts on ${event.start_date}). Contact organisation admin or manager.` }, { status: 403 })
+    }
+
+    if (event.end_date < today) {
+      return NextResponse.json({ error: `This event has ended (ended on ${event.end_date}). Contact organisation admin or manager.` }, { status: 403 })
     }
 
     // ── 3b. Event-access guard for collectors/managers ────────
@@ -170,11 +179,24 @@ export async function POST(request) {
 
     let receiptData = null
     if (isCollectorRecorded && donation) {
+      let logoUrl = null
+      if (mandal?.doc_logo) {
+        try {
+          const { data: signedData } = await supabaseAdmin.storage
+            .from('kyc-documents')
+            .createSignedUrl(mandal.doc_logo, 60 * 60 * 24 * 365)
+          logoUrl = signedData?.signedUrl || null
+        } catch (e) {
+          console.warn('Logo URL error:', e)
+        }
+      }
+
       receiptData = buildReceiptData({
         donation,
         mandal,
         event,
-        collectorName
+        collectorName,
+        logoUrl
       })
       const { error: updateError } = await supabaseAdmin
         .from('donations')

@@ -80,7 +80,8 @@ export async function POST(request, { params }) {
           name,
           address,
           city,
-          phone
+          phone,
+          doc_logo
         ),
         events (
           id,
@@ -131,11 +132,24 @@ export async function POST(request, { params }) {
     const event = donation.events
     const collector = donation.users
 
+    let logoUrl = null
+    if (mandal?.doc_logo) {
+      try {
+        const { data: signedData } = await supabaseAdmin.storage
+          .from('kyc-documents')
+          .createSignedUrl(mandal.doc_logo, 60 * 60 * 24 * 365)
+        logoUrl = signedData?.signedUrl || null
+      } catch (e) {
+        console.warn('Signed logo URL error:', e)
+      }
+    }
+
     const receiptData = buildReceiptData({
       donation,
       mandal,
       event,
-      collectorName: collector?.full_name || null
+      collectorName: collector?.full_name || null,
+      logoUrl
     })
 
     // 5. Save the receipt_data back to the donation row

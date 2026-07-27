@@ -55,6 +55,7 @@ export async function GET(request: Request) {
         admin_phone,
         pincode,
         upi_id,
+        doc_logo,
         doc_reg_cert,
         doc_admin_aadhaar,
         doc_admin_pan,
@@ -120,6 +121,7 @@ export async function PATCH(request: Request) {
     // Update document path if provided
     if (documentKey && documentPath) {
       const allowedKeys = [
+        'doc_logo',
         'doc_admin_aadhaar',
         'doc_bank_proof',
         'doc_auth_letter',
@@ -143,6 +145,91 @@ export async function PATCH(request: Request) {
       return NextResponse.json({ success: true, message: 'Document updated successfully' })
     }
 
+    if (!mandalId) {
+      return NextResponse.json({ error: 'mandalId is required' }, { status: 400 })
+    }
+
+    // Fetch current target mandal status for state transition enforcement
+    const { data: targetMandal, error: fetchErr } = await supabaseAdmin
+      .from('mandals')
+      .select('id, status, kyc_status, doc_logo, doc_admin_aadhaar, doc_bank_proof, doc_auth_letter, doc_address_proof, doc_reg_cert, doc_admin_pan, doc_org_pan, kyc_notes')
+      .eq('id', mandalId)
+      .single()
+
+    if (fetchErr || !targetMandal) {
+      return NextResponse.json({ error: 'Mandal not found' }, { status: 404 })
+    }
+
+    // Rule 1: Rejected organizations can ONLY transition to Pending or In Review
+    if (targetMandal.kyc_status === 'rejected') {
+      if (action === 'approve' || kycStatus === 'approved') {
+        return NextResponse.json(
+          { error: 'Rejected organizations cannot be approved directly. They must be moved to Pending or In Review first.' },
+          { status: 400 }
+        )
+      }
+      if (action === 'suspend') {
+        return NextResponse.json(
+          { error: 'Rejected organizations cannot be suspended.' },
+          { status: 400 }
+        )
+      }
+    }
+
+    // Rule 2: Active/Approved organizations can ONLY transition to Suspended
+    if (targetMandal.status === 'active') {
+      if (action === 'reject' || kycStatus === 'rejected') {
+        return NextResponse.json(
+          { error: 'Active/Approved organizations cannot be rejected directly. Suspend the organization instead.' },
+          { status: 400 }
+        )
+      }
+    }
+
+    // Check if approving mandal or setting KYC status to approved
+    if (action === 'approve' || kycStatus === 'approved') {
+      let currentDocStatuses: Record<string, string> = {}
+      try {
+        const notesStr = kycNotes || targetMandal.kyc_notes
+        if (notesStr) {
+          const parsed = JSON.parse(notesStr)
+          if (parsed && typeof parsed.documentStatuses === 'object') {
+            currentDocStatuses = parsed.documentStatuses
+          }
+        }
+      } catch (e) {
+        // Ignore parse error
+      }
+
+      const docFields = [
+        { key: 'doc_logo', label: 'Organisation Logo' },
+        { key: 'doc_admin_aadhaar', label: 'Admin Aadhaar' },
+        { key: 'doc_bank_proof', label: 'Bank Proof' },
+        { key: 'doc_auth_letter', label: 'Auth Letter / Resolution' },
+        { key: 'doc_address_proof', label: 'Address Proof' },
+        { key: 'doc_reg_cert', label: 'Registration Certificate' },
+        { key: 'doc_admin_pan', label: 'Admin PAN' },
+        { key: 'doc_org_pan', label: 'Organisation PAN' },
+      ]
+
+      const unapprovedUploaded: string[] = []
+      for (const doc of docFields) {
+        const filePath = targetMandal[doc.key as keyof typeof targetMandal]
+        if (filePath && typeof filePath === 'string' && filePath.trim() !== '') {
+          if (currentDocStatuses[doc.key] !== 'approved') {
+            unapprovedUploaded.push(doc.label)
+          }
+        }
+      }
+
+      if (unapprovedUploaded.length > 0) {
+        return NextResponse.json(
+          { error: `Cannot approve organization: All uploaded documents must be approved first. Missing approval for: ${unapprovedUploaded.join(', ')}` },
+          { status: 400 }
+        )
+      }
+    }
+
     // KYC update — separate from approve/reject action
     if (kycStatus) {
       const { error } = await supabaseAdmin
@@ -158,8 +245,8 @@ export async function PATCH(request: Request) {
       return NextResponse.json({ success: true, message: `KYC ${kycStatus}` })
     }
 
-    if (!mandalId || !action) {
-      return NextResponse.json({ error: 'mandalId and action are required' }, { status: 400 })
+    if (!action) {
+      return NextResponse.json({ error: 'action is required' }, { status: 400 })
     }
 
     if (!['approve', 'reject', 'suspend'].includes(action)) {
@@ -172,6 +259,9 @@ export async function PATCH(request: Request) {
     const updatePayload: Record<string, any> = { status: newStatus }
     if (action === 'approve') {
       updatePayload.kyc_status = 'approved'
+      if (kycNotes) {
+        updatePayload.kyc_notes = kycNotes
+      }
     } else if (action === 'reject') {
       updatePayload.kyc_status = 'rejected'
       if (kycNotes) {

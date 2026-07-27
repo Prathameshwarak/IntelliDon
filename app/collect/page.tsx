@@ -799,121 +799,145 @@ export default function CollectPage() {
           <div className="animate-fade-in">
             {/* STEP: Form */}
             {step === 'form' && (
-              <div className="flex flex-col gap-4">
-                <div>
-                  <h1 className="text-lg font-bold text-[#1A1208] dark:text-white">New Donation</h1>
-                  <p className="text-xs text-[#7a6a55] dark:text-gray-400 mt-0.5 font-medium">Enter donor details below</p>
+              events.length === 0 || !selectedEvent ? (
+                <div className="bg-[#F5EDE2] dark:bg-gray-900 border border-amber-500/30 dark:border-amber-500/20 rounded-2xl p-6 sm:p-8 text-center space-y-4 shadow-sm my-4">
+                  <div className="w-14 h-14 bg-amber-500/10 rounded-full flex items-center justify-center mx-auto text-amber-600 dark:text-amber-400 text-3xl">
+                    ⚠️
+                  </div>
+                  <div className="space-y-1.5">
+                    <h2 className="text-base font-bold text-[#1A1208] dark:text-white">
+                      No Live or Active Event Available
+                    </h2>
+                    <p className="text-xs text-[#7a6a55] dark:text-gray-400 max-w-sm mx-auto leading-relaxed font-medium">
+                      There is currently no live or active event available for your organization to collect donations. Please contact your organization Admin or Manager to activate or create an event.
+                    </p>
+                  </div>
+                  <div className="pt-2">
+                    <button
+                      onClick={() => window.location.reload()}
+                      className="px-4 py-2 bg-[#E8650A] hover:bg-[#d05807] text-white text-xs font-bold rounded-xl transition-all shadow-sm cursor-pointer"
+                    >
+                      🔄 Check Again
+                    </button>
+                  </div>
                 </div>
-
-                {events.length > 1 && (
+              ) : (
+                <div className="flex flex-col gap-4">
                   <div>
-                    <label className="text-xs text-[#7a6a55] dark:text-gray-400 mb-1 block font-bold">Event</label>
-                    <select
-                      value={selectedEvent?.id || ''}
-                      onChange={e => setSelectedEvent(events.find(ev => ev.id === e.target.value) || null)}
-                      className="w-full bg-white dark:bg-gray-900 border border-[#1A1208]/15 dark:border-gray-700 rounded-lg px-3 py-3 text-sm text-[#1A1208] dark:text-white font-medium focus:outline-none focus:border-[#E8650A]"
-                    >
-                      <option value="" className="bg-white dark:bg-gray-900 text-[#1A1208] dark:text-white">Select event</option>
-                      {events.map(ev => (
-                        <option key={ev.id} value={ev.id} className="bg-white dark:bg-gray-900 text-[#1A1208] dark:text-white">{ev.name} {ev.year}</option>
-                      ))}
-                    </select>
+                    <h1 className="text-lg font-bold text-[#1A1208] dark:text-white">New Donation</h1>
+                    <p className="text-xs text-[#7a6a55] dark:text-gray-400 mt-0.5 font-medium">Enter donor details below</p>
                   </div>
-                )}
 
-                {selectedEvent && events.length === 1 && (
-                  <div className="bg-[#F5EDE2] dark:bg-gray-900 border border-[#1A1208]/10 dark:border-gray-800 rounded-lg px-3 py-2">
-                    <p className="text-xs text-[#7a6a55] dark:text-gray-400 font-medium">Event</p>
-                    <p className="text-sm font-bold text-[#1A1208] dark:text-white">{selectedEvent.name} {selectedEvent.year}</p>
+                  {events.length > 1 && (
+                    <div>
+                      <label className="text-xs text-[#7a6a55] dark:text-gray-400 mb-1 block font-bold">Event</label>
+                      <select
+                        value={selectedEvent?.id || ''}
+                        onChange={e => setSelectedEvent(events.find(ev => ev.id === e.target.value) || null)}
+                        className="w-full bg-white dark:bg-gray-900 border border-[#1A1208]/15 dark:border-gray-700 rounded-lg px-3 py-3 text-sm text-[#1A1208] dark:text-white font-medium focus:outline-none focus:border-[#E8650A]"
+                      >
+                        <option value="" className="bg-white dark:bg-gray-900 text-[#1A1208] dark:text-white">Select event</option>
+                        {events.map(ev => (
+                          <option key={ev.id} value={ev.id} className="bg-white dark:bg-gray-900 text-[#1A1208] dark:text-white">{ev.name} {ev.year}</option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
+
+                  {selectedEvent && events.length === 1 && (
+                    <div className="bg-[#F5EDE2] dark:bg-gray-900 border border-[#1A1208]/10 dark:border-gray-800 rounded-lg px-3 py-2">
+                      <p className="text-xs text-[#7a6a55] dark:text-gray-400 font-medium">Event</p>
+                      <p className="text-sm font-bold text-[#1A1208] dark:text-white">{selectedEvent.name} {selectedEvent.year}</p>
+                    </div>
+                  )}
+
+                  <div>
+                    <label className="text-xs text-[#7a6a55] dark:text-gray-400 mb-1 block font-bold">Donor Name *</label>
+                    <input
+                      type="text"
+                      value={donorName}
+                      onChange={e => setDonorName(e.target.value)}
+                      placeholder="Full name"
+                      className="w-full bg-white dark:bg-gray-900 border border-[#1A1208]/15 dark:border-gray-700 rounded-lg px-3 py-3 text-sm text-[#1A1208] dark:text-white placeholder-[#9e8c76] dark:placeholder-gray-500 focus:outline-none focus:border-[#E8650A] font-medium"
+                    />
                   </div>
-                )}
 
-                <div>
-                  <label className="text-xs text-[#7a6a55] dark:text-gray-400 mb-1 block font-bold">Donor Name *</label>
-                  <input
-                    type="text"
-                    value={donorName}
-                    onChange={e => setDonorName(e.target.value)}
-                    placeholder="Full name"
-                    className="w-full bg-white dark:bg-gray-900 border border-[#1A1208]/15 dark:border-gray-700 rounded-lg px-3 py-3 text-sm text-[#1A1208] dark:text-white placeholder-[#9e8c76] dark:placeholder-gray-500 focus:outline-none focus:border-[#E8650A] font-medium"
-                  />
-                </div>
-
-                <div>
-                  <label className="text-xs text-[#7a6a55] dark:text-gray-400 mb-1 block font-bold">
-                    Phone Number <span className="text-[#9e8c76] dark:text-gray-500 font-normal">(optional)</span>
-                  </label>
-                  <input
-                    type="tel"
-                    value={donorPhone}
-                    onChange={e => setDonorPhone(e.target.value.replace(/[^0-9]/g, ''))}
-                    placeholder="10-digit mobile number"
-                    maxLength={10}
-                    className="w-full bg-white dark:bg-gray-900 border border-[#1A1208]/15 dark:border-gray-700 rounded-lg px-3 py-3 text-sm text-[#1A1208] dark:text-white placeholder-[#9e8c76] dark:placeholder-gray-500 focus:outline-none focus:border-[#E8650A] font-medium"
-                  />
-                </div>
-
-                <div>
-                  <label className="text-xs text-[#7a6a55] dark:text-gray-400 mb-1 block font-bold">Address <span className="text-[#9e8c76] dark:text-gray-500 font-normal">(optional)</span></label>
-                  <input
-                    type="text"
-                    value={donorAddress}
-                    onChange={e => setDonorAddress(e.target.value)}
-                    placeholder="Flat / Building / Area"
-                    className="w-full bg-white dark:bg-gray-900 border border-[#1A1208]/15 dark:border-gray-700 rounded-lg px-3 py-3 text-sm text-[#1A1208] dark:text-white placeholder-[#9e8c76] dark:placeholder-gray-500 focus:outline-none focus:border-[#E8650A] font-medium"
-                  />
-                </div>
-
-                <div>
-                  <label className="text-xs text-[#7a6a55] dark:text-gray-400 mb-1 block font-bold">Amount (₹) *</label>
-                  <input
-                    type="text"
-                    inputMode="numeric"
-                    value={amount}
-                    onChange={e => setAmount(e.target.value.replace(/[^0-9]/g, ''))}
-                    placeholder="0"
-                    className="w-full bg-white dark:bg-gray-900 border border-[#1A1208]/15 dark:border-gray-700 rounded-lg px-3 py-3 text-2xl font-extrabold text-[#1A1208] dark:text-white placeholder-[#9e8c76] dark:placeholder-gray-600 focus:outline-none focus:border-[#E8650A]"
-                  />
-                </div>
-
-                <div>
-                  <label className="text-xs text-[#7a6a55] dark:text-gray-400 mb-2 block font-bold">Payment Mode *</label>
-                  <div className="grid grid-cols-2 gap-2">
-                    <button
-                      onClick={() => setPaymentMode('cash')}
-                      className={`py-3 rounded-lg text-sm font-bold border transition-colors cursor-pointer
-                        ${paymentMode === 'cash'
-                          ? 'bg-gradient-to-r from-[#E8650A] to-[#f97316] border-[#E8650A] text-white shadow-md'
-                          : 'bg-white dark:bg-gray-900 border-[#1A1208]/15 dark:border-gray-700 text-[#7a6a55] dark:text-gray-400'}`}
-                    >
-                      💵 Cash
-                    </button>
-                    <button
-                      onClick={() => setPaymentMode('upi_collector')}
-                      className={`py-3 rounded-lg text-sm font-bold border transition-colors cursor-pointer
-                        ${paymentMode === 'upi_collector'
-                          ? 'bg-gradient-to-r from-[#E8650A] to-[#f97316] border-[#E8650A] text-white shadow-md'
-                          : 'bg-white dark:bg-gray-900 border-[#1A1208]/15 dark:border-gray-700 text-[#7a6a55] dark:text-gray-400'}`}
-                    >
-                      📱 UPI / QR
-                    </button>
+                  <div>
+                    <label className="text-xs text-[#7a6a55] dark:text-gray-400 mb-1 block font-bold">
+                      Phone Number <span className="text-[#9e8c76] dark:text-gray-500 font-normal">(optional)</span>
+                    </label>
+                    <input
+                      type="tel"
+                      value={donorPhone}
+                      onChange={e => setDonorPhone(e.target.value.replace(/[^0-9]/g, ''))}
+                      placeholder="10-digit mobile number"
+                      maxLength={10}
+                      className="w-full bg-white dark:bg-gray-900 border border-[#1A1208]/15 dark:border-gray-700 rounded-lg px-3 py-3 text-sm text-[#1A1208] dark:text-white placeholder-[#9e8c76] dark:placeholder-gray-500 focus:outline-none focus:border-[#E8650A] font-medium"
+                    />
                   </div>
-                </div>
 
-                {error && (
-                  <div className="bg-rose-500/10 border border-rose-500/20 rounded-lg px-3 py-2">
-                    <p className="text-rose-700 dark:text-red-400 text-sm font-bold">{error}</p>
+                  <div>
+                    <label className="text-xs text-[#7a6a55] dark:text-gray-400 mb-1 block font-bold">Address <span className="text-[#9e8c76] dark:text-gray-500 font-normal">(optional)</span></label>
+                    <input
+                      type="text"
+                      value={donorAddress}
+                      onChange={e => setDonorAddress(e.target.value)}
+                      placeholder="Flat / Building / Area"
+                      className="w-full bg-white dark:bg-gray-900 border border-[#1A1208]/15 dark:border-gray-700 rounded-lg px-3 py-3 text-sm text-[#1A1208] dark:text-white placeholder-[#9e8c76] dark:placeholder-gray-500 focus:outline-none focus:border-[#E8650A] font-medium"
+                    />
                   </div>
-                )}
 
-                <button
-                  onClick={handleFormSubmit}
-                  disabled={submitting || checkingPhone}
-                  className="w-full bg-gradient-to-r from-[#E8650A] to-[#f97316] hover:from-[#d05807] hover:to-[#ea580c] disabled:opacity-50 text-white font-bold py-4 rounded-xl text-base transition-all mt-2 cursor-pointer shadow-md"
-                >
-                  {checkingPhone ? 'Checking details...' : 'Continue →'}
-                </button>
-              </div>
+                  <div>
+                    <label className="text-xs text-[#7a6a55] dark:text-gray-400 mb-1 block font-bold">Amount (₹) *</label>
+                    <input
+                      type="text"
+                      inputMode="numeric"
+                      value={amount}
+                      onChange={e => setAmount(e.target.value.replace(/[^0-9]/g, ''))}
+                      placeholder="0"
+                      className="w-full bg-white dark:bg-gray-900 border border-[#1A1208]/15 dark:border-gray-700 rounded-lg px-3 py-3 text-2xl font-extrabold text-[#1A1208] dark:text-white placeholder-[#9e8c76] dark:placeholder-gray-600 focus:outline-none focus:border-[#E8650A]"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="text-xs text-[#7a6a55] dark:text-gray-400 mb-2 block font-bold">Payment Mode *</label>
+                    <div className="grid grid-cols-2 gap-2">
+                      <button
+                        onClick={() => setPaymentMode('cash')}
+                        className={`py-3 rounded-lg text-sm font-bold border transition-colors cursor-pointer
+                          ${paymentMode === 'cash'
+                            ? 'bg-gradient-to-r from-[#E8650A] to-[#f97316] border-[#E8650A] text-white shadow-md'
+                            : 'bg-white dark:bg-gray-900 border-[#1A1208]/15 dark:border-gray-700 text-[#7a6a55] dark:text-gray-400'}`}
+                      >
+                        💵 Cash
+                      </button>
+                      <button
+                        onClick={() => setPaymentMode('upi_collector')}
+                        className={`py-3 rounded-lg text-sm font-bold border transition-colors cursor-pointer
+                          ${paymentMode === 'upi_collector'
+                            ? 'bg-gradient-to-r from-[#E8650A] to-[#f97316] border-[#E8650A] text-white shadow-md'
+                            : 'bg-white dark:bg-gray-900 border-[#1A1208]/15 dark:border-gray-700 text-[#7a6a55] dark:text-gray-400'}`}
+                      >
+                        📱 UPI / QR
+                      </button>
+                    </div>
+                  </div>
+
+                  {error && (
+                    <div className="bg-rose-500/10 border border-rose-500/20 rounded-lg px-3 py-2">
+                      <p className="text-rose-700 dark:text-red-400 text-sm font-bold">{error}</p>
+                    </div>
+                  )}
+
+                  <button
+                    onClick={handleFormSubmit}
+                    disabled={submitting || checkingPhone}
+                    className="w-full bg-gradient-to-r from-[#E8650A] to-[#f97316] hover:from-[#d05807] hover:to-[#ea580c] disabled:opacity-50 text-white font-bold py-4 rounded-xl text-base transition-all mt-2 cursor-pointer shadow-md"
+                  >
+                    {checkingPhone ? 'Checking details...' : 'Continue →'}
+                  </button>
+                </div>
+              )
             )}
 
             {/* STEP: Cash Confirm */}

@@ -66,23 +66,19 @@ export async function GET(request) {
       return NextResponse.json({ error: 'Mandal not found' }, { status: 404 })
     }
 
-    // Get active events for this mandal
+    // Get active events for this mandal valid for today
+    const today = new Date().toISOString().split('T')[0]
     let { data: events, error: eventsError } = await supabaseAdmin
       .from('events')
-      .select('id, name, year, upi_id, upi_qr_url')
+      .select('id, name, year, upi_id, upi_qr_url, start_date, end_date, is_suspended, is_active')
       .eq('mandal_id', userRow.mandal_id)
       .eq('is_active', true)
+      .lte('start_date', today)
+      .gte('end_date', today)
       .order('year', { ascending: false })
 
-    if (!events || events.length === 0) {
-      // Fallback: fetch non-suspended events if is_active is omitted
-      const { data: fallbackEvents } = await supabaseAdmin
-        .from('events')
-        .select('id, name, year, upi_id, upi_qr_url')
-        .eq('mandal_id', userRow.mandal_id)
-        .order('year', { ascending: false })
-      events = fallbackEvents || []
-    }
+    // Filter out any suspended events
+    events = (events || []).filter(e => !e.is_suspended)
 
     return NextResponse.json({
       user: {

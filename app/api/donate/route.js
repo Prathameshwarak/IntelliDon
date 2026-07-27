@@ -61,33 +61,21 @@ export async function GET(request) {
     }
 
     // 2. Fetch current live event:
-    // Try explicitly active event (is_active = true) first
+    const today = new Date().toISOString().split('T')[0]
     let { data: events } = await supabaseAdmin
       .from('events')
-      .select('id, name, year, upi_id, upi_qr_url, is_active, is_suspended')
+      .select('id, name, year, upi_id, upi_qr_url, is_active, is_suspended, start_date, end_date')
       .eq('mandal_id', mandal.id)
       .eq('is_active', true)
-      .neq('is_suspended', true)
+      .lte('start_date', today)
+      .gte('end_date', today)
       .order('year', { ascending: false })
-      .limit(1)
 
-    // Fallback: If no event has is_active = true, fetch the latest non-suspended event for this mandal
-    if (!events || events.length === 0) {
-      const { data: latestEvents } = await supabaseAdmin
-        .from('events')
-        .select('id, name, year, upi_id, upi_qr_url, is_active, is_suspended')
-        .eq('mandal_id', mandal.id)
-        .neq('is_suspended', true)
-        .order('year', { ascending: false })
-        .order('created_at', { ascending: false })
-        .limit(1)
-
-      events = latestEvents || []
-    }
+    events = (events || []).filter(e => !e.is_suspended)
 
     if (!events || events.length === 0) {
       return NextResponse.json(
-        { error: 'No active event found for this organisation.' },
+        { error: 'No live or active event is currently available for this organisation. Please contact the organisation admin or manager.' },
         { status: 404 }
       )
     }
