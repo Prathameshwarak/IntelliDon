@@ -11,6 +11,7 @@ const supabaseAdmin = createClient(
 
 // ── Document fields expected from the form ────────────────────
 const DOC_FIELDS = [
+  'doc_logo',           // organization logo (optional - used in PDF receipts)
   'doc_reg_cert',       // registration certificate (optional)
   'doc_admin_aadhaar',  // admin aadhaar (optional)
   'doc_admin_pan',      // admin PAN (optional)

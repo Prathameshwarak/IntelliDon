@@ -46,21 +46,20 @@ export default function KycVerificationPanel({ mandal, userId, showToast, onResu
   const [adminPhone, setAdminPhone] = useState(mandal.admin_phone || '')
 
   const docFields = [
-    { key: 'doc_admin_aadhaar', label: 'Admin Aadhaar *', required: true },
-    { key: 'doc_bank_proof', label: 'Bank Proof (cheque/passbook) *', required: true },
-    { key: 'doc_auth_letter', label: 'Auth Letter / Resolution *', required: true },
-    { key: 'doc_address_proof', label: 'Address Proof *', required: true },
-    { key: 'doc_reg_cert', label: 'Registration Certificate', required: false },
-    { key: 'doc_admin_pan', label: 'Admin PAN', required: false },
-    { key: 'doc_org_pan', label: 'Organisation PAN', required: false }
+    { key: 'doc_admin_aadhaar', label: 'Admin Aadhaar' },
+    { key: 'doc_bank_proof', label: 'Bank Proof (cheque/passbook)' },
+    { key: 'doc_auth_letter', label: 'Auth Letter / Resolution' },
+    { key: 'doc_address_proof', label: 'Address Proof' },
+    { key: 'doc_reg_cert', label: 'Registration Certificate' },
+    { key: 'doc_admin_pan', label: 'Admin PAN' },
+    { key: 'doc_org_pan', label: 'Organisation PAN' }
   ]
 
   const isKycRejected = mandal.kyc_status === 'rejected'
   
-  // Re-uploadable fields are documents that are NOT approved
-  const reuploadableFields = isKycRejected
-    ? docFields.filter(doc => docStatuses[doc.key] !== 'approved')
-    : []
+  // Re-uploadable / uploadable fields are documents that are NOT approved yet
+  const reuploadableFields = docFields.filter(doc => docStatuses[doc.key] !== 'approved')
+  const canUploadOrResubmit = mandal.kyc_status !== 'approved' || mandal.status !== 'active'
 
   // List of fields that are explicitly rejected
   const rejectedFields = docFields.filter(doc => docStatuses[doc.key] === 'rejected')
@@ -90,9 +89,27 @@ export default function KycVerificationPanel({ mandal, userId, showToast, onResu
 
     // Ensure all explicitly rejected files have a new file selected
     const missingSelections = rejectedFields.filter(f => !filesToUpload[f.key])
-    if (missingSelections.length > 0) {
-      showToast(`Please select new files for: ${missingSelections.map(m => m.label).join(', ')}`, 'error')
+    if (isKycRejected && missingSelections.length > 0) {
+      showToast(`Please select new files for rejected documents: ${missingSelections.map(m => m.label).join(', ')}`, 'error')
       return
+    }
+
+    if (Object.keys(filesToUpload).length === 0) {
+      // Check if user changed any textual inputs
+      const textChanged = 
+        mandalName.trim() !== (mandal.name || '').trim() ||
+        mandalAddress.trim() !== (mandal.address || '').trim() ||
+        mandalCity.trim() !== (mandal.city || '').trim() ||
+        mandalPincode.trim() !== (mandal.pincode || '').trim() ||
+        mandalPhone.trim() !== (mandal.phone || '').trim() ||
+        mandalUpiId.trim() !== (mandal.upi_id || '').trim() ||
+        adminName.trim() !== (mandal.admin_full_name || '').trim() ||
+        adminPhone.trim() !== (mandal.admin_phone || '').trim()
+
+      if (!textChanged) {
+        showToast('Please select a document to upload or update your organization details.', 'error')
+        return
+      }
     }
 
     setResubmitting(true)
@@ -127,14 +144,14 @@ export default function KycVerificationPanel({ mandal, userId, showToast, onResu
       const data = await res.json()
 
       if (data.success) {
-        showToast('Verification resubmitted successfully!', 'success')
+        showToast('Verification details and documents submitted successfully!', 'success')
         setFilesToUpload({})
         onResubmitSuccess()
       } else {
-        showToast(data.error || 'Resubmission failed', 'error')
+        showToast(data.error || 'Submission failed', 'error')
       }
     } catch (err) {
-      showToast('Something went wrong during resubmission', 'error')
+      showToast('Something went wrong during submission', 'error')
     }
     setResubmitting(false)
   }
@@ -196,6 +213,24 @@ export default function KycVerificationPanel({ mandal, userId, showToast, onResu
             </span>
           </div>
 
+          {/* Prominent Rejection Reason Alert Box */}
+          {isKycRejected && (
+            <div className="p-4 bg-rose-950/40 border border-rose-800/60 rounded-xl space-y-2 text-rose-200">
+              <div className="flex items-center space-x-2">
+                <span className="text-rose-400 text-base font-bold">⚠️</span>
+                <h3 className="text-sm font-bold text-rose-400 uppercase tracking-wide">
+                  KYC / Registration Rejected
+                </h3>
+              </div>
+              <div className="text-xs space-y-1.5 pl-6">
+                <p className="font-semibold text-white">Rejection Reason specified by Super Admin:</p>
+                <div className="p-3 bg-rose-900/40 border border-rose-800/60 rounded-lg text-rose-100 font-medium leading-relaxed">
+                  {notes || 'One or more of your submitted documents or registration details were rejected during administrative audit. Please review the document status list below, attach replacement files for any rejected or missing documents, and click "Submit Documents & Profile for Review".'}
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Verification Details Box */}
           <div className="bg-gray-950/60 rounded-2xl p-5 border border-gray-850 space-y-4">
             <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider">Verification Details</h3>
@@ -203,7 +238,7 @@ export default function KycVerificationPanel({ mandal, userId, showToast, onResu
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
               <div className="space-y-1">
                 <span className="text-gray-500 font-medium">Expected Time Frame</span>
-                <p className="text-orange-400 font-bold text-sm">6 - 12 Hours</p>
+                <p className="text-orange-400 font-bold text-sm">1 - 2 Hours</p>
               </div>
               <div className="space-y-1">
                 <span className="text-gray-500 font-medium">Review Priority</span>
@@ -212,15 +247,9 @@ export default function KycVerificationPanel({ mandal, userId, showToast, onResu
             </div>
 
             {/* Notes / Reason alert if rejected or standard details */}
-            {notes && (
-              <div className={`mt-3 p-3.5 rounded-xl border text-xs leading-relaxed ${
-                mandal.kyc_status === 'rejected'
-                  ? 'bg-rose-950/15 border-rose-900/30 text-rose-300'
-                  : 'bg-gray-900 border-gray-800 text-gray-300'
-              }`}>
-                <p className="font-bold text-[10px] uppercase tracking-wide mb-1 opacity-75">
-                  {mandal.kyc_status === 'rejected' ? 'Rejection Reason' : 'Auditor Notes'}
-                </p>
+            {notes && !isKycRejected && (
+              <div className="mt-3 p-3.5 rounded-xl border border-gray-800 bg-gray-900 text-gray-300 text-xs leading-relaxed">
+                <p className="font-bold text-[10px] uppercase tracking-wide mb-1 opacity-75">Auditor Notes</p>
                 <p>{notes}</p>
               </div>
             )}
@@ -237,22 +266,34 @@ export default function KycVerificationPanel({ mandal, userId, showToast, onResu
                 return (
                   <div 
                     key={doc.key} 
-                    className="flex justify-between items-center p-3 bg-gray-950/30 border border-gray-850 rounded-xl text-xs"
+                    className={`flex justify-between items-center p-3 border rounded-xl text-xs ${
+                      status === 'rejected'
+                        ? 'bg-rose-950/20 border-rose-900/40'
+                        : 'bg-gray-950/30 border-gray-850'
+                    }`}
                   >
                     <div>
                       <span className="font-medium text-gray-300">{doc.label}</span>
-                      <span className="text-[10px] text-gray-500 block">
-                        {hasPath ? 'Document Uploaded' : doc.required ? 'Required Document Missing' : 'Optional Document'}
+                      <span className="text-[10px] block">
+                        {status === 'rejected' ? (
+                          <span className="text-rose-400 font-medium">✕ Document Rejected — Replacement Required</span>
+                        ) : hasPath ? (
+                          <span className="text-gray-500">Document Uploaded</span>
+                        ) : (
+                          <span className="text-gray-500">Document Not Uploaded</span>
+                        )}
                       </span>
                     </div>
 
                     <span className={`px-2.5 py-0.5 rounded text-[9px] font-bold uppercase border
-                      ${status === 'approved' 
+                      ${!hasPath
+                        ? 'bg-gray-800 text-gray-400 border-gray-700'
+                        : status === 'approved' 
                         ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
                         : status === 'rejected'
-                        ? 'bg-rose-500/10 text-rose-455 border-rose-500/20'
+                        ? 'bg-rose-600 text-white border-rose-500 shadow-sm'
                         : 'bg-amber-500/10 text-amber-405 border-amber-500/20'}`}>
-                      {status}
+                      {!hasPath ? 'Not Uploaded' : status}
                     </span>
                   </div>
                 )
@@ -260,13 +301,17 @@ export default function KycVerificationPanel({ mandal, userId, showToast, onResu
             </div>
           </div>
 
-          {/* Form to resubmit documents / details if KYC is rejected */}
-          {isKycRejected && (
+          {/* Form to resubmit or upload documents / details */}
+          {canUploadOrResubmit && (
             <form onSubmit={handleResubmit} className="border-t border-gray-850 pt-5 mt-5 space-y-6">
               <div className="space-y-1">
-                <h3 className="text-sm font-bold text-white">Resubmit Details & Documents</h3>
+                <h3 className="text-sm font-bold text-white">
+                  {isKycRejected ? 'Resubmit Details & Documents' : 'Upload / Update Documents & Details'}
+                </h3>
                 <p className="text-xs text-gray-400">
-                  Correct any rejected details or documents below. Approved documents are locked and cannot be changed.
+                  {isKycRejected 
+                    ? 'Correct any rejected details or documents below. Approved documents are locked and cannot be changed.' 
+                    : 'Upload any missing or updated documents for review. Approved documents are locked.'}
                 </p>
               </div>
 
@@ -366,19 +411,22 @@ export default function KycVerificationPanel({ mandal, userId, showToast, onResu
               {/* Document upload fields (only if there are re-uploadable files) */}
               {reuploadableFields.length > 0 && (
                 <div className="space-y-4">
-                  <h4 className="text-xs font-bold text-gray-400 uppercase tracking-wider block">2. Replace Rejected Documents</h4>
+                  <h4 className="text-xs font-bold text-gray-400 uppercase tracking-wider block">2. Upload / Replace Documents</h4>
                   <div className="space-y-3">
                     {reuploadableFields.map(doc => {
                       const status = docStatuses[doc.key] || 'pending'
+                      const hasPath = !!mandal[doc.key]
                       return (
                         <div key={doc.key} className="bg-gray-950/60 p-4 border border-gray-800 rounded-xl space-y-2">
                           <div className="flex justify-between items-center">
-                            <label className="block text-xs font-semibold text-gray-305">{doc.label}</label>
+                            <label className="block text-xs font-semibold text-gray-300">{doc.label}</label>
                             <span className={`px-2 py-0.5 rounded text-[8px] font-bold uppercase border
-                              ${status === 'rejected'
+                              ${!hasPath
+                                ? 'bg-gray-800 text-gray-400 border-gray-700'
+                                : status === 'rejected'
                                 ? 'bg-rose-500/10 text-rose-455 border-rose-500/20'
                                 : 'bg-amber-500/10 text-amber-400 border-amber-500/20'}`}>
-                              {status === 'rejected' ? 'Rejected' : 'Not Audited'}
+                              {!hasPath ? 'Not Uploaded' : status === 'rejected' ? 'Rejected' : 'Uploaded (Pending)'}
                             </span>
                           </div>
                           <input 
@@ -399,7 +447,7 @@ export default function KycVerificationPanel({ mandal, userId, showToast, onResu
                 disabled={resubmitting}
                 className="w-full py-3 bg-orange-500 hover:bg-orange-600 disabled:opacity-50 text-white font-bold rounded-xl text-xs transition-colors cursor-pointer flex items-center justify-center"
               >
-                {resubmitting ? 'Submitting Revisions...' : 'Resubmit KYC Profile for Review'}
+                {resubmitting ? 'Submitting Revisions...' : 'Submit Documents & Profile for Review'}
               </button>
             </form>
           )}

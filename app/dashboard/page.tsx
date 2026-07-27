@@ -15,7 +15,7 @@ import { downloadReceipt, shareReceipt, type ReceiptData } from '@/lib/downloadR
 // ── TESTING / MIGRATION CONFIGURATION ──────────────────────────
 // Set to true to bypass KYC blocks and mandatory document upload popups (for testing / old accounts migration).
 // Toggle to false for production compliance enforcement.
-const BYPASS_KYC_VERIFICATION = true
+const BYPASS_KYC_VERIFICATION = false
 
 // ── Types ──────────────────────────────────────────────────────
 type Tab = 'donations' | 'ranking' | 'history' | 'events' | 'team'
@@ -1931,7 +1931,7 @@ export default function DashboardPage() {
                                     <button
                                       onClick={() => setBulkVerifyModalCollector(c)}
                                       disabled={bulkVerifyingCollector === c.id}
-                                      className="bg-green-650 hover:bg-green-700 text-white font-medium text-xs px-3 py-2 rounded-lg transition-colors flex items-center gap-1 disabled:opacity-50 cursor-pointer shadow-md"
+                                      className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs px-3.5 py-2 rounded-xl transition-all flex items-center gap-1 disabled:opacity-50 cursor-pointer shadow-md"
                                     >
                                       {bulkVerifyingCollector === c.id ? 'Settling...' : '✓ Settle Handover'}
                                     </button>
@@ -1939,7 +1939,7 @@ export default function DashboardPage() {
                                     <button
                                       onClick={() => settleCollector(c.id, 'cash')}
                                       disabled={bulkVerifyingCollector === c.id}
-                                      className="bg-green-650 hover:bg-green-700 text-white font-medium text-xs px-3 py-2 rounded-lg transition-colors flex items-center gap-1 disabled:opacity-50 cursor-pointer shadow-md"
+                                      className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs px-3.5 py-2 rounded-xl transition-all flex items-center gap-1 disabled:opacity-50 cursor-pointer shadow-md"
                                     >
                                       {bulkVerifyingCollector === c.id ? 'Settling...' : `✓ Verify Cash Handover (${formatAmount(c.pendingCash)})`}
                                     </button>
@@ -1947,7 +1947,7 @@ export default function DashboardPage() {
                                     <button
                                       onClick={() => settleCollector(c.id, 'upi')}
                                       disabled={bulkVerifyingCollector === c.id}
-                                      className="bg-green-650 hover:bg-green-700 text-white font-medium text-xs px-3 py-2 rounded-lg transition-colors flex items-center gap-1 disabled:opacity-50 cursor-pointer shadow-md"
+                                      className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs px-3.5 py-2 rounded-xl transition-all flex items-center gap-1 disabled:opacity-50 cursor-pointer shadow-md"
                                     >
                                       {bulkVerifyingCollector === c.id ? 'Settling...' : `✓ Verify UPI Handover (${formatAmount(c.pendingUpi)})`}
                                     </button>
@@ -1957,7 +1957,7 @@ export default function DashboardPage() {
 
                               <button
                                 onClick={() => setExpandedCollectors(prev => ({ ...prev, [c.id]: !prev[c.id] }))}
-                                className="text-gray-400 hover:text-white p-1 ml-1 cursor-pointer"
+                                className="text-[#7a6a55] dark:text-gray-400 hover:text-[#1A1208] dark:hover:text-white p-1.5 ml-1 cursor-pointer transition-colors"
                               >
                                 <svg
                                   className={`w-4 h-4 transform transition-transform duration-200 ${isExpanded ? 'rotate-180' : ''}`}
@@ -2529,6 +2529,15 @@ export default function DashboardPage() {
             />
           ) : (
             <div className="flex flex-col gap-4">
+              {/* Event Activation Note Banner */}
+              <div className="bg-amber-500/10 border border-amber-500/30 dark:border-amber-500/20 rounded-xl p-3.5 flex items-start gap-3 text-xs text-amber-800 dark:text-amber-300 font-medium leading-relaxed shadow-xs">
+                <span className="text-amber-600 dark:text-amber-400 text-base font-bold shrink-0">📌</span>
+                <div>
+                  <strong className="font-bold text-[#1A1208] dark:text-white block mb-0.5">Important: Event Activation Required</strong>
+                  To accept donations (from collectors or public self-donation links), you <strong>must activate an event</strong>. Click the <strong>⚡ Activate</strong> button on your desired event. Only one event can be live at a time.
+                </div>
+              </div>
+
               <div className="flex items-center justify-between">
                 <p className="text-sm text-[#7a6a55] dark:text-gray-400 font-bold">{events.length} event{events.length !== 1 ? 's' : ''}</p>
                 {CAN.createEvent(userRole) && (
@@ -2537,6 +2546,13 @@ export default function DashboardPage() {
                       if (showEventForm) {
                         cancelEventForm()
                       } else {
+                        setEditingEventId(null)
+                        setEventName('')
+                        setEventYear(new Date().getFullYear().toString())
+                        setEventUpiId(mandalKyc?.upi_id || '')
+                        setEventStartDate('')
+                        setEventEndDate('')
+                        setDateError('')
                         setShowEventForm(true)
                       }
                     }}
@@ -2575,7 +2591,7 @@ export default function DashboardPage() {
                     />
                   </div>
 
-                  {/* UPI ID — required */}
+                  {/* UPI ID — pre-filled from registration & editable */}
                   <div>
                     <label className="text-xs text-[#7a6a55] dark:text-gray-400 mb-1 block font-bold">UPI ID *</label>
                     <input
@@ -2584,7 +2600,18 @@ export default function DashboardPage() {
                       placeholder="e.g. mandal@okaxis"
                       className="w-full bg-white dark:bg-gray-900 border border-[#1A1208]/15 dark:border-gray-700 rounded-lg px-3 py-2.5 text-sm text-[#1A1208] dark:text-white placeholder-[#9e8c76] dark:placeholder-gray-500 font-medium focus:outline-none focus:border-[#E8650A]"
                     />
-                    <p className="text-xs text-[#7a6a55] dark:text-gray-500 mt-1 font-medium">This is used to generate the UPI QR code for donations</p>
+                    <p className="text-xs text-[#7a6a55] dark:text-gray-500 mt-1 font-medium flex items-center justify-between">
+                      <span>Pre-filled from registration. You can edit this for the event.</span>
+                      {mandalKyc?.upi_id && eventUpiId !== mandalKyc.upi_id && (
+                        <button
+                          type="button"
+                          onClick={() => setEventUpiId(mandalKyc.upi_id)}
+                          className="text-[10px] text-[#E8650A] hover:underline font-bold cursor-pointer ml-2"
+                        >
+                          Reset to Org UPI ({mandalKyc.upi_id})
+                        </button>
+                      )}
+                    </p>
                   </div>
 
                   {/* Date row */}
@@ -2697,9 +2724,13 @@ export default function DashboardPage() {
                           {!isExpired && !isSuspended && CAN.toggleEvent(userRole) && (
                             <button
                               onClick={() => toggleEvent(ev.id, ev.is_active)}
-                              className="text-xs text-[#7a6a55] dark:text-gray-400 hover:text-[#1A1208] dark:hover:text-white transition-colors font-bold cursor-pointer"
+                              className={`text-xs font-extrabold rounded-lg transition-all cursor-pointer shadow-sm ${
+                                ev.is_active
+                                  ? 'px-3 py-1.5 bg-gray-100 dark:bg-gray-700/80 hover:bg-rose-50 dark:hover:bg-rose-950/40 text-gray-600 dark:text-gray-300 hover:text-rose-600 dark:hover:text-rose-400 border border-gray-300 dark:border-gray-600'
+                                  : 'px-3.5 py-1.5 bg-gradient-to-r from-[#E8650A] to-[#f97316] hover:from-[#d05807] hover:to-[#ea580c] text-white shadow-md shadow-[#E8650A]/30 border border-orange-500 hover:scale-105 animate-pulse'
+                              }`}
                             >
-                              {ev.is_active ? 'Deactivate' : 'Activate'}
+                              {ev.is_active ? 'Deactivate' : '⚡ Activate Event'}
                             </button>
                           )}
                           {/* Edit only available if not expired and not suspended */}

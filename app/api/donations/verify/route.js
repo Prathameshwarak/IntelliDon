@@ -67,7 +67,7 @@ export async function PATCH(request) {
           created_at,
           mandal_id,
           mandals (
-            id, name, address, city, phone
+            id, name, address, city, phone, doc_logo
           ),
           events (
             id, name, year
@@ -95,6 +95,21 @@ export async function PATCH(request) {
       // Bulk update per-row to generate receipt_data
       try {
         const verified_at = new Date().toISOString()
+
+        // Cache signed logo URL for bulk performance if mandal has a logo
+        let bulkLogoUrl = null
+        const firstMandalLogo = pendingDonations[0]?.mandals?.doc_logo
+        if (firstMandalLogo) {
+          try {
+            const { data: signedData } = await supabaseAdmin.storage
+              .from('kyc-documents')
+              .createSignedUrl(firstMandalLogo, 60 * 60 * 24 * 365)
+            bulkLogoUrl = signedData?.signedUrl || null
+          } catch (e) {
+            console.warn('Bulk logo URL error:', e)
+          }
+        }
+
         const updatePromises = pendingDonations.map(async (donation) => {
           const receiptData = buildReceiptData({
             donation: {
@@ -104,7 +119,8 @@ export async function PATCH(request) {
             },
             mandal: donation.mandals,
             event: donation.events,
-            collectorName: donation.users?.full_name
+            collectorName: donation.users?.full_name,
+            logoUrl: bulkLogoUrl
           })
           const { error } = await supabaseAdmin
             .from('donations')
@@ -157,7 +173,7 @@ export async function PATCH(request) {
         created_at,
         mandal_id,
         mandals (
-          id, name, address, city, phone
+          id, name, address, city, phone, doc_logo
         ),
         events (
           id, name, year
@@ -195,6 +211,18 @@ export async function PATCH(request) {
 
     let receiptData = null
     if (status === 'verified') {
+      let singleLogoUrl = null
+      if (donation.mandals?.doc_logo) {
+        try {
+          const { data: signedData } = await supabaseAdmin.storage
+            .from('kyc-documents')
+            .createSignedUrl(donation.mandals.doc_logo, 60 * 60 * 24 * 365)
+          singleLogoUrl = signedData?.signedUrl || null
+        } catch (e) {
+          console.warn('Single logo URL error:', e)
+        }
+      }
+
       receiptData = buildReceiptData({
         donation: {
           ...donation,
@@ -203,7 +231,8 @@ export async function PATCH(request) {
         },
         mandal: donation.mandals,
         event: donation.events,
-        collectorName: donation.users?.full_name
+        collectorName: donation.users?.full_name,
+        logoUrl: singleLogoUrl
       })
       updateData.receipt_data = receiptData
       updateData.verification_type = verifier.role

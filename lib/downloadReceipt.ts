@@ -6,6 +6,7 @@ export type ReceiptData = {
   mandalName: string
   mandalAddress: string
   mandalPhone: string
+  mandalLogo?: string | null
   eventName: string
   donorName: string
   donorPhone: string

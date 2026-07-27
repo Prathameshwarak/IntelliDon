@@ -57,6 +57,7 @@ export default function RegisterPage() {
 
   // Step 3 — document files
   const [docs, setDocs] = useState<Record<string, File | null>>({
+    doc_logo: null,
     doc_admin_aadhaar: null,
     doc_bank_proof: null,
     doc_auth_letter: null,
@@ -95,8 +96,8 @@ export default function RegisterPage() {
           error = "Mandal contact phone number is required.";
         } else {
           const cleanPhone = value.replace(/[^0-9]/g, "");
-          if (cleanPhone.length < 10) {
-            error = "Please enter a valid 10-digit phone number.";
+          if (cleanPhone.length !== 10) {
+            error = "Mandal contact phone number must be exactly 10 digits.";
           }
         }
         break;
@@ -138,7 +139,10 @@ export default function RegisterPage() {
   };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
-    const { name, value } = e.target;
+    let { name, value } = e.target;
+    if (name === "phone") {
+      value = value.replace(/[^0-9]/g, "").slice(0, 10);
+    }
     setFormData((prev) => ({ ...prev, [name]: value }));
     if (errorMsg) setErrorMsg("");
     validateField(name, value);
@@ -599,6 +603,7 @@ export default function RegisterPage() {
                       onChange={handleChange}
                       onBlur={(e) => validateField("phone", e.target.value)}
                       placeholder="e.g. 9876543210"
+                      maxLength={10}
                       className={`w-full pl-11 pr-4 py-3 bg-white dark:bg-[#0b0f19] border rounded-xl text-[#1A1208] dark:text-white placeholder-[#9e8c76] dark:placeholder-slate-500 focus:outline-none focus:ring-2 transition-all duration-200 ${errors.phone
                           ? "border-rose-500 focus:ring-rose-500/20 focus:border-rose-500"
                           : "border-[#1A1208]/15 dark:border-slate-800 focus:ring-[#E8650A]/20 focus:border-[#E8650A]"
@@ -1033,6 +1038,7 @@ export default function RegisterPage() {
                   </p>
 
                   {[
+                    { key: 'doc_logo', label: 'Organisation Logo', required: false, hint: 'PNG or JPG logo for donation receipt PDF (not considered for approval)' },
                     { key: 'doc_admin_aadhaar', label: 'Admin Aadhaar', required: false, hint: 'Front and back in one file' },
                     { key: 'doc_bank_proof', label: 'Bank Proof', required: false, hint: 'Cancelled cheque or passbook first page' },
                     { key: 'doc_auth_letter', label: 'Authorisation Letter / Committee Resolution', required: false, hint: 'Signed by committee members' },

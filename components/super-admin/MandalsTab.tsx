@@ -30,6 +30,7 @@ type Mandal = {
   admin_phone: string | null
   pincode: string | null
   upi_id: string | null
+  doc_logo: string | null
   doc_reg_cert: string | null
   doc_admin_aadhaar: string | null
   doc_admin_pan: string | null
@@ -65,6 +66,31 @@ function parseKycNotes(rawNotes: string | null): { notes: string; documentStatus
     // Treat as raw text note
   }
   return { notes: rawNotes, documentStatuses: {} }
+}
+
+const ALL_DOC_FIELDS = [
+  { key: 'doc_logo', label: 'Organisation Logo' },
+  { key: 'doc_admin_aadhaar', label: 'Admin Aadhaar' },
+  { key: 'doc_bank_proof', label: 'Bank Proof' },
+  { key: 'doc_auth_letter', label: 'Auth Letter / Resolution' },
+  { key: 'doc_address_proof', label: 'Address Proof' },
+  { key: 'doc_reg_cert', label: 'Registration Certificate' },
+  { key: 'doc_admin_pan', label: 'Admin PAN' },
+  { key: 'doc_org_pan', label: 'Organisation PAN' },
+]
+
+function getUnapprovedUploadedDocs(mandal: Mandal, currentDocStatuses: Record<string, 'approved' | 'rejected' | 'pending'>) {
+  const unapproved: string[] = []
+  for (const doc of ALL_DOC_FIELDS) {
+    const filePath = mandal[doc.key as keyof Mandal]
+    if (filePath && typeof filePath === 'string' && filePath.trim() !== '') {
+      const status = currentDocStatuses[doc.key] || 'pending'
+      if (status !== 'approved') {
+        unapproved.push(doc.label)
+      }
+    }
+  }
+  return unapproved
 }
 
 export default function MandalsTab({ showToast }: MandalsTabProps) {
@@ -135,6 +161,19 @@ export default function MandalsTab({ showToast }: MandalsTabProps) {
       }
       kycNotesPayload = JSON.stringify({
         notes: reason.trim(),
+        documentStatuses: docStatuses[mandalId] || {}
+      })
+    } else if (action === 'approve') {
+      const targetMandal = mandals.find(m => m.id === mandalId)
+      if (targetMandal) {
+        const unapproved = getUnapprovedUploadedDocs(targetMandal, docStatuses[mandalId] || {})
+        if (unapproved.length > 0) {
+          showToast(`Cannot approve organization: All uploaded documents must be approved first. Missing approval for: ${unapproved.join(', ')}`, 'error')
+          return
+        }
+      }
+      kycNotesPayload = JSON.stringify({
+        notes: kycNotes[mandalId] || '',
         documentStatuses: docStatuses[mandalId] || {}
       })
     }
@@ -219,6 +258,17 @@ export default function MandalsTab({ showToast }: MandalsTabProps) {
   }
 
   async function updateKycStatus(mandalId: string, status: 'in_review' | 'approved' | 'rejected') {
+    if (status === 'approved') {
+      const targetMandal = mandals.find(m => m.id === mandalId)
+      if (targetMandal) {
+        const unapproved = getUnapprovedUploadedDocs(targetMandal, docStatuses[mandalId] || {})
+        if (unapproved.length > 0) {
+          showToast(`Cannot approve KYC: All uploaded documents must be approved first. Missing approval for: ${unapproved.join(', ')}`, 'error')
+          return
+        }
+      }
+    }
+
     setKycUpdating(mandalId)
     const payloadNotes = JSON.stringify({
       notes: kycNotes[mandalId] || '',
@@ -580,27 +630,27 @@ export default function MandalsTab({ showToast }: MandalsTabProps) {
                         {/* Document links */}
                         <div className="space-y-1.5 border-t border-[#1A1208]/10 dark:border-gray-800 pt-2.5">
                           {[
-                            { key: 'doc_admin_aadhaar', label: 'Admin Aadhaar', required: true },
-                            { key: 'doc_bank_proof', label: 'Bank Proof', required: true },
-                            { key: 'doc_auth_letter', label: 'Auth Letter / Resolution', required: true },
-                            { key: 'doc_address_proof', label: 'Address Proof', required: true },
-                            { key: 'doc_reg_cert', label: 'Registration Certificate', required: false },
-                            { key: 'doc_admin_pan', label: 'Admin PAN', required: false },
-                            { key: 'doc_org_pan', label: 'Organisation PAN', required: false },
+                            { key: 'doc_logo', label: 'Organisation Logo (Receipt)' },
+                            { key: 'doc_admin_aadhaar', label: 'Admin Aadhaar' },
+                            { key: 'doc_bank_proof', label: 'Bank Proof' },
+                            { key: 'doc_auth_letter', label: 'Auth Letter / Resolution' },
+                            { key: 'doc_address_proof', label: 'Address Proof' },
+                            { key: 'doc_reg_cert', label: 'Registration Certificate' },
+                            { key: 'doc_admin_pan', label: 'Admin PAN' },
+                            { key: 'doc_org_pan', label: 'Organisation PAN' },
                           ].map(doc => {
                             const path = mandal[doc.key as keyof Mandal] as string | null
                             const docStatus = docStatuses[mandal.id]?.[doc.key] || 'pending'
-                            const isMissingOptional = !doc.required && !path
+                            const isNotAttached = !path
 
                             return (
                               <div key={doc.key} className="flex items-center justify-between text-[11px]">
-                                <span className={`${doc.required ? 'text-[#1A1208] dark:text-gray-300 font-bold' : 'text-[#7a6a55] dark:text-gray-500'}`}>
+                                <span className="text-[#1A1208] dark:text-gray-300 font-medium">
                                   {doc.label}
-                                  {doc.required && <span className="text-rose-500 ml-0.5">*</span>}
                                 </span>
                                 
                                 <div className="flex items-center gap-2">
-                                  {isMissingOptional ? (
+                                  {isNotAttached ? (
                                     <span className="text-[#7a6a55] dark:text-gray-500 text-[10px] italic pr-1 select-none font-medium">Not Attached</span>
                                   ) : (
                                     <>
@@ -702,14 +752,16 @@ export default function MandalsTab({ showToast }: MandalsTabProps) {
                             </button>
                             <button
                               onClick={() => updateKycStatus(mandal.id, 'approved')}
-                              disabled={kycUpdating === mandal.id || mandal.kyc_status === 'approved'}
+                              disabled={kycUpdating === mandal.id || mandal.kyc_status === 'approved' || mandal.kyc_status === 'rejected'}
+                              title={mandal.kyc_status === 'rejected' ? 'Rejected orgs must be moved to Pending/In Review before approval' : undefined}
                               className="flex-1 py-2 text-[10px] font-bold rounded-lg border border-emerald-500/30 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/20 disabled:opacity-40 transition-colors cursor-pointer"
                             >
                               Approve KYC
                             </button>
                             <button
                               onClick={() => updateKycStatus(mandal.id, 'rejected')}
-                              disabled={kycUpdating === mandal.id || mandal.kyc_status === 'rejected'}
+                              disabled={kycUpdating === mandal.id || mandal.kyc_status === 'rejected' || mandal.status === 'active'}
+                              title={mandal.status === 'active' ? 'Active organizations cannot be rejected directly. Suspend instead.' : undefined}
                               className="flex-1 py-2 text-[10px] font-bold rounded-lg border border-rose-500/30 bg-rose-500/10 text-rose-600 dark:text-rose-455 hover:bg-rose-500/20 disabled:opacity-40 transition-colors cursor-pointer"
                             >
                               Reject KYC
@@ -730,7 +782,7 @@ export default function MandalsTab({ showToast }: MandalsTabProps) {
                         onClick={() => handleAction(mandal.id, 'approve')} 
                         disabled={isActing || mandal.kyc_status === 'rejected'} 
                         className="flex-1 py-2 px-3 bg-gradient-to-r from-[#E8650A] to-[#f97316] hover:from-[#d05807] hover:to-[#ea580c] disabled:opacity-50 text-white text-xs font-bold rounded-xl transition-all cursor-pointer flex items-center justify-center space-x-1 shadow-md shadow-[#E8650A]/20"
-                        title={mandal.kyc_status === 'rejected' ? 'Cannot approve until resubmitted' : undefined}
+                        title={mandal.kyc_status === 'rejected' ? 'Cannot approve until moved to Pending / In Review' : undefined}
                       >
                         {isActing ? <span>Processing...</span> : <span>Approve Mandal</span>}
                       </button>
@@ -746,8 +798,17 @@ export default function MandalsTab({ showToast }: MandalsTabProps) {
                   )}
 
                   {activeTab === 'rejected' && (
-                    <div className="flex-1 text-center py-2 bg-rose-50 dark:bg-rose-950/30 border border-rose-200 dark:border-rose-900/40 text-rose-700 dark:text-rose-400 text-xs font-bold rounded-xl select-none">
-                      🔒 Awaiting Resubmission (Cannot Approve)
+                    <div className="flex-1 flex gap-2">
+                      <div className="flex-1 text-center py-2 bg-rose-50 dark:bg-rose-950/30 border border-rose-200 dark:border-rose-900/40 text-rose-700 dark:text-rose-400 text-xs font-bold rounded-xl select-none">
+                        🔒 Rejected (Cannot Approve Directly)
+                      </div>
+                      <button
+                        onClick={() => updateKycStatus(mandal.id, 'in_review')}
+                        disabled={kycUpdating === mandal.id}
+                        className="py-2 px-3 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-xl transition-all cursor-pointer shadow-md shadow-blue-500/20"
+                      >
+                        Move to In Review
+                      </button>
                     </div>
                   )}
 
