@@ -55,6 +55,16 @@ export default function LoginPage() {
     return true;
   };
 
+  const getOrCreateDeviceId = () => {
+    if (typeof window === "undefined") return "browser-device";
+    let id = localStorage.getItem("device_mac_id");
+    if (!id) {
+      id = "mac-" + Math.random().toString(36).substring(2, 11) + "-" + Date.now().toString(36);
+      localStorage.setItem("device_mac_id", id);
+    }
+    return id;
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -71,96 +81,43 @@ export default function LoginPage() {
     setErrorMsg("");
 
     try {
-      // 1. Sign in with Supabase auth
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email,
-        password,
+      // 1. Authenticate via our custom backend API with IP + Device/MAC headers
+      const response = await fetch("/api/auth/login", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-device-id": getOrCreateDeviceId(),
+          "x-mac-address": getOrCreateDeviceId(),
+        },
+        body: JSON.stringify({
+          email: email.trim(),
+          password,
+        }),
       });
 
-      if (error) {
-        throw error;
+      const data = await response.json();
+
+      if (!response.ok || !data.success) {
+        throw new Error(data.error || "Invalid email or password.");
       }
 
-      if (!data.user) {
-        throw new Error("Could not log in. User details are missing.");
+      if (!data.session || !data.user) {
+        throw new Error("Could not log in. Session details missing.");
       }
 
-      // 2. Fetch corresponding user profile & mandal details
-      let userProfile: any = null;
-      let profileError: any = null;
+      // 2. Synchronize authenticated session in client-side Supabase instance
+      const { error: sessionError } = await supabase.auth.setSession({
+        access_token: data.session.access_token,
+        refresh_token: data.session.refresh_token,
+      });
 
-      for (let attempt = 1; attempt <= 3; attempt++) {
-        const { data: profile, error } = await supabase
-          .from("users")
-          .select(`
-            full_name,
-            role,
-            is_active,
-            mandals!users_mandal_id_fkey (
-              name
-            )
-          `)
-          .eq("id", data.user.id)
-          .single();
-
-        if (profile) {
-          userProfile = profile;
-          profileError = null;
-          break;
-        }
-
-        profileError = error;
-
-        // Fallback if is_active column does not exist
-        if (error && error.message.includes("is_active")) {
-          const { data: fallbackProfile, error: fallbackError } = await supabase
-            .from("users")
-            .select(`
-              full_name,
-              role,
-              mandals!users_mandal_id_fkey (
-                name
-              )
-            `)
-            .eq("id", data.user.id)
-            .single();
-
-          if (fallbackProfile) {
-            userProfile = {
-              ...fallbackProfile,
-              is_active: true
-            };
-            profileError = null;
-            break;
-          }
-          profileError = fallbackError;
-        }
-
-        if (attempt < 3) {
-          await new Promise((resolve) => setTimeout(resolve, 250));
-        }
+      if (sessionError) {
+        console.warn("Set session error:", sessionError.message);
       }
 
-      let userRole = "";
-      if (!profileError && userProfile) {
-        // Check if account is deactivated
-        if (userProfile.is_active === false) {
-          await supabase.auth.signOut();
-          setErrorMsg("Your account has been deactivated. Please contact your Adhyaksha.");
-          setLoading(false);
-          return;
-        }
-
-        setAdminName(userProfile.full_name || "");
-        userRole = userProfile.role || "";
-        const mandalsData = userProfile.mandals as unknown as { name: string }[] | { name: string } | null;
-        if (mandalsData) {
-          const mandalObj = Array.isArray(mandalsData) ? mandalsData[0] : mandalsData;
-          if (mandalObj) {
-            setMandalName(mandalObj.name || "");
-          }
-        }
-      }
+      const userRole = data.profile?.role || "";
+      setAdminName(data.profile?.full_name || "");
+      setMandalName(data.profile?.mandal_name || "");
 
       localStorage.setItem("remember_me", rememberMe ? "true" : "false");
       localStorage.setItem("login_time", Date.now().toString());

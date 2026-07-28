@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js'
 import { NextResponse } from 'next/server'
+import { isOTPVerified } from '@/lib/otp-store'
 
 // Use the SERVICE ROLE key to bypass Row Level Security (RLS) on administrative tasks
 const supabaseAdmin = createClient(
@@ -340,11 +341,14 @@ export async function POST(request: Request) {
       name,
       address,
       city,
+      state = 'Maharashtra',
       pincode,
       phone,
+      orgEmail,
       upiId,
       adminName,
       adminEmail,
+      adminPhone,
       adminPassword,
       autoApprove
     } = body
@@ -357,11 +361,41 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Password must be at least 8 characters' }, { status: 400 })
     }
 
+    const cleanPhone = phone.replace(/[^0-9]/g, '')
+    const cleanAdminPhone = (adminPhone || phone).replace(/[^0-9]/g, '')
+
+    if (cleanPhone.length !== 10 || cleanAdminPhone.length !== 10) {
+      return NextResponse.json({ error: 'Phone numbers must be valid 10-digit numbers.' }, { status: 400 })
+    }
+
+    const cleanOrgEmail = orgEmail ? orgEmail.trim().toLowerCase() : ''
+    const cleanAdminEmail = adminEmail ? adminEmail.trim().toLowerCase() : ''
+
+    // Server-Side OTP Verification Check
+    if (cleanOrgEmail && !isOTPVerified(cleanOrgEmail)) {
+      return NextResponse.json({ error: 'Security Exception: Organization email has not been verified via OTP.' }, { status: 403 })
+    }
+
+    if (!cleanAdminEmail || !isOTPVerified(cleanAdminEmail)) {
+      return NextResponse.json({ error: 'Security Exception: Admin email has not been verified via OTP.' }, { status: 403 })
+    }
+
     // Check if email already registered
     const { data: existingAuth } = await supabaseAdmin.auth.admin.listUsers()
-    const emailTaken = existingAuth?.users?.some(u => u.email === adminEmail)
+    const emailTaken = existingAuth?.users?.some(u => u.email?.toLowerCase() === cleanAdminEmail)
     if (emailTaken) {
-      return NextResponse.json({ error: 'This email is already registered' }, { status: 409 })
+      return NextResponse.json({ error: 'This admin email is already registered' }, { status: 409 })
+    }
+
+    // Check if phone numbers already registered
+    const { data: existingPhones } = await supabaseAdmin
+      .from('mandals')
+      .select('id')
+      .or(`phone.eq.${cleanPhone},admin_phone.eq.${cleanPhone},phone.eq.${cleanAdminPhone},admin_phone.eq.${cleanAdminPhone}`)
+      .limit(1)
+
+    if (existingPhones && existingPhones.length > 0) {
+      return NextResponse.json({ error: 'A Mandal or Admin is already registered with this phone number.' }, { status: 409 })
     }
 
     // Generate slug
@@ -383,13 +417,14 @@ export async function POST(request: Request) {
         org_type: 'mandal',
         address,
         city,
-        state: 'Maharashtra',
+        state: state || 'Maharashtra',
         pincode,
-        phone,
+        phone: cleanPhone,
+        org_email: cleanOrgEmail || null,
         upi_id: upiId || null,
         admin_full_name: adminName,
-        admin_email: adminEmail,
-        admin_phone: phone,
+        admin_email: cleanAdminEmail,
+        admin_phone: cleanAdminPhone,
         status: mandalStatus,
         kyc_status: kycStatus,
         submitted_at: new Date().toISOString()

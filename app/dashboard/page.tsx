@@ -544,11 +544,19 @@ export default function DashboardPage() {
 
     setChangingPassword(true)
     try {
-      const { error } = await supabase.auth.updateUser({
-        password: newPassword,
-        data: { requires_password_change: false }
+      const { data: { session } } = await supabase.auth.getSession()
+      const token = session?.access_token
+
+      const res = await fetch('/api/auth/update-password', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {})
+        },
+        body: JSON.stringify({ password: newPassword })
       })
-      if (error) throw error
+      const data = await res.json()
+      if (!res.ok || data.error) throw new Error(data.error || 'Could not update password')
 
       showToast('Password changed successfully!', 'success')
       setRequiresPasswordChange(false)
@@ -581,24 +589,20 @@ export default function DashboardPage() {
 
       for (const [field, file] of Object.entries(kycFiles)) {
         if (!file) continue
-        const ext = file.name.split('.').pop() || 'pdf'
-        const path = `${mandalId}/${field}.${ext}`
+        const formData = new FormData()
+        formData.append('file', file)
+        formData.append('documentKey', field)
+        if (mandalId) formData.append('mandalId', mandalId)
 
-        const { error: uploadError } = await supabase.storage
-          .from('kyc-documents')
-          .upload(path, file, { upsert: true })
+        const res = await fetch('/api/storage/upload', {
+          method: 'POST',
+          body: formData
+        })
+        const data = await res.json()
+        if (!res.ok || data.error) throw new Error(`Failed to upload ${file.name}: ${data.error}`)
 
-        if (uploadError) throw new Error(`Failed to upload ${file.name}: ${uploadError.message}`)
-
-        updates[field] = path
+        updates[field] = data.path
       }
-
-      const { error: dbError } = await supabase
-        .from('mandals')
-        .update(updates)
-        .eq('id', mandalId)
-
-      if (dbError) throw dbError
 
       showToast('KYC Documents uploaded successfully!', 'success')
       setMandalKyc((prev: any) => prev ? { ...prev, ...updates } : prev)
@@ -611,40 +615,42 @@ export default function DashboardPage() {
 
   async function initDashboard() {
     setLoading(true)
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) { router.push('/login'); return }
+    const { data: { session } } = await supabase.auth.getSession()
+    const token = session?.access_token
+    if (!token) { router.push('/login'); return }
 
-    const { data: userRow } = await supabase
-      .from('users')
-      .select('role, mandal_id')
-      .eq('id', user.id)
-      .single()
+    try {
+      const res = await fetch('/api/auth/me', {
+        headers: { Authorization: `Bearer ${token}` }
+      })
+      const meData = await res.json()
+      if (!res.ok || meData.error || !meData.user || !meData.profile) {
+        router.push('/login')
+        return
+      }
 
-    // Only admin and manager reach this page
-    if (!userRow || !['admin', 'manager'].includes(userRow.role)) {
-      if (userRow?.role === 'collector') router.push('/collect')
-      else if (userRow?.role === 'super_admin') router.push('/super-admin')
-      else router.push('/login')
-      return
+      const role = meData.profile.role
+      if (!['admin', 'manager'].includes(role)) {
+        if (role === 'collector') router.push('/collect')
+        else if (role === 'super_admin') router.push('/super-admin')
+        else router.push('/login')
+        return
+      }
+
+      setUserId(meData.user.id)
+      setUserRole(role)
+      setMandalId(meData.profile.mandal_id)
+      setMandalName(meData.mandal?.name || '')
+      setMandalKyc(meData.mandal)
+
+      if (meData.user.user_metadata?.requires_password_change) {
+        setRequiresPasswordChange(true)
+      }
+    } catch (e) {
+      router.push('/login')
+    } finally {
+      setLoading(false)
     }
-
-    const { data: mandal } = await supabase
-      .from('mandals')
-      .select('*')
-      .eq('id', userRow.mandal_id)
-      .single()
-
-    setUserId(user.id)
-    setUserRole(userRow.role)
-    setMandalId(userRow.mandal_id)
-    setMandalName(mandal?.name || '')
-    setMandalKyc(mandal)
-
-    if (user.user_metadata?.requires_password_change) {
-      setRequiresPasswordChange(true)
-    }
-
-    setLoading(false)
   }
 
   // ── Auth guard ────────────────────────────────────────────────

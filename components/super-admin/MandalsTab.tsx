@@ -222,10 +222,17 @@ export default function MandalsTab({ showToast }: MandalsTabProps) {
   }
 
   async function getSignedUrl(path: string): Promise<string> {
-    const { data } = await supabase.storage
-      .from('kyc-documents')
-      .createSignedUrl(path, 60 * 60) // 1 hour
-    return data?.signedUrl || ''
+    try {
+      const res = await fetch('/api/storage/signed-url', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ path, bucket: 'kyc-documents' })
+      })
+      const data = await res.json()
+      return data.signedUrl || ''
+    } catch (e) {
+      return ''
+    }
   }
 
   async function handleViewDoc(mandalId: string, docKey: string, docLabel: string, path: string | null) {

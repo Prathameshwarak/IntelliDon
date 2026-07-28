@@ -53,6 +53,7 @@ export default function RegisterPage() {
   const [formData, setFormData] = useState({
     name: "",
     phone: "",
+    orgEmail: "",
     address: "",
     city: "",
     adminName: "",
@@ -61,8 +62,159 @@ export default function RegisterPage() {
     confirmPassword: "",
   });
 
+  // OTP State for Organization Mail
+  const [orgOtpSent, setOrgOtpSent] = useState(false);
+  const [orgOtpCode, setOrgOtpCode] = useState("");
+  const [orgEmailVerified, setOrgEmailVerified] = useState(false);
+  const [orgOtpLoading, setOrgOtpLoading] = useState(false);
+  const [orgOtpTimer, setOrgOtpTimer] = useState(0);
+  const [orgCooldownTimer, setOrgCooldownTimer] = useState(0);
+  const [orgOtpError, setOrgOtpError] = useState("");
+  const [orgOtpSuccessMsg, setOrgOtpSuccessMsg] = useState("");
+
+  // OTP State for Admin Mail
+  const [adminOtpSent, setAdminOtpSent] = useState(false);
+  const [adminOtpCode, setAdminOtpCode] = useState("");
+  const [adminEmailVerified, setAdminEmailVerified] = useState(false);
+  const [adminOtpLoading, setAdminOtpLoading] = useState(false);
+  const [adminOtpTimer, setAdminOtpTimer] = useState(0);
+  const [adminCooldownTimer, setAdminCooldownTimer] = useState(0);
+  const [adminOtpError, setAdminOtpError] = useState("");
+  const [adminOtpSuccessMsg, setAdminOtpSuccessMsg] = useState("");
+  const [allowAdminEmailEdit, setAllowAdminEmailEdit] = useState(false);
+
   // Validation States
   const [errors, setErrors] = useState<Record<string, string>>({});
+
+  // Countdown timers for OTP expiration (5 mins)
+  useEffect(() => {
+    if (orgOtpTimer > 0) {
+      const timer = setInterval(() => setOrgOtpTimer((t) => t - 1), 1000);
+      return () => clearInterval(timer);
+    }
+  }, [orgOtpTimer]);
+
+  useEffect(() => {
+    if (adminOtpTimer > 0) {
+      const timer = setInterval(() => setAdminOtpTimer((t) => t - 1), 1000);
+      return () => clearInterval(timer);
+    }
+  }, [adminOtpTimer]);
+
+  // Countdown timers for Resend Cooldown (60s)
+  useEffect(() => {
+    if (orgCooldownTimer > 0) {
+      const timer = setInterval(() => setOrgCooldownTimer((t) => t - 1), 1000);
+      return () => clearInterval(timer);
+    }
+  }, [orgCooldownTimer]);
+
+  useEffect(() => {
+    if (adminCooldownTimer > 0) {
+      const timer = setInterval(() => setAdminCooldownTimer((t) => t - 1), 1000);
+      return () => clearInterval(timer);
+    }
+  }, [adminCooldownTimer]);
+
+  const handleSendOtp = async (target: "org" | "admin") => {
+    const isOrg = target === "org";
+    const email = isOrg ? formData.orgEmail : formData.adminEmail;
+    const cooldownTimer = isOrg ? orgCooldownTimer : adminCooldownTimer;
+    const setLoading = isOrg ? setOrgOtpLoading : setAdminOtpLoading;
+    const setError = isOrg ? setOrgOtpError : setAdminOtpError;
+    const setSuccess = isOrg ? setOrgOtpSuccessMsg : setAdminOtpSuccessMsg;
+    const setSent = isOrg ? setOrgOtpSent : setAdminOtpSent;
+    const setTimer = isOrg ? setOrgOtpTimer : setAdminOtpTimer;
+    const setCooldown = isOrg ? setOrgCooldownTimer : setAdminCooldownTimer;
+
+    if (cooldownTimer > 0) {
+      setError(`Please wait ${cooldownTimer}s before requesting a new OTP.`);
+      return;
+    }
+
+    setError("");
+    setSuccess("");
+
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    const fieldName = isOrg ? "orgEmail" : "adminEmail";
+
+    if (!email || !emailRegex.test(email.trim())) {
+      const err = "Please enter a valid email address first.";
+      setError(err);
+      setErrors((prev) => ({ ...prev, [fieldName]: err }));
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const res = await fetch("/api/send-otp", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: email.trim() }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        if (data.remainingSec) {
+          setCooldown(data.remainingSec);
+        }
+        const msg = data.error || "Failed to send OTP.";
+        setErrors((prev) => ({ ...prev, [fieldName]: msg }));
+        setError(msg);
+        setErrorMsg(msg);
+        return;
+      }
+      setErrors((prev) => ({ ...prev, [fieldName]: "" }));
+      if (errorMsg) setErrorMsg("");
+      setSent(true);
+      setTimer(300); // 5 minutes validity
+      setCooldown(120); // 2 minutes (120s) cooling period
+      setSuccess("Verification code sent to your email!");
+    } catch (err: any) {
+      const msg = err.message || "Could not send OTP code.";
+      setErrors((prev) => ({ ...prev, [fieldName]: msg }));
+      setError(msg);
+      setErrorMsg(msg);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleVerifyOtp = async (target: "org" | "admin") => {
+    const isOrg = target === "org";
+    const email = isOrg ? formData.orgEmail : formData.adminEmail;
+    const code = isOrg ? orgOtpCode : adminOtpCode;
+    const setLoading = isOrg ? setOrgOtpLoading : setAdminOtpLoading;
+    const setError = isOrg ? setOrgOtpError : setAdminOtpError;
+    const setSuccess = isOrg ? setOrgOtpSuccessMsg : setAdminOtpSuccessMsg;
+    const setVerified = isOrg ? setOrgEmailVerified : setAdminEmailVerified;
+
+    setError("");
+    setSuccess("");
+
+    if (!code || code.length !== 6) {
+      setError("Please enter the 6-digit verification code.");
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const res = await fetch("/api/verify-otp", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: email.trim(), otp: code.trim() }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        throw new Error(data.error || "Invalid OTP code.");
+      }
+      setVerified(true);
+      setSuccess("Email address verified successfully!");
+    } catch (err: any) {
+      setError(err.message || "OTP verification failed.");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   // Real-time Field Validator
   const validateField = (name: string, value: string) => {
@@ -80,6 +232,16 @@ export default function RegisterPage() {
           const cleanPhone = value.replace(/[^0-9]/g, "");
           if (cleanPhone.length !== 10) {
             error = "Mandal contact phone number must be exactly 10 digits.";
+          }
+        }
+        break;
+      case "orgEmail":
+        if (!value.trim()) {
+          error = "Organization Email is required.";
+        } else {
+          const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+          if (!emailRegex.test(value)) {
+            error = "Please enter a valid email address.";
           }
         }
         break;
@@ -120,29 +282,94 @@ export default function RegisterPage() {
     return !error;
   };
 
+  // Auto-verify Admin Email if it matches Organization Email and Org Email is already verified
+  useEffect(() => {
+    if (allowAdminEmailEdit) return;
+    const org = formData.orgEmail.trim().toLowerCase();
+    const admin = formData.adminEmail.trim().toLowerCase();
+    if (org && admin && org === admin && orgEmailVerified) {
+      if (!adminEmailVerified) {
+        setAdminEmailVerified(true);
+        setAdminOtpError("");
+        setAdminOtpSuccessMsg("Same email address as Organization Email (Verified)");
+      }
+    }
+  }, [formData.orgEmail, formData.adminEmail, orgEmailVerified, adminEmailVerified, allowAdminEmailEdit]);
+
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     let { name, value } = e.target;
     if (name === "phone") {
       value = value.replace(/[^0-9]/g, "").slice(0, 10);
+    }
+    if (name === "orgEmail" && orgEmailVerified) {
+      setOrgEmailVerified(false);
+      setOrgOtpSent(false);
+    }
+    if (name === "adminEmail") {
+      if (allowAdminEmailEdit) {
+        setAllowAdminEmailEdit(false);
+      }
+      if (adminEmailVerified) {
+        const org = formData.orgEmail.trim().toLowerCase();
+        const newAdmin = value.trim().toLowerCase();
+        if (!org || org !== newAdmin || !orgEmailVerified) {
+          setAdminEmailVerified(false);
+          setAdminOtpSent(false);
+        }
+      }
     }
     setFormData((prev) => ({ ...prev, [name]: value }));
     if (errorMsg) setErrorMsg("");
     validateField(name, value);
   };
 
-  const handleNext = () => {
-    const isNameValid = validateField("name", formData.name);
-    const isPhoneValid = validateField("phone", formData.phone);
-
-    if (isNameValid && isPhoneValid) {
-      setErrorMsg("");
-      setStep(2);
-    } else {
-      setErrorMsg("Please correct the errors before proceeding.");
+  const checkPhoneExists = async (phone: string): Promise<boolean> => {
+    const clean = phone.replace(/[^0-9]/g, "");
+    if (clean.length !== 10) return false;
+    try {
+      const res = await fetch("/api/check-phone", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ phone: clean }),
+      });
+      const data = await res.json();
+      return data.exists === true;
+    } catch (e) {
+      return false;
     }
   };
 
-  const handleNext2 = () => {
+  const handleNext = async () => {
+    const isNameValid = validateField("name", formData.name);
+    const isPhoneValid = validateField("phone", formData.phone);
+    const isOrgEmailValid = validateField("orgEmail", formData.orgEmail);
+
+    if (!isNameValid || !isPhoneValid || !isOrgEmailValid) {
+      setErrorMsg("Please correct the errors before proceeding.");
+      return;
+    }
+
+    if (!orgEmailVerified) {
+      setErrorMsg("Please verify your Organization Email address with OTP before proceeding.");
+      return;
+    }
+
+    setLoading(true);
+    const phoneTaken = await checkPhoneExists(formData.phone);
+    setLoading(false);
+
+    if (phoneTaken) {
+      const msg = "This Mandal contact phone number is already registered.";
+      setErrors((prev) => ({ ...prev, phone: msg }));
+      setErrorMsg(msg);
+      return;
+    }
+
+    setErrorMsg("");
+    setStep(2);
+  };
+
+  const handleNext2 = async () => {
     const isAdminNameValid = validateField("adminName", formData.adminName);
     const isAdminEmailValid = validateField("adminEmail", formData.adminEmail);
     const isAdminPasswordValid = validateField("adminPassword", formData.adminPassword);
@@ -154,12 +381,29 @@ export default function RegisterPage() {
       isPhoneValid = false;
     }
 
-    if (isAdminNameValid && isAdminEmailValid && isAdminPasswordValid && isConfirmPasswordValid && isPhoneValid) {
-      setErrorMsg("");
-      setStep(3);
-    } else {
+    if (!isAdminNameValid || !isAdminEmailValid || !isAdminPasswordValid || !isConfirmPasswordValid || !isPhoneValid) {
       setErrorMsg("Please fix all errors in step 2 before proceeding.");
+      return;
     }
+
+    if (!adminEmailVerified) {
+      setErrorMsg("Please verify your Admin Email address with OTP before proceeding.");
+      return;
+    }
+
+    setLoading(true);
+    const adminPhoneTaken = await checkPhoneExists(adminPhone);
+    setLoading(false);
+
+    if (adminPhoneTaken) {
+      const msg = "This Admin mobile number is already registered.";
+      setErrors((prev) => ({ ...prev, adminPhone: msg }));
+      setErrorMsg(msg);
+      return;
+    }
+
+    setErrorMsg("");
+    setStep(3);
   };
 
   const handleBack = () => {
@@ -174,6 +418,12 @@ export default function RegisterPage() {
     setErrorMsg("");
 
     try {
+      if (!orgEmailVerified || !adminEmailVerified) {
+        setErrorMsg('Both Organization Email and Admin Email must be verified via OTP to submit registration.');
+        setLoading(false);
+        return;
+      }
+
       if (!pincode.trim() || pincode.length < 6) {
         setErrorMsg('Please enter a valid 6-digit pincode.');
         setLoading(false);
@@ -191,6 +441,7 @@ export default function RegisterPage() {
       const fd = new FormData();
       fd.append('name', formData.name);
       fd.append('phone', formData.phone);
+      fd.append('org_email', formData.orgEmail);
       fd.append('address', formData.address || '');
       fd.append('city', formData.city || '');
       fd.append('state', state);
@@ -583,7 +834,15 @@ export default function RegisterPage() {
                       name="phone"
                       value={formData.phone}
                       onChange={handleChange}
-                      onBlur={(e) => validateField("phone", e.target.value)}
+                      onBlur={async (e) => {
+                        validateField("phone", e.target.value);
+                        if (e.target.value.length === 10) {
+                          const taken = await checkPhoneExists(e.target.value);
+                          if (taken) {
+                            setErrors((prev) => ({ ...prev, phone: "This phone number is already registered." }));
+                          }
+                        }
+                      }}
                       placeholder="e.g. 9876543210"
                       maxLength={10}
                       className={`w-full pl-11 pr-4 py-3 bg-white dark:bg-[#0b0f19] border rounded-xl text-[#1A1208] dark:text-white placeholder-[#9e8c76] dark:placeholder-slate-500 focus:outline-none focus:ring-2 transition-all duration-200 ${errors.phone
@@ -600,6 +859,126 @@ export default function RegisterPage() {
                       </svg>
                       <span>{errors.phone}</span>
                     </p>
+                  )}
+                </div>
+
+                {/* Organization Email with OTP verification */}
+                <div className="space-y-1.5">
+                  <label htmlFor="orgEmail" className="text-xs font-bold text-[#1A1208] dark:text-slate-300 uppercase tracking-wider">
+                    Organization Email Address *
+                  </label>
+                  <div className="relative flex items-center gap-2">
+                    <div className="relative flex-1">
+                      <span className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-[#7a6a55] dark:text-slate-400">
+                        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                        </svg>
+                      </span>
+                      <input
+                        type="email"
+                        id="orgEmail"
+                        name="orgEmail"
+                        value={formData.orgEmail}
+                        onChange={handleChange}
+                        onBlur={(e) => validateField("orgEmail", e.target.value)}
+                        placeholder="contact@mandalname.org"
+                        className={`w-full pl-11 pr-4 py-3 bg-white dark:bg-[#0b0f19] border rounded-xl text-[#1A1208] dark:text-white placeholder-[#9e8c76] dark:placeholder-slate-500 focus:outline-none focus:ring-2 transition-all duration-200 ${
+                          orgEmailVerified
+                            ? "border-emerald-500 bg-emerald-500/5 dark:bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 font-semibold"
+                            : errors.orgEmail
+                            ? "border-rose-500 focus:ring-rose-500/20 focus:border-rose-500"
+                            : "border-[#1A1208]/15 dark:border-slate-800 focus:ring-[#E8650A]/20 focus:border-[#E8650A]"
+                        }`}
+                        required
+                      />
+                    </div>
+
+                    {orgEmailVerified ? (
+                      <span className="inline-flex items-center gap-1.5 px-3.5 py-3 rounded-xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-600 dark:text-emerald-400 text-xs font-bold whitespace-nowrap">
+                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                        </svg>
+                        Verified
+                      </span>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => handleSendOtp("org")}
+                        disabled={orgOtpLoading || !formData.orgEmail.trim() || orgCooldownTimer > 0}
+                        className="px-4 py-3 bg-[#E8650A] hover:bg-[#d05807] disabled:opacity-50 text-white font-bold text-xs rounded-xl shadow-md transition-all duration-200 whitespace-nowrap cursor-pointer flex items-center gap-1.5"
+                      >
+                        {orgOtpLoading ? (
+                          <>
+                            <svg className="animate-spin h-3.5 w-3.5 text-white" fill="none" viewBox="0 0 24 24">
+                              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 11-8-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                            </svg>
+                            <span>Sending...</span>
+                          </>
+                        ) : orgCooldownTimer > 0 ? (
+                          <span>
+                            Resend in {orgCooldownTimer >= 60 ? `${Math.floor(orgCooldownTimer / 60)}m ${orgCooldownTimer % 60}s` : `${orgCooldownTimer}s`}
+                          </span>
+                        ) : orgOtpSent ? (
+                          <span>Resend OTP</span>
+                        ) : (
+                          <span>Send OTP</span>
+                        )}
+                      </button>
+                    )}
+                  </div>
+
+                  {errors.orgEmail && (
+                    <p className="text-xs text-rose-600 dark:text-rose-400 mt-1 font-medium flex items-center space-x-1">
+                      <svg className="w-3.5 h-3.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                        <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                      </svg>
+                      <span>{errors.orgEmail}</span>
+                    </p>
+                  )}
+
+                  {/* OTP Entry Card for Organization Email */}
+                  {orgOtpSent && !orgEmailVerified && (
+                    <div className="mt-2.5 p-4 bg-[#F5EDE2] dark:bg-slate-900/90 border border-[#E8650A]/30 rounded-xl space-y-3 animate-fade-in-up">
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="font-semibold text-[#1A1208] dark:text-slate-200">
+                          Enter 6-digit OTP sent to email
+                        </span>
+                        <span className="font-mono text-[#E8650A] font-bold">
+                          ⏱ {Math.floor(orgOtpTimer / 60)}:{(orgOtpTimer % 60).toString().padStart(2, "0")}
+                        </span>
+                      </div>
+
+                      <div className="flex gap-2">
+                        <input
+                          type="text"
+                          maxLength={6}
+                          value={orgOtpCode}
+                          onChange={(e) => setOrgOtpCode(e.target.value.replace(/[^0-9]/g, ""))}
+                          placeholder="6-digit OTP"
+                          className="flex-1 px-3 py-2.5 bg-white dark:bg-[#0b0f19] border border-[#1A1208]/15 dark:border-slate-700 rounded-xl text-center tracking-widest font-mono text-base font-bold text-[#1A1208] dark:text-white focus:outline-none focus:border-[#E8650A]"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => handleVerifyOtp("org")}
+                          disabled={orgOtpLoading || orgOtpCode.length !== 6}
+                          className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white text-xs font-bold rounded-xl transition-all cursor-pointer flex items-center justify-center gap-1.5 shadow-md"
+                        >
+                          {orgOtpLoading ? "Verifying..." : "Verify OTP"}
+                        </button>
+                      </div>
+
+                      {orgOtpError && (
+                        <p className="text-xs text-rose-600 dark:text-rose-400 font-medium">
+                          ⚠️ {orgOtpError}
+                        </p>
+                      )}
+                      {orgOtpSuccessMsg && (
+                        <p className="text-xs text-emerald-600 dark:text-emerald-400 font-medium">
+                          ✓ {orgOtpSuccessMsg}
+                        </p>
+                      )}
+                    </div>
                   )}
                 </div>
 
@@ -704,32 +1083,91 @@ export default function RegisterPage() {
                   )}
                 </div>
 
-                {/* Admin Email */}
+                {/* Admin Email with OTP verification */}
                 <div className="space-y-1.5">
                   <label htmlFor="adminEmail" className="text-xs font-bold text-[#1A1208] dark:text-slate-300 uppercase tracking-wider">
                     Admin Email Address *
                   </label>
-                  <div className="relative">
-                    <span className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-[#7a6a55] dark:text-slate-400">
-                      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-                      </svg>
-                    </span>
-                    <input
-                      type="email"
-                      id="adminEmail"
-                      name="adminEmail"
-                      value={formData.adminEmail}
-                      onChange={handleChange}
-                      onBlur={(e) => validateField("adminEmail", e.target.value)}
-                      placeholder="rajesh@mandalname.com"
-                      className={`w-full pl-11 pr-4 py-3 bg-white dark:bg-[#0b0f19] border rounded-xl text-[#1A1208] dark:text-white placeholder-[#9e8c76] dark:placeholder-slate-500 focus:outline-none focus:ring-2 transition-all duration-200 ${errors.adminEmail
-                          ? "border-rose-500 focus:ring-rose-500/20 focus:border-rose-500"
-                          : "border-[#1A1208]/15 dark:border-slate-800 focus:ring-[#E8650A]/20 focus:border-[#E8650A]"
+                  <div className="relative flex items-center gap-2">
+                    <div className="relative flex-1">
+                      <span className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-[#7a6a55] dark:text-slate-400">
+                        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                        </svg>
+                      </span>
+                      <input
+                        type="email"
+                        id="adminEmail"
+                        name="adminEmail"
+                        value={formData.adminEmail}
+                        onChange={handleChange}
+                        onBlur={(e) => validateField("adminEmail", e.target.value)}
+                        placeholder="rajesh@mandalname.com"
+                        className={`w-full pl-11 pr-4 py-3 bg-white dark:bg-[#0b0f19] border rounded-xl text-[#1A1208] dark:text-white placeholder-[#9e8c76] dark:placeholder-slate-500 focus:outline-none focus:ring-2 transition-all duration-200 ${
+                          adminEmailVerified
+                            ? "border-emerald-500 bg-emerald-500/5 dark:bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 font-semibold"
+                            : errors.adminEmail
+                            ? "border-rose-500 focus:ring-rose-500/20 focus:border-rose-500"
+                            : "border-[#1A1208]/15 dark:border-slate-800 focus:ring-[#E8650A]/20 focus:border-[#E8650A]"
                         }`}
-                      required
-                    />
+                        required
+                      />
+                    </div>
+
+                    {adminEmailVerified ? (
+                      <div className="flex items-center gap-1.5">
+                        <span className="inline-flex items-center gap-1.5 px-3.5 py-3 rounded-xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-600 dark:text-emerald-400 text-xs font-bold whitespace-nowrap">
+                          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                          </svg>
+                          Verified
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setAdminEmailVerified(false);
+                            setAdminOtpSent(false);
+                            setAdminOtpSuccessMsg("");
+                            setAllowAdminEmailEdit(true);
+                            setFormData((prev) => ({ ...prev, adminEmail: "" }));
+                          }}
+                          title="Change Admin Email"
+                          aria-label="Change Admin Email"
+                          className="p-2.5 rounded-xl bg-[#F5EDE2] dark:bg-slate-800 text-[#7a6a55] dark:text-slate-400 hover:text-[#E8650A] hover:bg-[#E8650A]/10 border border-[#1A1208]/10 dark:border-slate-700 transition-all duration-200 cursor-pointer flex items-center justify-center"
+                        >
+                          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                          </svg>
+                        </button>
+                      </div>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => handleSendOtp("admin")}
+                        disabled={adminOtpLoading || !formData.adminEmail.trim() || adminCooldownTimer > 0}
+                        className="px-4 py-3 bg-[#E8650A] hover:bg-[#d05807] disabled:opacity-50 text-white font-bold text-xs rounded-xl shadow-md transition-all duration-200 whitespace-nowrap cursor-pointer flex items-center gap-1.5"
+                      >
+                        {adminOtpLoading ? (
+                          <>
+                            <svg className="animate-spin h-3.5 w-3.5 text-white" fill="none" viewBox="0 0 24 24">
+                              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 11-8-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                            </svg>
+                            <span>Sending...</span>
+                          </>
+                        ) : adminCooldownTimer > 0 ? (
+                          <span>
+                            Resend in {adminCooldownTimer >= 60 ? `${Math.floor(adminCooldownTimer / 60)}m ${adminCooldownTimer % 60}s` : `${adminCooldownTimer}s`}
+                          </span>
+                        ) : adminOtpSent ? (
+                          <span>Resend OTP</span>
+                        ) : (
+                          <span>Send OTP</span>
+                        )}
+                      </button>
+                    )}
                   </div>
+
                   {errors.adminEmail && (
                     <p className="text-xs text-rose-600 dark:text-rose-400 mt-1 font-medium flex items-center space-x-1">
                       <svg className="w-3.5 h-3.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
@@ -737,6 +1175,50 @@ export default function RegisterPage() {
                       </svg>
                       <span>{errors.adminEmail}</span>
                     </p>
+                  )}
+
+                  {/* OTP Entry Card for Admin Email */}
+                  {adminOtpSent && !adminEmailVerified && (
+                    <div className="mt-2.5 p-4 bg-[#F5EDE2] dark:bg-slate-900/90 border border-[#E8650A]/30 rounded-xl space-y-3 animate-fade-in-up">
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="font-semibold text-[#1A1208] dark:text-slate-200">
+                          Enter 6-digit OTP sent to email
+                        </span>
+                        <span className="font-mono text-[#E8650A] font-bold">
+                          ⏱ {Math.floor(adminOtpTimer / 60)}:{(adminOtpTimer % 60).toString().padStart(2, "0")}
+                        </span>
+                      </div>
+
+                      <div className="flex gap-2">
+                        <input
+                          type="text"
+                          maxLength={6}
+                          value={adminOtpCode}
+                          onChange={(e) => setAdminOtpCode(e.target.value.replace(/[^0-9]/g, ""))}
+                          placeholder="6-digit OTP"
+                          className="flex-1 px-3 py-2.5 bg-white dark:bg-[#0b0f19] border border-[#1A1208]/15 dark:border-slate-700 rounded-xl text-center tracking-widest font-mono text-base font-bold text-[#1A1208] dark:text-white focus:outline-none focus:border-[#E8650A]"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => handleVerifyOtp("admin")}
+                          disabled={adminOtpLoading || adminOtpCode.length !== 6}
+                          className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white text-xs font-bold rounded-xl transition-all cursor-pointer flex items-center justify-center gap-1.5 shadow-md"
+                        >
+                          {adminOtpLoading ? "Verifying..." : "Verify OTP"}
+                        </button>
+                      </div>
+
+                      {adminOtpError && (
+                        <p className="text-xs text-rose-600 dark:text-rose-400 font-medium">
+                          ⚠️ {adminOtpError}
+                        </p>
+                      )}
+                      {adminOtpSuccessMsg && (
+                        <p className="text-xs text-emerald-600 dark:text-emerald-400 font-medium">
+                          ✓ {adminOtpSuccessMsg}
+                        </p>
+                      )}
+                    </div>
                   )}
                 </div>
 
@@ -753,6 +1235,14 @@ export default function RegisterPage() {
                       setAdminPhone(val);
                       if (val.length === 10) {
                         setErrors(prev => ({ ...prev, adminPhone: "" }));
+                      }
+                    }}
+                    onBlur={async (e) => {
+                      if (e.target.value.length === 10) {
+                        const taken = await checkPhoneExists(e.target.value);
+                        if (taken) {
+                          setErrors((prev) => ({ ...prev, adminPhone: "This phone number is already registered." }));
+                        }
                       }
                     }}
                     placeholder="e.g. 9876543210"

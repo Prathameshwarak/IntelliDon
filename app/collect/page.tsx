@@ -150,45 +150,55 @@ export default function CollectPage() {
 
   useEffect(() => {
     async function init() {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) { router.push('/login'); return }
-
-      const { data: userRow } = await supabase
-        .from('users')
-        .select('role')
-        .eq('id', user.id)
-        .single()
-
-      if (!userRow || userRow.role !== 'collector') {
-        if (userRow?.role === 'admin' || userRow?.role === 'manager') {
-          router.push('/dashboard')
-        } else if (userRow?.role === 'super_admin') {
-          router.push('/super-admin')
-        } else {
-          router.push('/')
-        }
-        return
-      }
-
-      setUserId(user.id)
       const { data: { session } } = await supabase.auth.getSession()
       const token = session?.access_token
-      const headers: HeadersInit = token ? { 'Authorization': `Bearer ${token}` } : {}
+      if (!token) { router.push('/login'); return }
 
-      const res = await fetch(`/api/collector?user_id=${user.id}`, { headers })
-      const data = await res.json()
+      try {
+        const res = await fetch('/api/auth/me', {
+          headers: { Authorization: `Bearer ${token}` }
+        })
+        const meData = await res.json()
+        if (!res.ok || meData.error || !meData.user) {
+          router.push('/login')
+          return
+        }
 
-      if (data.error) { setError(data.error); setLoading(false); return }
+        const role = meData.profile?.role
+        if (role !== 'collector') {
+          if (role === 'admin' || role === 'manager') {
+            router.push('/dashboard')
+          } else if (role === 'super_admin') {
+            router.push('/super-admin')
+          } else {
+            router.push('/')
+          }
+          return
+        }
 
-      setCollectorName(data.user.full_name)
-      setMandal(data.mandal)
-      setEvents(data.events)
-      if (data.events.length === 1) setSelectedEvent(data.events[0])
+        const userId = meData.user.id
+        setUserId(userId)
 
-      // Initial loading of collections history
-      await loadDonations(data.mandal.id, user.id)
-      setLoading(false)
+        const headers: HeadersInit = { Authorization: `Bearer ${token}` }
+        const collectorRes = await fetch(`/api/collector?user_id=${userId}`, { headers })
+        const data = await collectorRes.json()
+
+        if (data.error) { setError(data.error); setLoading(false); return }
+
+        setCollectorName(data.user.full_name)
+        setMandal(data.mandal)
+        setEvents(data.events)
+        if (data.events.length === 1) setSelectedEvent(data.events[0])
+
+        // Initial loading of collections history
+        await loadDonations(data.mandal.id, userId)
+      } catch (e) {
+        router.push('/login')
+      } finally {
+        setLoading(false)
+      }
     }
+
     init()
   }, [router])
 
@@ -599,7 +609,11 @@ export default function CollectPage() {
           </button>
           <ThemeToggle />
           <button
-            onClick={() => supabase.auth.signOut().then(() => router.push('/login'))}
+            onClick={() => {
+              fetch('/api/auth/logout', { method: 'POST' }).finally(() => {
+                supabase.auth.signOut().then(() => router.push('/login'))
+              })
+            }}
             className="text-[10px] sm:text-xs text-rose-600 hover:text-rose-700 dark:text-red-400 dark:hover:text-red-300 font-bold transition-colors cursor-pointer whitespace-nowrap"
           >
             Sign out

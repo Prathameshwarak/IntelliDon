@@ -22,49 +22,53 @@ export default function SharePage() {
   // ── Load mandal info ──────────────────────────────────────────
   useEffect(() => {
     async function init() {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) { router.push('/login'); return }
+      const { data: { session } } = await supabase.auth.getSession()
+      const token = session?.access_token
+      if (!token) { router.push('/login'); return }
 
-      const { data: userRow } = await supabase
-        .from('users')
-        .select('role, mandal_id')
-        .eq('id', user.id)
-        .single()
+      try {
+        const res = await fetch('/api/auth/me', {
+          headers: { Authorization: `Bearer ${token}` }
+        })
+        const meData = await res.json()
+        if (!res.ok || meData.error || !meData.user || !meData.profile) {
+          router.push('/login')
+          return
+        }
 
-      if (!userRow || !['admin', 'manager', 'collector'].includes(userRow.role)) {
+        const role = meData.profile.role
+        if (!['admin', 'manager', 'collector'].includes(role)) {
+          router.push('/login')
+          return
+        }
+
+        setUserRole(role)
+
+        const mandal = meData.mandal
+        if (!mandal) { router.push('/login'); return }
+
+        setMandalName(mandal.name || '')
+        const targetSlug = mandal.slug || mandal.id
+        const link = `${window.location.origin}/donate/${targetSlug}`
+        setSlug(targetSlug)
+        setDonationLink(link)
+
+        // Fetch active event name via API
+        const eventsRes = await fetch('/api/events', {
+          headers: { Authorization: `Bearer ${token}` }
+        })
+        const eventsData = await eventsRes.json()
+        if (eventsData.events && eventsData.events.length > 0) {
+          const activeEv = eventsData.events.find((e: any) => e.is_active) || eventsData.events[0]
+          setEventName(activeEv.name || '')
+        }
+      } catch (e) {
         router.push('/login')
-        return
+      } finally {
+        setLoading(false)
       }
-
-      setUserRole(userRow.role)
-
-      // Get mandal slug + name
-      const { data: mandal } = await supabase
-        .from('mandals')
-        .select('id, name, slug')
-        .eq('id', userRow.mandal_id)
-        .single()
-
-      if (!mandal) { router.push('/login'); return }
-
-      // Get active event name
-      const { data: events } = await supabase
-        .from('events')
-        .select('name, year')
-        .eq('mandal_id', userRow.mandal_id)
-        .order('is_active', { ascending: false })
-        .order('year', { ascending: false })
-        .limit(1)
-
-      const targetSlug = mandal.slug || mandal.id
-      const link = `${window.location.origin}/donate/${targetSlug}`
-
-      setMandalName(mandal.name)
-      setSlug(targetSlug)
-      setDonationLink(link)
-      setEventName(events?.[0] ? `${events[0].name} ${events[0].year}` : 'Active Event')
-      setLoading(false)
     }
+
     init()
   }, [router])
 
