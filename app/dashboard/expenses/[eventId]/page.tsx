@@ -69,22 +69,31 @@ export default function EventExpensePage() {
   // ── Auth + event resolution ─────────────────────────────────
   useEffect(() => {
     async function checkAccess() {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) { router.push('/login'); return }
+      const { data: { session } } = await supabase.auth.getSession()
+      const token = session?.access_token
+      if (!token) { router.push('/login'); return }
 
-      const { data: userRow } = await supabase
-        .from('users')
-        .select('role, mandal_id')
-        .eq('id', user.id)
-        .single()
+      try {
+        const res = await fetch('/api/auth/me', {
+          headers: { Authorization: `Bearer ${token}` }
+        })
+        const meData = await res.json()
+        if (!res.ok || meData.error || !meData.user || !meData.profile) {
+          router.push('/login')
+          return
+        }
 
-      if (!userRow || !['admin', 'manager'].includes(userRow.role)) {
+        const role = meData.profile.role
+        if (!['admin', 'manager'].includes(role)) {
+          router.push('/dashboard')
+          return
+        }
+
+        setMandalId(meData.profile.mandal_id)
+        setAuthorized(true)
+      } catch (e) {
         router.push('/dashboard')
-        return
       }
-
-      setMandalId(userRow.mandal_id)
-      setAuthorized(true)
     }
     checkAccess()
   }, [router])

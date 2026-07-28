@@ -3,6 +3,7 @@
 
 import { createClient } from '@supabase/supabase-js'
 import { NextResponse } from 'next/server'
+import { isOTPVerified } from '@/lib/otp-store'
 
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL,
@@ -74,6 +75,7 @@ export async function POST(request) {
     const state        = formData.get('state')?.toString().trim() || 'Maharashtra'
     const pincode      = formData.get('pincode')?.toString().trim()
     const phone        = formData.get('phone')?.toString().trim()
+    const orgEmail     = formData.get('org_email')?.toString().trim() || formData.get('email')?.toString().trim()
     const upiId        = formData.get('upi_id')?.toString().trim()
     const adminName    = formData.get('admin_name')?.toString().trim()
     const adminEmail   = formData.get('admin_email')?.toString().trim()
@@ -123,6 +125,24 @@ export async function POST(request) {
       )
     }
 
+    // ── Server-Side Security Check: Verify Email OTP Verification ──
+    const cleanOrgEmail = orgEmail ? orgEmail.trim().toLowerCase() : ''
+    const cleanAdminEmail = adminEmail ? adminEmail.trim().toLowerCase() : ''
+
+    if (cleanOrgEmail && !isOTPVerified(cleanOrgEmail)) {
+      return NextResponse.json(
+        { error: 'Security Exception: Organization email address has not been verified via OTP.' },
+        { status: 403 }
+      )
+    }
+
+    if (!cleanAdminEmail || !isOTPVerified(cleanAdminEmail)) {
+      return NextResponse.json(
+        { error: 'Security Exception: Admin email address has not been verified via OTP.' },
+        { status: 403 }
+      )
+    }
+
     // ── Validate required documents ─────────────────────────
     const missingDocs = []
     for (const field of REQUIRED_DOCS) {
@@ -155,6 +175,20 @@ export async function POST(request) {
       )
     }
 
+    // ── Check phone numbers not already registered ──────────
+    const { data: existingPhones } = await supabaseAdmin
+      .from('mandals')
+      .select('id')
+      .or(`phone.eq.${cleanPhone},admin_phone.eq.${cleanPhone},phone.eq.${cleanAdminPhone},admin_phone.eq.${cleanAdminPhone}`)
+      .limit(1)
+
+    if (existingPhones && existingPhones.length > 0) {
+      return NextResponse.json(
+        { error: 'A Mandal or Admin is already registered with this phone number.' },
+        { status: 409 }
+      )
+    }
+
     // ── Generate slug ───────────────────────────────────────
     const baseSlug = name
       .toLowerCase()
@@ -174,6 +208,7 @@ export async function POST(request) {
         state,
         pincode,
         phone,
+        org_email: orgEmail || adminEmail,
         upi_id: upiId || null,
         admin_full_name: adminName,
         admin_email: adminEmail,

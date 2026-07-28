@@ -63,6 +63,7 @@ export default function SessionWatcher() {
       localStorage.removeItem('remember_me')
       localStorage.removeItem('login_time')
       localStorage.removeItem('last_active')
+      await fetch('/api/auth/logout', { method: 'POST' }).catch(() => {})
       await supabase.auth.signOut()
       router.push('/login')
     }

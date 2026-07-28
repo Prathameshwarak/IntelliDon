@@ -38,40 +38,45 @@ export default function DashboardSubscriptionPage() {
   // ── Auth ────────────────────────────────────────────────────
   useEffect(() => {
     async function checkAccess() {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) { router.push('/login'); return }
+      const { data: { session } } = await supabase.auth.getSession()
+      const token = session?.access_token
+      if (!token) { router.push('/login'); return }
 
-      const { data: userRow } = await supabase
-        .from('users')
-        .select('role, mandal_id')
-        .eq('id', user.id)
-        .single()
+      try {
+        const res = await fetch('/api/auth/me', {
+          headers: { Authorization: `Bearer ${token}` }
+        })
+        const meData = await res.json()
+        if (!res.ok || meData.error || !meData.user || !meData.profile) {
+          router.push('/login')
+          return
+        }
 
-      if (!userRow || !['super_admin', 'admin', 'manager'].includes(userRow.role)) {
+        const role = meData.profile.role
+        if (!['super_admin', 'admin', 'manager'].includes(role)) {
+          router.push('/')
+          return
+        }
+
+        if (role === 'super_admin') {
+          router.push('/super-admin/subscriptions')
+          return
+        }
+
+        setMandalId(meData.profile.mandal_id)
+        if (meData.mandal) {
+          setMandalName(meData.mandal.name || '')
+        }
+        if (meData.profile) {
+          setAdminName(meData.profile.full_name || '')
+          setAdminPhone(meData.profile.phone || '')
+          setAdminEmail(meData.user?.email || '')
+        }
+
+        setAuthorized(true)
+      } catch (e) {
         router.push('/')
-        return
       }
-
-      if (userRow.role === 'super_admin') {
-        router.push('/super-admin/subscriptions')
-        return
-      }
-
-      setMandalId(userRow.mandal_id)
-
-      if (userRow.mandal_id) {
-        const { data: mandal } = await supabase
-          .from('mandals')
-          .select('name, admin_full_name, admin_phone, admin_email')
-          .eq('id', userRow.mandal_id)
-          .single()
-        setMandalName(mandal?.name || '')
-        setAdminName(mandal?.admin_full_name || '')
-        setAdminPhone(mandal?.admin_phone || '')
-        setAdminEmail(mandal?.admin_email || '')
-      }
-
-      setAuthorized(true)
     }
     checkAccess()
   }, [router])

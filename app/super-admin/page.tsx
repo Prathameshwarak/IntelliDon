@@ -45,22 +45,25 @@ function SuperAdminDashboardContent() {
   // ── Auth & Query Params ──────────────────────────────────────
   useEffect(() => {
     async function checkAccess() {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) { router.push('/login'); return }
+      const { data: { session } } = await supabase.auth.getSession()
+      const token = session?.access_token
+      if (!token) { router.push('/login'); return }
 
-      const { data: userRow } = await supabase
-        .from('users')
-        .select('role, full_name')
-        .eq('id', user.id)
-        .single()
+      try {
+        const res = await fetch('/api/auth/me', {
+          headers: { Authorization: `Bearer ${token}` }
+        })
+        const meData = await res.json()
+        if (!res.ok || meData.error || !meData.user || meData.profile?.role !== 'super_admin') {
+          router.push('/')
+          return
+        }
 
-      if (!userRow || userRow.role !== 'super_admin') {
+        setSuperAdminName(meData.profile.full_name || 'Super Admin')
+        setAuthorized(true)
+      } catch (e) {
         router.push('/')
-        return
       }
-
-      setSuperAdminName(userRow.full_name || 'Super Admin')
-      setAuthorized(true)
     }
     checkAccess()
   }, [router])
@@ -99,6 +102,7 @@ function SuperAdminDashboardContent() {
   }
 
   async function handleSignOut() {
+    await fetch('/api/auth/logout', { method: 'POST' }).catch(() => {})
     await supabase.auth.signOut()
     router.push('/login')
   }

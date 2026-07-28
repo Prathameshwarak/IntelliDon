@@ -157,6 +157,7 @@ export default function KycVerificationPanel({ mandal, userId, showToast, onResu
   }
 
   async function handleSignOut() {
+    await fetch('/api/auth/logout', { method: 'POST' }).catch(() => {})
     await supabase.auth.signOut()
     window.location.href = '/login'
   }

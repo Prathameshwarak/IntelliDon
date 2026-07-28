@@ -91,13 +91,183 @@ export default function AllOrganizationsTab({ showToast }: AllOrganizationsTabPr
   const [mandalName, setMandalName] = useState('')
   const [mandalAddress, setMandalAddress] = useState('')
   const [mandalCity, setMandalCity] = useState('')
+  const [mandalState, setMandalState] = useState('Maharashtra')
   const [mandalPincode, setMandalPincode] = useState('')
   const [mandalPhone, setMandalPhone] = useState('')
+  const [orgEmail, setOrgEmail] = useState('')
   const [mandalUpiId, setMandalUpiId] = useState('')
   const [adminName, setAdminName] = useState('')
   const [adminEmail, setAdminEmail] = useState('')
+  const [adminPhone, setAdminPhone] = useState('')
   const [adminPassword, setAdminPassword] = useState('Welcome@123')
+  const [adminConfirmPassword, setAdminConfirmPassword] = useState('Welcome@123')
   const [autoApprove, setAutoApprove] = useState(true)
+
+  // Phone error states
+  const [mandalPhoneError, setMandalPhoneError] = useState('')
+  const [adminPhoneError, setAdminPhoneError] = useState('')
+
+  // OTP State for Organization Email
+  const [orgOtpSent, setOrgOtpSent] = useState(false)
+  const [orgOtpCode, setOrgOtpCode] = useState('')
+  const [orgEmailVerified, setOrgEmailVerified] = useState(false)
+  const [orgOtpLoading, setOrgOtpLoading] = useState(false)
+  const [orgOtpTimer, setOrgOtpTimer] = useState(0)
+  const [orgCooldownTimer, setOrgCooldownTimer] = useState(0)
+  const [orgOtpError, setOrgOtpError] = useState('')
+  const [orgOtpSuccessMsg, setOrgOtpSuccessMsg] = useState('')
+
+  // OTP State for Admin Email
+  const [adminOtpSent, setAdminOtpSent] = useState(false)
+  const [adminOtpCode, setAdminOtpCode] = useState('')
+  const [adminEmailVerified, setAdminEmailVerified] = useState(false)
+  const [adminOtpLoading, setAdminOtpLoading] = useState(false)
+  const [adminOtpTimer, setAdminOtpTimer] = useState(0)
+  const [adminCooldownTimer, setAdminCooldownTimer] = useState(0)
+  const [adminOtpError, setAdminOtpError] = useState('')
+  const [adminOtpSuccessMsg, setAdminOtpSuccessMsg] = useState('')
+  const [allowAdminEmailEdit, setAllowAdminEmailEdit] = useState(false)
+
+  // Timers for OTP Expiration & Cooldowns
+  useEffect(() => {
+    if (orgOtpTimer > 0) {
+      const timer = setInterval(() => setOrgOtpTimer((t) => t - 1), 1000)
+      return () => clearInterval(timer)
+    }
+  }, [orgOtpTimer])
+
+  useEffect(() => {
+    if (adminOtpTimer > 0) {
+      const timer = setInterval(() => setAdminOtpTimer((t) => t - 1), 1000)
+      return () => clearInterval(timer)
+    }
+  }, [adminOtpTimer])
+
+  useEffect(() => {
+    if (orgCooldownTimer > 0) {
+      const timer = setInterval(() => setOrgCooldownTimer((t) => t - 1), 1000)
+      return () => clearInterval(timer)
+    }
+  }, [orgCooldownTimer])
+
+  useEffect(() => {
+    if (adminCooldownTimer > 0) {
+      const timer = setInterval(() => setAdminCooldownTimer((t) => t - 1), 1000)
+      return () => clearInterval(timer)
+    }
+  }, [adminCooldownTimer])
+
+  // Auto-verify Admin Email if it matches Organization Email and Org Email is verified
+  useEffect(() => {
+    if (allowAdminEmailEdit) return
+    const org = orgEmail.trim().toLowerCase()
+    const admin = adminEmail.trim().toLowerCase()
+    if (org && admin && org === admin && orgEmailVerified) {
+      if (!adminEmailVerified) {
+        setAdminEmailVerified(true)
+        setAdminOtpError('')
+        setAdminOtpSuccessMsg('Same email address as Organization Email (Verified)')
+      }
+    }
+  }, [orgEmail, adminEmail, orgEmailVerified, adminEmailVerified, allowAdminEmailEdit])
+
+  const checkPhoneExists = async (phone: string): Promise<boolean> => {
+    const clean = phone.replace(/[^0-9]/g, '')
+    if (clean.length !== 10) return false
+    try {
+      const res = await fetch('/api/check-phone', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ phone: clean }),
+      })
+      const data = await res.json()
+      return data.exists === true
+    } catch (e) {
+      return false
+    }
+  }
+
+  const handleSendOtp = async (target: 'org' | 'admin') => {
+    const isOrg = target === 'org'
+    const email = isOrg ? orgEmail : adminEmail
+    const setLoading = isOrg ? setOrgOtpLoading : setAdminOtpLoading
+    const setError = isOrg ? setOrgOtpError : setAdminOtpError
+    const setSuccess = isOrg ? setOrgOtpSuccessMsg : setAdminOtpSuccessMsg
+    const setSent = isOrg ? setOrgOtpSent : setAdminOtpSent
+    const setTimer = isOrg ? setOrgOtpTimer : setAdminOtpTimer
+    const setCooldown = isOrg ? setOrgCooldownTimer : setAdminCooldownTimer
+
+    setError('')
+    setSuccess('')
+
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+    if (!email || !emailRegex.test(email.trim())) {
+      setError('Please enter a valid email address first.')
+      return
+    }
+
+    setLoading(true)
+    try {
+      const res = await fetch('/api/send-otp', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: email.trim() }),
+      })
+      const data = await res.json()
+      if (!res.ok || !data.success) {
+        if (data.remainingSec) {
+          setCooldown(data.remainingSec)
+        }
+        setError(data.error || 'Failed to send OTP.')
+        return
+      }
+      setSent(true)
+      setTimer(300)
+      setCooldown(120)
+      setSuccess('Verification code sent to your email!')
+    } catch (err: any) {
+      setError(err.message || 'Could not send OTP code.')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleVerifyOtp = async (target: 'org' | 'admin') => {
+    const isOrg = target === 'org'
+    const email = isOrg ? orgEmail : adminEmail
+    const code = isOrg ? orgOtpCode : adminOtpCode
+    const setLoading = isOrg ? setOrgOtpLoading : setAdminOtpLoading
+    const setError = isOrg ? setOrgOtpError : setAdminOtpError
+    const setSuccess = isOrg ? setOrgOtpSuccessMsg : setAdminOtpSuccessMsg
+    const setVerified = isOrg ? setOrgEmailVerified : setAdminEmailVerified
+
+    setError('')
+    setSuccess('')
+
+    if (!code || code.length !== 6) {
+      setError('Please enter the 6-digit verification code.')
+      return
+    }
+
+    setLoading(true)
+    try {
+      const res = await fetch('/api/verify-otp', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: email.trim(), otp: code.trim() }),
+      })
+      const data = await res.json()
+      if (!res.ok || !data.success) {
+        throw new Error(data.error || 'Invalid OTP code.')
+      }
+      setVerified(true)
+      setSuccess('Email address verified successfully!')
+    } catch (err: any) {
+      setError(err.message || 'OTP verification failed.')
+    } finally {
+      setLoading(false)
+    }
+  }
 
   // View organization details modal state
   const [viewingOrg, setViewingOrg] = useState<Mandal | null>(null)
@@ -176,11 +346,14 @@ export default function AllOrganizationsTab({ showToast }: AllOrganizationsTabPr
     }
     
     try {
-      const { data, error } = await supabase.storage
-        .from('kyc-documents')
-        .createSignedUrl(path, 300)
+      const res = await fetch('/api/storage/signed-url', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ path, bucket: 'kyc-documents' })
+      })
+      const data = await res.json()
         
-      if (error || !data?.signedUrl) throw new Error(error?.message || 'Could not sign file URL')
+      if (!res.ok || !data?.signedUrl) throw new Error(data?.error || 'Could not sign file URL')
       setPreviewDoc({ mandalId, key: docKey, label, url: data.signedUrl })
     } catch (err: any) {
       showToast('Error opening file: ' + err.message, 'error')
@@ -193,11 +366,14 @@ export default function AllOrganizationsTab({ showToast }: AllOrganizationsTabPr
     setSelectedDocUrl('') // Reset while loading
     
     try {
-      const { data, error } = await supabase.storage
-        .from('kyc-documents')
-        .createSignedUrl(path, 300)
+      const res = await fetch('/api/storage/signed-url', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ path, bucket: 'kyc-documents' })
+      })
+      const data = await res.json()
         
-      if (error || !data?.signedUrl) throw new Error(error?.message || 'Could not sign file URL')
+      if (!res.ok || !data?.signedUrl) throw new Error(data?.error || 'Could not sign file URL')
       setSelectedDocUrl(data.signedUrl)
     } catch (err: any) {
       showToast('Error loading file: ' + err.message, 'error')
@@ -219,15 +395,20 @@ export default function AllOrganizationsTab({ showToast }: AllOrganizationsTabPr
 
     setUploadingFile(true)
     try {
-      const ext = file.name.split('.').pop() || 'pdf'
-      const path = `${viewingOrg.id}/${uploadingDocKey}.${ext}`
+      const formData = new FormData()
+      formData.append('file', file)
+      formData.append('documentKey', uploadingDocKey)
+      formData.append('mandalId', viewingOrg.id)
+      formData.append('bucket', 'kyc-documents')
 
-      // 1. Upload to Supabase Storage
-      const { error: uploadError } = await supabase.storage
-        .from('kyc-documents')
-        .upload(path, file, { upsert: true })
+      const uploadRes = await fetch('/api/storage/upload', {
+        method: 'POST',
+        body: formData
+      })
+      const uploadData = await uploadRes.json()
+      if (!uploadRes.ok || uploadData.error) throw new Error(uploadData.error || 'Upload error')
 
-      if (uploadError) throw new Error(`Upload error: ${uploadError.message}`)
+      const path = uploadData.path
 
       // 2. Update DB via PATCH api
       const { data: { session } } = await supabase.auth.getSession()
@@ -238,11 +419,7 @@ export default function AllOrganizationsTab({ showToast }: AllOrganizationsTabPr
           'Content-Type': 'application/json',
           ...(token ? { Authorization: `Bearer ${token}` } : {})
         },
-        body: JSON.stringify({
-          mandalId: viewingOrg.id,
-          documentKey: uploadingDocKey,
-          documentPath: path
-        })
+        body: JSON.stringify({ mandalId: viewingOrg.id, documentKey: uploadingDocKey, documentPath: path })
       })
       const data = await res.json()
       if (data.error) throw new Error(data.error)
@@ -330,18 +507,46 @@ export default function AllOrganizationsTab({ showToast }: AllOrganizationsTabPr
 
   async function handleCreateOrganization(e: React.FormEvent) {
     e.preventDefault()
-    
+
     if (!mandalName.trim()) { showToast('Organization name is required', 'error'); return }
-    if (!mandalPhone.trim()) { showToast('Mandal phone is required', 'error'); return }
+    if (!mandalPhone.trim() || mandalPhone.replace(/[^0-9]/g, '').length !== 10) {
+      showToast('Mandal contact phone must be a 10-digit number', 'error'); return
+    }
+    if (!orgEmail.trim() || !orgEmailVerified) {
+      showToast('Organization email must be verified via OTP before creating', 'error'); return
+    }
     if (!mandalAddress.trim()) { showToast('Address is required', 'error'); return }
     if (!mandalCity.trim()) { showToast('City is required', 'error'); return }
     if (!mandalPincode.trim() || mandalPincode.length < 6) { showToast('Please enter a valid 6-digit pincode', 'error'); return }
     if (!adminName.trim()) { showToast('Admin full name is required', 'error'); return }
-    if (!adminEmail.trim()) { showToast('Admin email is required', 'error'); return }
+    if (!adminEmail.trim() || !adminEmailVerified) {
+      showToast('Admin email must be verified via OTP before creating', 'error'); return
+    }
+    if (!adminPhone.trim() || adminPhone.replace(/[^0-9]/g, '').length !== 10) {
+      showToast('Admin mobile number must be a 10-digit number', 'error'); return
+    }
     if (!adminPassword.trim() || adminPassword.length < 8) { showToast('Password must be at least 8 characters', 'error'); return }
+    if (adminPassword !== adminConfirmPassword) { showToast('Admin passwords do not match', 'error'); return }
 
     setCreating(true)
     try {
+      // Check phone duplicates before creating
+      const mandalPhoneTaken = await checkPhoneExists(mandalPhone)
+      if (mandalPhoneTaken) {
+        setMandalPhoneError('This phone number is already registered.')
+        showToast('Mandal phone number is already registered with another organization.', 'error')
+        setCreating(false)
+        return
+      }
+
+      const adminPhoneTaken = await checkPhoneExists(adminPhone)
+      if (adminPhoneTaken) {
+        setAdminPhoneError('This phone number is already registered.')
+        showToast('Admin phone number is already registered with another organization.', 'error')
+        setCreating(false)
+        return
+      }
+
       const { data: { session } } = await supabase.auth.getSession()
       const token = session?.access_token
 
@@ -355,11 +560,14 @@ export default function AllOrganizationsTab({ showToast }: AllOrganizationsTabPr
           name: mandalName.trim(),
           address: mandalAddress.trim(),
           city: mandalCity.trim(),
+          state: mandalState.trim(),
           pincode: mandalPincode.trim(),
           phone: mandalPhone.trim(),
+          orgEmail: orgEmail.trim(),
           upiId: mandalUpiId.trim(),
           adminName: adminName.trim(),
           adminEmail: adminEmail.trim(),
+          adminPhone: adminPhone.trim(),
           adminPassword: adminPassword,
           autoApprove
         })
@@ -374,12 +582,20 @@ export default function AllOrganizationsTab({ showToast }: AllOrganizationsTabPr
       setMandalName('')
       setMandalAddress('')
       setMandalCity('')
+      setMandalState('Maharashtra')
       setMandalPincode('')
       setMandalPhone('')
+      setOrgEmail('')
+      setOrgEmailVerified(false)
+      setOrgOtpSent(false)
       setMandalUpiId('')
       setAdminName('')
       setAdminEmail('')
+      setAdminEmailVerified(false)
+      setAdminOtpSent(false)
+      setAdminPhone('')
       setAdminPassword('Welcome@123')
+      setAdminConfirmPassword('Welcome@123')
       setAutoApprove(true)
       setShowCreateModal(false)
       
@@ -651,6 +867,7 @@ export default function AllOrganizationsTab({ showToast }: AllOrganizationsTabPr
               <div className="space-y-4">
                 <h4 className="text-xs font-extrabold text-[#E8650A] dark:text-orange-400 uppercase tracking-wider block">1. Organization Details</h4>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  {/* Name */}
                   <div className="sm:col-span-2">
                     <label className="block text-xs font-bold text-[#7a6a55] dark:text-gray-300 mb-1">Organization Name *</label>
                     <input 
@@ -663,31 +880,114 @@ export default function AllOrganizationsTab({ showToast }: AllOrganizationsTabPr
                     />
                   </div>
                   
+                  {/* Mandal Phone */}
                   <div>
-                    <label className="block text-xs font-bold text-[#7a6a55] dark:text-gray-300 mb-1">Mandal Phone *</label>
+                    <label className="block text-xs font-bold text-[#7a6a55] dark:text-gray-300 mb-1">Mandal Contact Phone *</label>
                     <input 
-                      type="text" 
+                      type="tel" 
                       value={mandalPhone} 
-                      onChange={e => setMandalPhone(e.target.value)}
+                      onChange={e => {
+                        const val = e.target.value.replace(/[^0-9]/g, '').slice(0, 10);
+                        setMandalPhone(val);
+                        if (val.length === 10) setMandalPhoneError('');
+                      }}
+                      onBlur={async (e) => {
+                        const val = e.target.value.replace(/[^0-9]/g, '');
+                        if (val.length === 10) {
+                          const taken = await checkPhoneExists(val);
+                          if (taken) setMandalPhoneError('This phone number is already registered.');
+                          else setMandalPhoneError('');
+                        }
+                      }}
+                      maxLength={10}
                       required
                       placeholder="10-digit number"
-                      className="w-full bg-white dark:bg-gray-950 border border-[#1A1208]/15 dark:border-gray-800 rounded-lg px-3 py-2 text-xs text-[#1A1208] dark:text-white placeholder-[#9e8c76] dark:placeholder-gray-500 focus:outline-none focus:border-[#E8650A] font-medium"
+                      className={`w-full bg-white dark:bg-gray-950 border rounded-lg px-3 py-2 text-xs text-[#1A1208] dark:text-white placeholder-[#9e8c76] dark:placeholder-gray-500 focus:outline-none font-medium ${
+                        mandalPhoneError ? 'border-rose-500' : 'border-[#1A1208]/15 dark:border-gray-800 focus:border-[#E8650A]'
+                      }`}
                     />
+                    {mandalPhoneError && (
+                      <p className="text-[10px] text-rose-500 mt-1 font-semibold">{mandalPhoneError}</p>
+                    )}
                   </div>
 
+                  {/* Organization Email with OTP verification */}
                   <div>
-                    <label className="block text-xs font-bold text-[#7a6a55] dark:text-gray-300 mb-1">UPI ID (optional)</label>
-                    <input 
-                      type="text" 
-                      value={mandalUpiId} 
-                      onChange={e => setMandalUpiId(e.target.value)}
-                      placeholder="e.g. mandal@upi"
-                      className="w-full bg-white dark:bg-gray-950 border border-[#1A1208]/15 dark:border-gray-800 rounded-lg px-3 py-2 text-xs text-[#1A1208] dark:text-white placeholder-[#9e8c76] dark:placeholder-gray-500 focus:outline-none focus:border-[#E8650A] font-medium"
-                    />
+                    <label className="block text-xs font-bold text-[#7a6a55] dark:text-gray-300 mb-1">Organization Email *</label>
+                    <div className="flex items-center gap-2">
+                      <input 
+                        type="email" 
+                        value={orgEmail} 
+                        onChange={e => {
+                          setOrgEmail(e.target.value);
+                          if (orgEmailVerified) {
+                            setOrgEmailVerified(false);
+                            setOrgOtpSent(false);
+                          }
+                        }}
+                        required
+                        placeholder="contact@mandalname.org"
+                        className={`w-full bg-white dark:bg-gray-950 border rounded-lg px-3 py-2 text-xs text-[#1A1208] dark:text-white placeholder-[#9e8c76] dark:placeholder-gray-500 focus:outline-none font-medium ${
+                          orgEmailVerified ? 'border-emerald-500 text-emerald-600 font-bold' : orgOtpError ? 'border-rose-500' : 'border-[#1A1208]/15 dark:border-gray-800 focus:border-[#E8650A]'
+                        }`}
+                      />
+
+                      {orgEmailVerified ? (
+                        <span className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-emerald-500/15 border border-emerald-500/30 text-emerald-600 dark:text-emerald-400 text-[10px] font-bold whitespace-nowrap">
+                          <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                          </svg>
+                          Verified
+                        </span>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => handleSendOtp('org')}
+                          disabled={orgOtpLoading || !orgEmail.trim() || orgCooldownTimer > 0}
+                          className="px-3 py-2 bg-[#E8650A] hover:bg-[#d05807] disabled:opacity-50 text-white font-bold text-[10px] rounded-lg transition-all whitespace-nowrap cursor-pointer flex items-center gap-1"
+                        >
+                          {orgOtpLoading ? 'Sending...' : orgCooldownTimer > 0 ? `Resend (${orgCooldownTimer}s)` : orgOtpSent ? 'Resend OTP' : 'Send OTP'}
+                        </button>
+                      )}
+                    </div>
+
+                    {orgOtpError && <p className="text-[10px] text-rose-500 mt-1 font-semibold">{orgOtpError}</p>}
+                    {orgOtpSuccessMsg && <p className="text-[10px] text-emerald-600 dark:text-emerald-400 mt-1 font-semibold">{orgOtpSuccessMsg}</p>}
+
+                    {/* Organization Email OTP Verification Card */}
+                    {orgOtpSent && !orgEmailVerified && (
+                      <div className="mt-2 p-3 bg-[#F5EDE2] dark:bg-gray-950 border border-[#E8650A]/30 rounded-xl space-y-2">
+                        <div className="flex items-center justify-between text-[10px]">
+                          <span className="font-semibold text-[#1A1208] dark:text-gray-300">Enter 6-Digit OTP</span>
+                          <span className="font-mono text-[#E8650A] font-bold">
+                            Expires in {Math.floor(orgOtpTimer / 60)}:{(orgOtpTimer % 60).toString().padStart(2, '0')}
+                          </span>
+                        </div>
+                        <div className="flex gap-2">
+                          <input
+                            type="text"
+                            maxLength={6}
+                            value={orgOtpCode}
+                            onChange={(e) => setOrgOtpCode(e.target.value.replace(/[^0-9]/g, ''))}
+                            placeholder="6-digit code"
+                            className="flex-1 px-3 py-1.5 text-xs font-mono font-bold tracking-widest bg-white dark:bg-gray-900 border border-[#1A1208]/15 dark:border-gray-700 rounded-lg focus:outline-none focus:border-[#E8650A]"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => handleVerifyOtp('org')}
+                            disabled={orgOtpLoading || orgOtpCode.length !== 6}
+                            className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white font-bold text-[10px] rounded-lg transition-colors cursor-pointer"
+                          >
+                            {orgOtpLoading ? 'Verifying...' : 'Verify OTP'}
+                          </button>
+                        </div>
+                      </div>
+                    )}
                   </div>
 
+                  {/* Address */}
                   <div className="sm:col-span-2">
-                    <label className="block text-xs font-bold text-[#7a6a55] dark:text-gray-300 mb-1">Address *</label>
+                    <label className="block text-xs font-bold text-[#7a6a55] dark:text-gray-300 mb-1">Office Address *</label>
                     <input 
                       type="text" 
                       value={mandalAddress} 
@@ -698,6 +998,7 @@ export default function AllOrganizationsTab({ showToast }: AllOrganizationsTabPr
                     />
                   </div>
 
+                  {/* City */}
                   <div>
                     <label className="block text-xs font-bold text-[#7a6a55] dark:text-gray-300 mb-1">City *</label>
                     <input 
@@ -710,14 +1011,51 @@ export default function AllOrganizationsTab({ showToast }: AllOrganizationsTabPr
                     />
                   </div>
 
+                  {/* State */}
+                  <div>
+                    <label className="block text-xs font-bold text-[#7a6a55] dark:text-gray-300 mb-1">State *</label>
+                    <select
+                      value={mandalState}
+                      onChange={e => setMandalState(e.target.value)}
+                      className="w-full bg-white dark:bg-gray-950 border border-[#1A1208]/15 dark:border-gray-800 rounded-lg px-3 py-2 text-xs text-[#1A1208] dark:text-white focus:outline-none focus:border-[#E8650A] font-medium"
+                    >
+                      <option value="Maharashtra">Maharashtra</option>
+                      <option value="Gujarat">Gujarat</option>
+                      <option value="Delhi">Delhi</option>
+                      <option value="Karnataka">Karnataka</option>
+                      <option value="Tamil Nadu">Tamil Nadu</option>
+                      <option value="Telangana">Telangana</option>
+                      <option value="Uttar Pradesh">Uttar Pradesh</option>
+                      <option value="Rajasthan">Rajasthan</option>
+                      <option value="Madhya Pradesh">Madhya Pradesh</option>
+                      <option value="West Bengal">West Bengal</option>
+                      <option value="Goa">Goa</option>
+                      <option value="Other">Other</option>
+                    </select>
+                  </div>
+
+                  {/* Pincode */}
                   <div>
                     <label className="block text-xs font-bold text-[#7a6a55] dark:text-gray-300 mb-1">Pincode *</label>
                     <input 
                       type="text" 
                       value={mandalPincode} 
-                      onChange={e => setMandalPincode(e.target.value)}
+                      onChange={e => setMandalPincode(e.target.value.replace(/[^0-9]/g, '').slice(0, 6))}
                       required
+                      maxLength={6}
                       placeholder="6-digit pincode"
+                      className="w-full bg-white dark:bg-gray-950 border border-[#1A1208]/15 dark:border-gray-800 rounded-lg px-3 py-2 text-xs text-[#1A1208] dark:text-white placeholder-[#9e8c76] dark:placeholder-gray-500 focus:outline-none focus:border-[#E8650A] font-medium"
+                    />
+                  </div>
+
+                  {/* UPI ID */}
+                  <div>
+                    <label className="block text-xs font-bold text-[#7a6a55] dark:text-gray-300 mb-1">UPI ID (optional)</label>
+                    <input 
+                      type="text" 
+                      value={mandalUpiId} 
+                      onChange={e => setMandalUpiId(e.target.value)}
+                      placeholder="e.g. mandal@upi"
                       className="w-full bg-white dark:bg-gray-950 border border-[#1A1208]/15 dark:border-gray-800 rounded-lg px-3 py-2 text-xs text-[#1A1208] dark:text-white placeholder-[#9e8c76] dark:placeholder-gray-500 focus:outline-none focus:border-[#E8650A] font-medium"
                     />
                   </div>
@@ -728,6 +1066,7 @@ export default function AllOrganizationsTab({ showToast }: AllOrganizationsTabPr
               <div className="space-y-4 border-t border-[#1A1208]/10 dark:border-gray-800 pt-5">
                 <h4 className="text-xs font-extrabold text-[#E8650A] dark:text-orange-400 uppercase tracking-wider block">2. Admin User Details</h4>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  {/* Admin Name */}
                   <div>
                     <label className="block text-xs font-bold text-[#7a6a55] dark:text-gray-300 mb-1">Admin Full Name *</label>
                     <input 
@@ -740,28 +1079,164 @@ export default function AllOrganizationsTab({ showToast }: AllOrganizationsTabPr
                     />
                   </div>
 
+                  {/* Admin Phone */}
                   <div>
-                    <label className="block text-xs font-bold text-[#7a6a55] dark:text-gray-300 mb-1">Admin Email *</label>
+                    <label className="block text-xs font-bold text-[#7a6a55] dark:text-gray-300 mb-1">Admin Mobile Number *</label>
                     <input 
-                      type="email" 
-                      value={adminEmail} 
-                      onChange={e => setAdminEmail(e.target.value)}
+                      type="tel" 
+                      value={adminPhone} 
+                      onChange={e => {
+                        const val = e.target.value.replace(/[^0-9]/g, '').slice(0, 10);
+                        setAdminPhone(val);
+                        if (val.length === 10) setAdminPhoneError('');
+                      }}
+                      onBlur={async (e) => {
+                        const val = e.target.value.replace(/[^0-9]/g, '');
+                        if (val.length === 10) {
+                          const taken = await checkPhoneExists(val);
+                          if (taken) setAdminPhoneError('This phone number is already registered.');
+                          else setAdminPhoneError('');
+                        }
+                      }}
+                      maxLength={10}
                       required
-                      placeholder="admin@email.com"
-                      className="w-full bg-white dark:bg-gray-950 border border-[#1A1208]/15 dark:border-gray-800 rounded-lg px-3 py-2 text-xs text-[#1A1208] dark:text-white placeholder-[#9e8c76] dark:placeholder-gray-500 focus:outline-none focus:border-[#E8650A] font-medium"
+                      placeholder="10-digit number"
+                      className={`w-full bg-white dark:bg-gray-950 border rounded-lg px-3 py-2 text-xs text-[#1A1208] dark:text-white placeholder-[#9e8c76] dark:placeholder-gray-500 focus:outline-none font-medium ${
+                        adminPhoneError ? 'border-rose-500' : 'border-[#1A1208]/15 dark:border-gray-800 focus:border-[#E8650A]'
+                      }`}
                     />
+                    {adminPhoneError && (
+                      <p className="text-[10px] text-rose-500 mt-1 font-semibold">{adminPhoneError}</p>
+                    )}
                   </div>
 
+                  {/* Admin Email */}
                   <div className="sm:col-span-2">
+                    <label className="block text-xs font-bold text-[#7a6a55] dark:text-gray-300 mb-1">Admin Email Address *</label>
+                    <div className="flex items-center gap-2">
+                      <input 
+                        type="email" 
+                        value={adminEmail} 
+                        onChange={e => {
+                          const val = e.target.value;
+                          setAdminEmail(val);
+                          if (allowAdminEmailEdit) setAllowAdminEmailEdit(false);
+                          if (adminEmailVerified) {
+                            const org = orgEmail.trim().toLowerCase();
+                            if (!org || org !== val.trim().toLowerCase() || !orgEmailVerified) {
+                              setAdminEmailVerified(false);
+                              setAdminOtpSent(false);
+                            }
+                          }
+                        }}
+                        required
+                        placeholder="admin@email.com"
+                        className={`w-full bg-white dark:bg-gray-950 border rounded-lg px-3 py-2 text-xs text-[#1A1208] dark:text-white placeholder-[#9e8c76] dark:placeholder-gray-500 focus:outline-none font-medium ${
+                          adminEmailVerified ? 'border-emerald-500 text-emerald-600 font-bold' : adminOtpError ? 'border-rose-500' : 'border-[#1A1208]/15 dark:border-gray-800 focus:border-[#E8650A]'
+                        }`}
+                      />
+
+                      {adminEmailVerified ? (
+                        <div className="flex items-center gap-1.5">
+                          <span className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-emerald-500/15 border border-emerald-500/30 text-emerald-600 dark:text-emerald-400 text-[10px] font-bold whitespace-nowrap">
+                            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                            </svg>
+                            Verified
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setAdminEmailVerified(false);
+                              setAdminOtpSent(false);
+                              setAdminOtpSuccessMsg("");
+                              setAllowAdminEmailEdit(true);
+                              setAdminEmail("");
+                            }}
+                            title="Change Admin Email"
+                            aria-label="Change Admin Email"
+                            className="p-1.5 rounded-lg bg-[#F5EDE2] dark:bg-gray-800 text-[#7a6a55] dark:text-slate-400 hover:text-[#E8650A] hover:bg-[#E8650A]/10 border border-[#1A1208]/10 dark:border-slate-700 transition-all duration-200 cursor-pointer flex items-center justify-center"
+                          >
+                            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                            </svg>
+                          </button>
+                        </div>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => handleSendOtp('admin')}
+                          disabled={adminOtpLoading || !adminEmail.trim() || adminCooldownTimer > 0}
+                          className="px-3 py-2 bg-[#E8650A] hover:bg-[#d05807] disabled:opacity-50 text-white font-bold text-[10px] rounded-lg transition-all whitespace-nowrap cursor-pointer flex items-center gap-1"
+                        >
+                          {adminOtpLoading ? 'Sending...' : adminCooldownTimer > 0 ? `Resend (${adminCooldownTimer}s)` : adminOtpSent ? 'Resend OTP' : 'Send OTP'}
+                        </button>
+                      )}
+                    </div>
+
+                    {adminOtpError && <p className="text-[10px] text-rose-500 mt-1 font-semibold">{adminOtpError}</p>}
+                    {adminOtpSuccessMsg && <p className="text-[10px] text-emerald-600 dark:text-emerald-400 mt-1 font-semibold">{adminOtpSuccessMsg}</p>}
+
+                    {/* Admin Email OTP Verification Card */}
+                    {adminOtpSent && !adminEmailVerified && (
+                      <div className="mt-2 p-3 bg-[#F5EDE2] dark:bg-gray-950 border border-[#E8650A]/30 rounded-xl space-y-2">
+                        <div className="flex items-center justify-between text-[10px]">
+                          <span className="font-semibold text-[#1A1208] dark:text-gray-300">Enter 6-Digit OTP</span>
+                          <span className="font-mono text-[#E8650A] font-bold">
+                            Expires in {Math.floor(adminOtpTimer / 60)}:{(adminOtpTimer % 60).toString().padStart(2, '0')}
+                          </span>
+                        </div>
+                        <div className="flex gap-2">
+                          <input
+                            type="text"
+                            maxLength={6}
+                            value={adminOtpCode}
+                            onChange={(e) => setAdminOtpCode(e.target.value.replace(/[^0-9]/g, ''))}
+                            placeholder="6-digit code"
+                            className="flex-1 px-3 py-1.5 text-xs font-mono font-bold tracking-widest bg-white dark:bg-gray-900 border border-[#1A1208]/15 dark:border-gray-700 rounded-lg focus:outline-none focus:border-[#E8650A]"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => handleVerifyOtp('admin')}
+                            disabled={adminOtpLoading || adminOtpCode.length !== 6}
+                            className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white font-bold text-[10px] rounded-lg transition-colors cursor-pointer"
+                          >
+                            {adminOtpLoading ? 'Verifying...' : 'Verify OTP'}
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Password */}
+                  <div>
                     <label className="block text-xs font-bold text-[#7a6a55] dark:text-gray-300 mb-1">Admin Password *</label>
                     <input 
-                      type="text" 
+                      type="password" 
                       value={adminPassword} 
                       onChange={e => setAdminPassword(e.target.value)}
                       required
                       placeholder="Min 8 characters"
                       className="w-full bg-white dark:bg-gray-950 border border-[#1A1208]/15 dark:border-gray-800 rounded-lg px-3 py-2 text-xs text-[#1A1208] dark:text-white placeholder-[#9e8c76] dark:placeholder-gray-500 focus:outline-none focus:border-[#E8650A] font-mono font-medium"
                     />
+                  </div>
+
+                  {/* Confirm Password */}
+                  <div>
+                    <label className="block text-xs font-bold text-[#7a6a55] dark:text-gray-300 mb-1">Confirm Admin Password *</label>
+                    <input 
+                      type="password" 
+                      value={adminConfirmPassword} 
+                      onChange={e => setAdminConfirmPassword(e.target.value)}
+                      required
+                      placeholder="Confirm password"
+                      className={`w-full bg-white dark:bg-gray-950 border rounded-lg px-3 py-2 text-xs text-[#1A1208] dark:text-white placeholder-[#9e8c76] dark:placeholder-gray-500 focus:outline-none font-mono font-medium ${
+                        adminConfirmPassword && adminPassword !== adminConfirmPassword ? 'border-rose-500' : 'border-[#1A1208]/15 dark:border-gray-800 focus:border-[#E8650A]'
+                      }`}
+                    />
+                    {adminConfirmPassword && adminPassword !== adminConfirmPassword && (
+                      <p className="text-[10px] text-rose-500 mt-1 font-semibold">Passwords do not match.</p>
+                    )}
                   </div>
                 </div>
               </div>
@@ -790,16 +1265,16 @@ export default function AllOrganizationsTab({ showToast }: AllOrganizationsTabPr
                 <button
                   type="button"
                   onClick={() => setShowCreateModal(false)}
-                  className="px-4 py-2.5 bg-[#F5EDE2] dark:bg-gray-800 hover:bg-[#ebdcc9] dark:hover:bg-gray-700 text-[#1A1208] dark:text-gray-300 font-bold border border-[#1A1208]/10 dark:border-gray-700 rounded-xl text-xs transition-colors cursor-pointer"
+                  className="px-4 py-2 bg-[#F5EDE2] dark:bg-gray-800 hover:bg-[#ebdcc9] dark:hover:bg-gray-700 text-[#1A1208] dark:text-gray-300 font-bold rounded-xl text-xs transition-colors cursor-pointer border border-[#1A1208]/10 dark:border-gray-700"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  disabled={creating}
-                  className="px-5 py-2.5 bg-gradient-to-r from-[#E8650A] to-[#f97316] hover:from-[#d05807] hover:to-[#ea580c] text-white font-bold rounded-xl text-xs transition-colors cursor-pointer disabled:opacity-50 shadow-md shadow-[#E8650A]/20"
+                  disabled={creating || !orgEmailVerified || !adminEmailVerified}
+                  className="px-5 py-2 bg-gradient-to-r from-[#E8650A] to-[#f97316] hover:from-[#d05807] hover:to-[#ea580c] text-white font-bold rounded-xl text-xs transition-all cursor-pointer disabled:opacity-50 shadow-md shadow-[#E8650A]/20 flex items-center gap-1.5"
                 >
-                  {creating ? 'Creating Organization...' : 'Create Organization'}
+                  {creating ? 'Creating...' : 'Create Organization'}
                 </button>
               </div>
             </form>
