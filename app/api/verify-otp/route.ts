@@ -30,7 +30,7 @@ export async function POST(request: Request) {
       );
     }
 
-    const record = getOTP(cleanEmail);
+    const record = await getOTP(cleanEmail);
 
     if (!record) {
       return NextResponse.json(
@@ -47,7 +47,7 @@ export async function POST(request: Request) {
     }
 
     // Mark email as verified
-    markOTPVerified(cleanEmail);
+    await markOTPVerified(cleanEmail);
 
     return NextResponse.json({
       success: true,

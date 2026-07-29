@@ -129,14 +129,14 @@ export async function POST(request) {
     const cleanOrgEmail = orgEmail ? orgEmail.trim().toLowerCase() : ''
     const cleanAdminEmail = adminEmail ? adminEmail.trim().toLowerCase() : ''
 
-    if (cleanOrgEmail && !isOTPVerified(cleanOrgEmail)) {
+    if (cleanOrgEmail && !(await isOTPVerified(cleanOrgEmail))) {
       return NextResponse.json(
         { error: 'Security Exception: Organization email address has not been verified via OTP.' },
         { status: 403 }
       )
     }
 
-    if (!cleanAdminEmail || !isOTPVerified(cleanAdminEmail)) {
+    if (!cleanAdminEmail || !(await isOTPVerified(cleanAdminEmail))) {
       return NextResponse.json(
         { error: 'Security Exception: Admin email address has not been verified via OTP.' },
         { status: 403 }
