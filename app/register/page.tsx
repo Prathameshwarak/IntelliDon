@@ -1110,6 +1110,7 @@ export default function RegisterPage() {
                             ? "border-rose-500 focus:ring-rose-500/20 focus:border-rose-500"
                             : "border-[#1A1208]/15 dark:border-slate-800 focus:ring-[#E8650A]/20 focus:border-[#E8650A]"
                         }`}
+                        readOnly={adminEmailVerified}
                         required
                       />
                     </div>
@@ -1122,23 +1123,25 @@ export default function RegisterPage() {
                           </svg>
                           Verified
                         </span>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setAdminEmailVerified(false);
-                            setAdminOtpSent(false);
-                            setAdminOtpSuccessMsg("");
-                            setAllowAdminEmailEdit(true);
-                            setFormData((prev) => ({ ...prev, adminEmail: "" }));
-                          }}
-                          title="Change Admin Email"
-                          aria-label="Change Admin Email"
-                          className="p-2.5 rounded-xl bg-[#F5EDE2] dark:bg-slate-800 text-[#7a6a55] dark:text-slate-400 hover:text-[#E8650A] hover:bg-[#E8650A]/10 border border-[#1A1208]/10 dark:border-slate-700 transition-all duration-200 cursor-pointer flex items-center justify-center"
-                        >
-                          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
-                            <path strokeLinecap="round" strokeLinejoin="round" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
-                          </svg>
-                        </button>
+                        {formData.orgEmail.trim() && formData.adminEmail.trim().toLowerCase() === formData.orgEmail.trim().toLowerCase() && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setAdminEmailVerified(false);
+                              setAdminOtpSent(false);
+                              setAdminOtpSuccessMsg("");
+                              setAllowAdminEmailEdit(true);
+                              setFormData((prev) => ({ ...prev, adminEmail: "" }));
+                            }}
+                            title="Change Admin Email"
+                            aria-label="Change Admin Email"
+                            className="p-2.5 rounded-xl bg-[#F5EDE2] dark:bg-slate-800 text-[#7a6a55] dark:text-slate-400 hover:text-[#E8650A] hover:bg-[#E8650A]/10 border border-[#1A1208]/10 dark:border-slate-700 transition-all duration-200 cursor-pointer flex items-center justify-center"
+                          >
+                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                            </svg>
+                          </button>
+                        )}
                       </div>
                     ) : (
                       <button
