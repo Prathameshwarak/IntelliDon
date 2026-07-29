@@ -68,7 +68,7 @@ export async function POST(request: Request) {
     }
 
     // Rate Limit / Cooldown Check (2 minutes / 120 seconds cooling period)
-    const checkCooldown = canSendOTP(cleanEmail, 2 * 60 * 1000);
+    const checkCooldown = await canSendOTP(cleanEmail, 2 * 60 * 1000);
     if (!checkCooldown.allowed) {
       return NextResponse.json(
         {
@@ -96,7 +96,7 @@ export async function POST(request: Request) {
     const code = Math.floor(100000 + Math.random() * 900000).toString();
 
     // Store OTP with 5-minute expiry
-    saveOTP(cleanEmail, code, 5 * 60 * 1000);
+    await saveOTP(cleanEmail, code, 5 * 60 * 1000);
 
     // Configure Nodemailer Gmail Transport
     const transporter = nodemailer.createTransport({
