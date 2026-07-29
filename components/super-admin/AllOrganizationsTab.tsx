@@ -1129,6 +1129,7 @@ export default function AllOrganizationsTab({ showToast }: AllOrganizationsTabPr
                             }
                           }
                         }}
+                        readOnly={adminEmailVerified}
                         required
                         placeholder="admin@email.com"
                         className={`w-full bg-white dark:bg-gray-950 border rounded-lg px-3 py-2 text-xs text-[#1A1208] dark:text-white placeholder-[#9e8c76] dark:placeholder-gray-500 focus:outline-none font-medium ${
@@ -1144,23 +1145,25 @@ export default function AllOrganizationsTab({ showToast }: AllOrganizationsTabPr
                             </svg>
                             Verified
                           </span>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setAdminEmailVerified(false);
-                              setAdminOtpSent(false);
-                              setAdminOtpSuccessMsg("");
-                              setAllowAdminEmailEdit(true);
-                              setAdminEmail("");
-                            }}
-                            title="Change Admin Email"
-                            aria-label="Change Admin Email"
-                            className="p-1.5 rounded-lg bg-[#F5EDE2] dark:bg-gray-800 text-[#7a6a55] dark:text-slate-400 hover:text-[#E8650A] hover:bg-[#E8650A]/10 border border-[#1A1208]/10 dark:border-slate-700 transition-all duration-200 cursor-pointer flex items-center justify-center"
-                          >
-                            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
-                              <path strokeLinecap="round" strokeLinejoin="round" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
-                            </svg>
-                          </button>
+                          {orgEmail.trim() && adminEmail.trim().toLowerCase() === orgEmail.trim().toLowerCase() && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setAdminEmailVerified(false);
+                                setAdminOtpSent(false);
+                                setAdminOtpSuccessMsg("");
+                                setAllowAdminEmailEdit(true);
+                                setAdminEmail("");
+                              }}
+                              title="Change Admin Email"
+                              aria-label="Change Admin Email"
+                              className="p-1.5 rounded-lg bg-[#F5EDE2] dark:bg-gray-800 text-[#7a6a55] dark:text-slate-400 hover:text-[#E8650A] hover:bg-[#E8650A]/10 border border-[#1A1208]/10 dark:border-slate-700 transition-all duration-200 cursor-pointer flex items-center justify-center"
+                            >
+                              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                              </svg>
+                            </button>
+                          )}
                         </div>
                       ) : (
                         <button
