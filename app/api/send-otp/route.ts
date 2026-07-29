@@ -3,8 +3,6 @@ import { Resend } from 'resend';
 import { createClient } from '@supabase/supabase-js';
 import { saveOTP, canSendOTP } from '@/lib/otp-store';
 
-const resendApiKey = process.env.RESEND_API_KEY;
-
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL || '',
   process.env.SUPABASE_SERVICE_ROLE_KEY || ''
@@ -81,6 +79,8 @@ export async function POST(request: Request) {
         { status: 429 }
       );
     }
+
+    const resendApiKey = process.env.RESEND_API_KEY || process.env.RESEND_KEY;
 
     if (!resendApiKey) {
       console.error('RESEND_API_KEY is missing in environment variables.');
