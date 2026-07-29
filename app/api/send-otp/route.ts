@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { Resend } from 'resend';
+import nodemailer from 'nodemailer';
 import { createClient } from '@supabase/supabase-js';
 import { saveOTP, canSendOTP } from '@/lib/otp-store';
 
@@ -80,12 +80,14 @@ export async function POST(request: Request) {
       );
     }
 
-    const resendApiKey = process.env.RESEND_API_KEY || process.env.RESEND_KEY;
+    const gmailUser = process.env.GMAIL_USER || 'intellidon.otp@gmail.com';
+    const rawAppPassword = process.env.GMAIL_APP_PASSWORD || process.env.GMAIL_PASSWORD || '';
+    const gmailAppPassword = rawAppPassword.replace(/\s+/g, '');
 
-    if (!resendApiKey) {
-      console.error('RESEND_API_KEY is missing in environment variables.');
+    if (!gmailAppPassword) {
+      console.error('GMAIL_APP_PASSWORD is missing in environment variables.');
       return NextResponse.json(
-        { success: false, error: 'Email service configuration missing. Please contact support.' },
+        { success: false, error: 'Email service configuration missing (GMAIL_APP_PASSWORD). Please contact support.' },
         { status: 500 }
       );
     }
@@ -96,12 +98,18 @@ export async function POST(request: Request) {
     // Store OTP with 5-minute expiry
     saveOTP(cleanEmail, code, 5 * 60 * 1000);
 
-    const resend = new Resend(resendApiKey);
-    const fromAddress = process.env.RESEND_FROM_EMAIL || 'onboarding@resend.dev';
+    // Configure Nodemailer Gmail Transport
+    const transporter = nodemailer.createTransport({
+      service: 'gmail',
+      auth: {
+        user: gmailUser,
+        pass: gmailAppPassword,
+      },
+    });
 
-    const { data, error } = await resend.emails.send({
-      from: `IntelliDon <${fromAddress}>`,
-      to: [cleanEmail],
+    await transporter.sendMail({
+      from: `"IntelliDon" <${gmailUser}>`,
+      to: cleanEmail,
       subject: `${code} is your IntelliDon verification code`,
       html: `
         <!DOCTYPE html>
@@ -143,22 +151,14 @@ export async function POST(request: Request) {
       `,
     });
 
-    if (error) {
-      console.error('Resend email send error:', error);
-      return NextResponse.json(
-        { success: false, error: error.message || 'Failed to send OTP email.' },
-        { status: 400 }
-      );
-    }
-
     return NextResponse.json({
       success: true,
       message: `OTP verification code sent successfully to ${cleanEmail}`,
     });
   } catch (err: any) {
-    console.error('API /api/send-otp error:', err);
+    console.error('API /api/send-otp Nodemailer error:', err);
     return NextResponse.json(
-      { success: false, error: err.message || 'An unexpected error occurred while sending OTP.' },
+      { success: false, error: err.message || 'An unexpected error occurred while sending OTP email via Gmail.' },
       { status: 500 }
     );
   }
