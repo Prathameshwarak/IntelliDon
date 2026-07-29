@@ -81,7 +81,8 @@ export async function POST(request: Request) {
     }
 
     const gmailUser = process.env.GMAIL_USER || 'intellidon.otp@gmail.com';
-    const gmailAppPassword = process.env.GMAIL_APP_PASSWORD || process.env.GMAIL_PASSWORD;
+    const rawAppPassword = process.env.GMAIL_APP_PASSWORD || process.env.GMAIL_PASSWORD || '';
+    const gmailAppPassword = rawAppPassword.replace(/\s+/g, '');
 
     if (!gmailAppPassword) {
       console.error('GMAIL_APP_PASSWORD is missing in environment variables.');
