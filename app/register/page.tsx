@@ -1513,7 +1513,7 @@ export default function RegisterPage() {
                   </p>
 
                   {[
-                    { key: 'doc_logo', label: 'Organisation Logo', required: false, hint: 'PNG or JPG logo for donation receipt PDF (not considered for approval)' },
+                    { key: 'doc_logo', label: 'Organisation Logo', required: false, hint: 'Transparent PNG logo without background (~500×500 px recommended) for best PDF receipt result' },
                     { key: 'doc_admin_aadhaar', label: 'Admin Aadhaar', required: false, hint: 'Front and back in one file' },
                     { key: 'doc_bank_proof', label: 'Bank Proof', required: false, hint: 'Cancelled cheque or passbook first page' },
                     { key: 'doc_auth_letter', label: 'Authorisation Letter / Committee Resolution', required: false, hint: 'Signed by committee members' },
