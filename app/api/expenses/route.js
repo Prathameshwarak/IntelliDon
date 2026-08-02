@@ -1,6 +1,6 @@
 import { createClient } from '@supabase/supabase-js'
 import { NextResponse } from 'next/server'
-import { EXPENSE_PAYMENT_MODE_VALUES, EXPENSE_AMOUNT_REGEX, roundToTwoDecimals } from '@/lib/expensePaymentModes'
+import { EXPENSE_PAYMENT_MODE_VALUES } from '@/lib/expensePaymentModes'
 
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL,
@@ -74,9 +74,6 @@ function validateExpenseFields({ expense_date, vendor_name, vendor_phone, title,
   if (Number(amount) > MAX_AMOUNT) {
     return 'Amount cannot exceed 9 digits'
   }
-  if (!EXPENSE_AMOUNT_REGEX.test(String(amount).trim())) {
-    return 'Amount can have at most 2 decimal places'
-  }
   if (transaction_id && transaction_id.trim()) {
     if (transaction_id.trim().length > 25) return 'Transaction ID must be 25 characters or fewer'
     if (!/^[A-Za-z0-9]+$/.test(transaction_id.trim())) return 'Transaction ID must be alphanumeric'
@@ -120,7 +117,7 @@ export async function GET(request) {
   }
 
   if (expenses.length === 0) {
-    return NextResponse.json({ expenses: [], summary: { total_amount: 0, total_paid: 0, count: 0 } })
+    return NextResponse.json({ expenses: [], summary: { total_amount: 0, count: 0 } })
   }
 
   // Resolve created_by / updated_by ids to display names in one batch query
@@ -131,42 +128,33 @@ export async function GET(request) {
     namesById = Object.fromEntries((creators || []).map(u => [u.id, u.full_name]))
   }
 
-  // Each expense can have zero or more expense_payments rows (installments
-  // recorded against its Estimated Amount) — mirrors how sponsor_payments
-  // is aggregated per sponsor in the Sponsorship module. Resolve all of
-  // them in one batch query and attach the full list + computed totals to
-  // each expense.
+  // Each flat expense entry has (at most) a single matching expense_payments
+  // row — created alongside it to capture "how it was paid" (payment mode).
+  // Resolve those in one batch query and attach to each expense.
   const expenseIds = expenses.map(e => e.id)
   const { data: payments } = await supabaseAdmin
     .from('expense_payments')
-    .select('*')
+    .select('id, expense_id, payment_mode')
     .in('expense_id', expenseIds)
 
-  const paymentsByExpenseId = {}
+  const paymentByExpenseId = {}
   for (const p of payments || []) {
-    if (!paymentsByExpenseId[p.expense_id]) paymentsByExpenseId[p.expense_id] = []
-    paymentsByExpenseId[p.expense_id].push(p)
+    // If multiple payment rows ever exist for one expense, prefer the most
+    // recently seen one (query has no explicit order, but this keeps the
+    // lookup defensive rather than throwing away data).
+    paymentByExpenseId[p.expense_id] = p
   }
 
-  const fullExpenses = expenses.map(e => {
-    const expensePayments = (paymentsByExpenseId[e.id] || []).sort((a, b) => new Date(b.paid_at) - new Date(a.paid_at))
-    const amountPaid = roundToTwoDecimals(expensePayments.reduce((sum, p) => sum + Number(p.amount), 0))
-    const amountPending = roundToTwoDecimals(Math.max(0, Number(e.amount) - amountPaid))
-    const paymentStatus = amountPaid <= 0 ? 'pending' : amountPending > 0 ? 'partially_paid' : 'completed'
-    return {
-      ...e,
-      created_by_name: e.created_by ? (namesById[e.created_by] || 'Unknown') : null,
-      updated_by_name: e.updated_by ? (namesById[e.updated_by] || 'Unknown') : null,
-      amount_paid: amountPaid,
-      amount_pending: amountPending,
-      payment_status: paymentStatus,
-      payments: expensePayments
-    }
-  })
+  const fullExpenses = expenses.map(e => ({
+    ...e,
+    created_by_name: e.created_by ? (namesById[e.created_by] || 'Unknown') : null,
+    updated_by_name: e.updated_by ? (namesById[e.updated_by] || 'Unknown') : null,
+    payment_mode: paymentByExpenseId[e.id]?.payment_mode || null,
+    payment_id: paymentByExpenseId[e.id]?.id || null
+  }))
 
   const summary = {
-    total_amount: roundToTwoDecimals(fullExpenses.reduce((sum, e) => sum + Number(e.amount), 0)),
-    total_paid: roundToTwoDecimals(fullExpenses.reduce((sum, e) => sum + e.amount_paid, 0)),
+    total_amount: fullExpenses.reduce((sum, e) => sum + Number(e.amount), 0),
     count: fullExpenses.length
   }
 
@@ -197,7 +185,7 @@ export async function POST(request) {
     // via a crafted event_id from another organization)
     const { data: event, error: eventError } = await supabaseAdmin
       .from('events')
-      .select('id, end_date')
+      .select('id')
       .eq('id', event_id)
       .eq('mandal_id', mandal_id)
       .single()
@@ -206,17 +194,6 @@ export async function POST(request) {
       return NextResponse.json({ error: 'Event not found' }, { status: 404 })
     }
 
-    // Once the event's date range has ended, no new expenses can be added —
-    // the event can only be viewed/downloaded from this point on.
-    const today = new Date().toISOString().split('T')[0]
-    if (event.end_date < today) {
-      return NextResponse.json({ error: `This event has ended (ended on ${event.end_date}). Expenses can no longer be added.` }, { status: 403 })
-    }
-
-    // Note: amount here is the expense's Estimated Amount. How/when it was
-    // actually paid is tracked separately as one or more installments in
-    // expense_payments via /api/expenses/[id]/payments, the same way a
-    // sponsor's committed_amount is tracked separately from sponsor_payments.
     const { data: expense, error: insertError } = await supabaseAdmin
       .from('event_expenses')
       .insert({
@@ -227,7 +204,7 @@ export async function POST(request) {
         vendor_phone: vendor_phone?.trim() || null,
         title: title.trim(),
         description: description?.trim() || null,
-        amount: roundToTwoDecimals(amount),
+        amount: Number(amount),
         transaction_id: transaction_id?.trim() || null,
         created_by: authCheck.callerId,
         updated_by: authCheck.callerId
@@ -239,10 +216,27 @@ export async function POST(request) {
       return NextResponse.json({ error: 'Could not create expense' }, { status: 500 })
     }
 
-    return NextResponse.json({
-      success: true,
-      expense: { ...expense, amount_paid: 0, amount_pending: Number(expense.amount), payment_status: 'pending', payments: [] }
-    })
+    // Record how this expense was paid as a single, fully-paid entry in the
+    // existing expense_payments table (amount === expense.amount). This
+    // reuses the installment-payment infrastructure already backing
+    // /api/expenses/[id]/payments instead of adding a new column.
+    let paymentId = null
+    if (payment_mode) {
+      const { data: payment } = await supabaseAdmin
+        .from('expense_payments')
+        .insert({
+          expense_id: expense.id,
+          amount: Number(amount),
+          paid_at: new Date(expense_date).toISOString(),
+          payment_mode,
+          recorded_by: authCheck.callerId
+        })
+        .select('id')
+        .single()
+      paymentId = payment?.id || null
+    }
+
+    return NextResponse.json({ success: true, expense: { ...expense, payment_mode: payment_mode || null, payment_id: paymentId } })
   } catch (err) {
     return NextResponse.json({ error: 'Something went wrong' }, { status: 500 })
   }
