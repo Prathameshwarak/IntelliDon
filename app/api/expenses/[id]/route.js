@@ -1,6 +1,6 @@
 import { createClient } from '@supabase/supabase-js'
 import { NextResponse } from 'next/server'
-import { EXPENSE_PAYMENT_MODE_VALUES, EXPENSE_AMOUNT_REGEX, roundToTwoDecimals } from '@/lib/expensePaymentModes'
+import { EXPENSE_PAYMENT_MODE_VALUES } from '@/lib/expensePaymentModes'
 
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL,
@@ -70,9 +70,6 @@ function validateExpenseFields({ expense_date, vendor_name, vendor_phone, title,
   if (Number(amount) > MAX_AMOUNT) {
     return 'Amount cannot exceed 9 digits'
   }
-  if (!EXPENSE_AMOUNT_REGEX.test(String(amount).trim())) {
-    return 'Amount can have at most 2 decimal places'
-  }
   if (transaction_id && transaction_id.trim()) {
     if (transaction_id.trim().length > 25) return 'Transaction ID must be 25 characters or fewer'
     if (!/^[A-Za-z0-9]+$/.test(transaction_id.trim())) return 'Transaction ID must be alphanumeric'
@@ -92,7 +89,7 @@ export async function PATCH(request, { params }) {
 
     const { data: existing, error: fetchError } = await supabaseAdmin
       .from('event_expenses')
-      .select('id, mandal_id, event_id')
+      .select('id, mandal_id')
       .eq('id', id)
       .single()
 
@@ -105,38 +102,9 @@ export async function PATCH(request, { params }) {
       return NextResponse.json({ error: authCheck.error }, { status: authCheck.status })
     }
 
-    // Once the event's date range has ended, expenses become read-only —
-    // only viewing/downloading is permitted from that point on.
-    const { data: event } = await supabaseAdmin
-      .from('events')
-      .select('end_date')
-      .eq('id', existing.event_id)
-      .single()
-    const today = new Date().toISOString().split('T')[0]
-    if (event && event.end_date < today) {
-      return NextResponse.json({ error: `This event has ended (ended on ${event.end_date}). Expenses can no longer be edited.` }, { status: 403 })
-    }
-
     const validationError = validateExpenseFields({ expense_date, vendor_name, vendor_phone, title, description, amount, transaction_id, payment_mode })
     if (validationError) {
       return NextResponse.json({ error: validationError }, { status: 400 })
-    }
-
-    // The Estimated Amount can never be edited below what's already been
-    // recorded as paid against this expense — otherwise a paid installment
-    // total would exceed the estimate it was recorded against.
-    const { data: existingPayments } = await supabaseAdmin
-      .from('expense_payments')
-      .select('amount')
-      .eq('expense_id', id)
-
-    const alreadyPaid = roundToTwoDecimals((existingPayments || []).reduce((sum, p) => sum + Number(p.amount), 0))
-    const newAmount = roundToTwoDecimals(amount)
-    if (newAmount < alreadyPaid) {
-      return NextResponse.json(
-        { error: `Estimated Amount cannot be less than the total recorded payment amount (₹${alreadyPaid.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })})` },
-        { status: 400 }
-      )
     }
 
     const { data: updated, error: updateError } = await supabaseAdmin
@@ -147,7 +115,7 @@ export async function PATCH(request, { params }) {
         vendor_phone: vendor_phone?.trim() || null,
         title: title.trim(),
         description: description?.trim() || null,
-        amount: newAmount,
+        amount: Number(amount),
         transaction_id: transaction_id?.trim() || null,
         updated_by: authCheck.callerId,
         updated_at: new Date().toISOString()
@@ -160,23 +128,49 @@ export async function PATCH(request, { params }) {
       return NextResponse.json({ error: 'Could not update expense' }, { status: 500 })
     }
 
-    // Recompute paid/pending against the (possibly changed) Estimated
-    // Amount from whatever installments already exist in expense_payments —
-    // those installment rows themselves are left untouched by this edit.
-    const { data: fullPayments } = await supabaseAdmin
+    // Keep the linked expense_payments row (this flat expense's "how it was
+    // paid" record) in sync with the edited amount/date/mode. There should
+    // be at most one such row for a flat expense entry; if one doesn't
+    // exist yet (e.g. an expense created before this feature shipped),
+    // create it now instead.
+    let paymentId = null
+    const { data: existingPayments } = await supabaseAdmin
       .from('expense_payments')
-      .select('*')
+      .select('id')
       .eq('expense_id', id)
+      .order('created_at', { ascending: true })
+      .limit(1)
 
-    const sortedPayments = (fullPayments || []).sort((a, b) => new Date(b.paid_at) - new Date(a.paid_at))
-    const amountPaid = roundToTwoDecimals(sortedPayments.reduce((sum, p) => sum + Number(p.amount), 0))
-    const amountPending = roundToTwoDecimals(Math.max(0, Number(updated.amount) - amountPaid))
-    const paymentStatus = amountPaid <= 0 ? 'pending' : amountPending > 0 ? 'partially_paid' : 'completed'
+    const existingPayment = existingPayments?.[0] || null
 
-    return NextResponse.json({
-      success: true,
-      expense: { ...updated, amount_paid: amountPaid, amount_pending: amountPending, payment_status: paymentStatus, payments: sortedPayments }
-    })
+    if (existingPayment) {
+      const { data: syncedPayment } = await supabaseAdmin
+        .from('expense_payments')
+        .update({
+          amount: Number(amount),
+          paid_at: new Date(expense_date).toISOString(),
+          payment_mode: payment_mode || null
+        })
+        .eq('id', existingPayment.id)
+        .select('id')
+        .single()
+      paymentId = syncedPayment?.id || existingPayment.id
+    } else if (payment_mode) {
+      const { data: newPayment } = await supabaseAdmin
+        .from('expense_payments')
+        .insert({
+          expense_id: id,
+          amount: Number(amount),
+          paid_at: new Date(expense_date).toISOString(),
+          payment_mode,
+          recorded_by: authCheck.callerId
+        })
+        .select('id')
+        .single()
+      paymentId = newPayment?.id || null
+    }
+
+    return NextResponse.json({ success: true, expense: { ...updated, payment_mode: payment_mode || null, payment_id: paymentId } })
   } catch (err) {
     return NextResponse.json({ error: 'Something went wrong' }, { status: 500 })
   }
