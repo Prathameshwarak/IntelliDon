@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import { SPONSOR_PAYMENT_METHODS, PAYMENT_EDIT_WINDOW_MS } from '@/lib/sponsorPaymentMethods'
 
@@ -144,7 +144,6 @@ export default function SponsorshipSection({ mandalId, events, showToast }: Prop
 
   const [expandedId, setExpandedId] = useState<string | null>(null)
   const [expandedPanel, setExpandedPanel] = useState<'payments' | 'benefits'>('payments')
-  const expandedCardRef = useRef<HTMLDivElement | null>(null)
 
   const [payAmount, setPayAmount] = useState('')
   const [payMethod, setPayMethod] = useState('cash')
@@ -188,21 +187,6 @@ export default function SponsorshipSection({ mandalId, events, showToast }: Prop
   }
 
   useEffect(() => { if (mandalId) fetchSponsors() }, [mandalId, eventFilter])
-
-  // ── Auto-close the expanded Payments/Promises card on outside click ──
-  useEffect(() => {
-    if (!expandedId) return
-
-    function handleOutsideClick(e: MouseEvent) {
-      const target = e.target as HTMLElement
-      if (expandedCardRef.current && expandedCardRef.current.contains(target)) return
-      setExpandedId(null)
-      setEditingPaymentId(null)
-    }
-
-    document.addEventListener('mousedown', handleOutsideClick)
-    return () => document.removeEventListener('mousedown', handleOutsideClick)
-  }, [expandedId])
 
   function resetForm() {
     setForm(emptyForm)
@@ -319,15 +303,16 @@ export default function SponsorshipSection({ mandalId, events, showToast }: Prop
     setEditingPaymentId(null)
   }
 
-  function toggleExpand(s: Sponsor, panel: 'payments' | 'benefits') {
-    if (expandedId === s.id && expandedPanel === panel) {
-      setExpandedId(null)
-    } else {
-      setExpandedId(s.id)
-      setExpandedPanel(panel)
-      resetPaymentForm()
-      setBenefitName(''); setBenefitRepetition(''); setBenefitStart(''); setBenefitEnd('')
-    }
+  function openSponsorModal(s: Sponsor, panel: 'payments' | 'benefits') {
+    setExpandedId(s.id)
+    setExpandedPanel(panel)
+    resetPaymentForm()
+    setBenefitName(''); setBenefitRepetition(''); setBenefitStart(''); setBenefitEnd('')
+  }
+
+  function closeSponsorModal() {
+    setExpandedId(null)
+    setEditingPaymentId(null)
   }
 
   function canEditPayment(p: SponsorPayment) {
@@ -467,8 +452,18 @@ export default function SponsorshipSection({ mandalId, events, showToast }: Prop
       </div>
 
       {showForm && (
-        <div className="bg-[#F5EDE2] dark:bg-gray-800 border border-[#1A1208]/10 dark:border-gray-700 rounded-xl p-4 flex flex-col gap-3">
-          <p className="text-sm font-bold text-[#1A1208] dark:text-white">{editingId ? 'Edit Sponsor' : 'New Sponsor'}</p>
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm animate-fade-in"
+          onClick={resetForm}
+        >
+          <div
+            className="bg-[#F5EDE2] dark:bg-gray-900 border border-[#1A1208]/15 dark:border-gray-800 rounded-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto p-5 shadow-2xl flex flex-col gap-3"
+            onClick={e => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between mb-1">
+              <h3 className="text-sm font-bold text-[#1A1208] dark:text-white">{editingId ? 'Edit Sponsor' : 'New Sponsor'}</h3>
+              <button onClick={resetForm} className="text-[#7a6a55] dark:text-gray-500 hover:text-[#1A1208] dark:hover:text-white text-xl leading-none cursor-pointer">&times;</button>
+            </div>
 
           <div>
             <label className="text-xs text-[#7a6a55] dark:text-gray-400 mb-1 block font-bold">Event</label>
@@ -585,7 +580,8 @@ export default function SponsorshipSection({ mandalId, events, showToast }: Prop
               className="flex-1 bg-gradient-to-r from-[#E8650A] to-[#f97316] hover:from-[#d05807] hover:to-[#ea580c] disabled:opacity-50 text-white text-xs font-bold py-2.5 rounded-xl transition-all cursor-pointer shadow-md shadow-[#E8650A]/20">
               {submitting ? 'Saving...' : editingId ? 'Save Changes' : 'Add Sponsor'}
             </button>
-            <button onClick={resetForm} className="px-4 bg-[#F5EDE2] dark:bg-gray-700 hover:bg-[#ebdcc9] dark:hover:bg-gray-600 text-[#1A1208] dark:text-gray-300 border border-[#1A1208]/10 dark:border-gray-600 text-xs font-bold rounded-xl transition-colors cursor-pointer">Cancel</button>
+            <button onClick={resetForm} className="px-4 bg-white dark:bg-gray-700 hover:bg-[#ebdcc9] dark:hover:bg-gray-600 text-[#1A1208] dark:text-gray-300 border border-[#1A1208]/10 dark:border-gray-600 text-xs font-bold rounded-xl transition-colors cursor-pointer">Cancel</button>
+          </div>
           </div>
         </div>
       )}
@@ -597,10 +593,9 @@ export default function SponsorshipSection({ mandalId, events, showToast }: Prop
       ) : (
         <div className="flex flex-col gap-3">
           {sponsors.map(s => {
-            const isExpanded = expandedId === s.id
             const displayPackage = s.package === 'others' ? (s.package_name || 'Others') : s.package
             return (
-            <div key={s.id} ref={isExpanded ? expandedCardRef : undefined} className="bg-white dark:bg-gray-800 border border-[#1A1208]/15 dark:border-gray-700 rounded-xl p-4 shadow-sm">
+            <div key={s.id} className="bg-white dark:bg-gray-800 border border-[#1A1208]/15 dark:border-gray-700 rounded-xl p-4 shadow-sm">
               <div className="flex items-start justify-between gap-3">
                 <div className="flex-1">
                   <div className="flex items-center gap-2 flex-wrap">
@@ -638,124 +633,181 @@ export default function SponsorshipSection({ mandalId, events, showToast }: Prop
               </div>
 
               <div className="flex items-center gap-3 mt-3 flex-wrap">
-                <button onClick={() => toggleExpand(s, 'payments')} className="text-xs text-orange-600 dark:text-orange-400 hover:underline font-bold">
-                  {isExpanded && expandedPanel === 'payments' ? 'Hide payments' : `Payments (${s.payments.length})`}
+                <button onClick={() => openSponsorModal(s, 'payments')} className="text-xs text-orange-600 dark:text-orange-400 hover:underline font-bold cursor-pointer">
+                  {`Payments (${s.payments.length})`}
                 </button>
-                <button onClick={() => toggleExpand(s, 'benefits')} className="text-xs text-purple-400 hover:text-purple-300 font-medium">
-                  {isExpanded && expandedPanel === 'benefits' ? 'Hide promises' : `Promises (${s.benefits.length})`}
+                <button onClick={() => openSponsorModal(s, 'benefits')} className="text-xs text-purple-600 dark:text-purple-400 hover:underline font-bold cursor-pointer">
+                  {`Promises (${s.benefits.length})`}
                 </button>
-                <button onClick={() => startEdit(s)} className="text-xs text-gray-400 hover:text-white font-medium ml-auto">Edit</button>
+                <button onClick={() => startEdit(s)} className="text-xs text-[#7a6a55] dark:text-gray-400 hover:text-[#1A1208] dark:hover:text-white font-bold ml-auto cursor-pointer">Edit</button>
               </div>
-
-              {/* Payments panel */}
-              {isExpanded && expandedPanel === 'payments' && (
-                <div className="mt-3 pt-3 border-t border-gray-700 flex flex-col gap-2">
-                  {s.payments.length === 0 && <p className="text-xs text-gray-500">No payments recorded yet.</p>}
-                  {s.payments.map(p => (
-                    <div key={p.id} className="flex items-center justify-between bg-gray-900 border border-gray-800 rounded-lg px-3 py-2">
-                      <div>
-                        <p className="text-xs text-white font-medium">
-                          {formatMoney(p.amount)} <span className="text-gray-500 font-normal">· {paymentMethodLabel(p.payment_method)}</span>
-                        </p>
-                        <p className="text-[11px] text-gray-500">
-                          {new Date(p.received_at).toLocaleString('en-IN', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
-                          {p.transaction_id ? ` · Txn: ${p.transaction_id}` : ''}
-                          {p.notes ? ` · ${p.notes}` : ''}
-                        </p>
-                      </div>
-                      {canEditPayment(p) && (
-                        <button onClick={() => startEditPayment(p)} className="text-[11px] text-orange-400/80 hover:text-orange-400">Edit</button>
-                      )}
-                    </div>
-                  ))}
-
-                  {(s.committed_amount === 0 || s.amount_pending > 0 || editingPaymentId) && (
-                    <div className="bg-gray-900 border border-gray-800 rounded-lg p-3 mt-1 flex flex-col gap-2">
-                      <p className="text-xs font-medium text-gray-300">
-                        {editingPaymentId ? 'Edit payment' : 'Record a payment (installment)'}
-                      </p>
-                      <div className="grid grid-cols-2 gap-2">
-                        <input value={payAmount} onChange={e => setPayAmount(e.target.value)} type="number" min="0" step="0.01"
-                          placeholder={s.committed_amount > 0 ? `Amount (up to ${formatMoney(s.amount_pending)})` : 'Amount'}
-                          className="bg-gray-950 border border-gray-800 rounded-lg px-3 py-2 text-xs text-white placeholder-gray-600 focus:outline-none focus:border-orange-500" />
-                        <select value={payMethod} onChange={e => setPayMethod(e.target.value)}
-                          className="bg-gray-950 border border-gray-800 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-orange-500">
-                          {SPONSOR_PAYMENT_METHODS.map(m => <option key={m.value} value={m.value}>{m.label}</option>)}
-                        </select>
-                      </div>
-                      <input value={payDate} onChange={e => setPayDate(e.target.value)} type="datetime-local"
-                        className="bg-gray-950 border border-gray-800 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-orange-500" style={{ colorScheme: 'dark' }} />
-                      <input value={payTxnId} onChange={e => setPayTxnId(e.target.value)} placeholder="Transaction ID (optional)"
-                        className="bg-gray-950 border border-gray-800 rounded-lg px-3 py-2 text-xs text-white placeholder-gray-600 focus:outline-none focus:border-orange-500" />
-                      <input value={payNotes} onChange={e => setPayNotes(e.target.value)} placeholder="Notes (optional)"
-                        className="bg-gray-950 border border-gray-800 rounded-lg px-3 py-2 text-xs text-white placeholder-gray-600 focus:outline-none focus:border-orange-500" />
-                      <div className="flex gap-2">
-                        <button onClick={() => submitPayment(s)} disabled={paySubmitting}
-                          className="flex-1 bg-orange-500 hover:bg-orange-600 disabled:opacity-50 text-white text-xs font-medium py-2 rounded-lg">
-                          {paySubmitting ? 'Saving...' : editingPaymentId ? 'Save Changes' : 'Record Payment'}
-                        </button>
-                        {editingPaymentId && (
-                          <button onClick={resetPaymentForm} className="px-3 bg-gray-800 text-gray-300 text-xs rounded-lg">Cancel</button>
-                        )}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {/* Promises panel */}
-              {isExpanded && expandedPanel === 'benefits' && (
-                <div className="mt-3 pt-3 border-t border-gray-700 flex flex-col gap-2">
-                  {s.benefits.length === 0 && <p className="text-xs text-gray-500">No promised benefits added yet.</p>}
-                  {s.benefits.map(b => (
-                    <div key={b.id} className="flex items-center justify-between bg-gray-900 border border-gray-800 rounded-lg px-3 py-2 gap-2">
-                      <div className="flex-1">
-                        <p className="text-xs text-white font-medium">{b.benefit_name}</p>
-                        <p className="text-[11px] text-gray-500">
-                          {b.repetition ? `${b.repetition} · ` : ''}
-                          {b.date_start ? new Date(b.date_start).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' }) : ''}
-                          {b.date_start && b.date_end ? ' – ' : ''}
-                          {b.date_end ? new Date(b.date_end).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' }) : ''}
-                          {(b.date_start || b.date_end) ? ' · ' : ''}
-                          {durationRemainingLabel(b)}
-                        </p>
-                      </div>
-                      <button
-                        onClick={() => toggleDelivered(b)}
-                        className={`text-[11px] px-2 py-1 rounded-lg font-semibold shrink-0 ${
-                          b.delivered ? 'bg-green-900/50 text-green-400' : 'bg-gray-700 text-gray-300'
-                        }`}
-                      >
-                        {b.delivered ? 'Delivered ✓' : 'Mark Delivered'}
-                      </button>
-                      <button onClick={() => deleteBenefit(b.id)} className="text-[11px] text-red-400/70 hover:text-red-400 shrink-0">Remove</button>
-                    </div>
-                  ))}
-
-                  <div className="bg-gray-900 border border-gray-800 rounded-lg p-3 mt-1 flex flex-col gap-2">
-                    <p className="text-xs font-medium text-gray-300">Add a promised benefit</p>
-                    <input value={benefitName} onChange={e => setBenefitName(e.target.value)} placeholder="Benefit name (e.g. Banner, Logo, Stall Space)"
-                      className="bg-gray-950 border border-gray-800 rounded-lg px-3 py-2 text-xs text-white placeholder-gray-600 focus:outline-none focus:border-orange-500" />
-                    <input value={benefitRepetition} onChange={e => setBenefitRepetition(e.target.value)} placeholder="Repetition (e.g. 3x per day, optional)"
-                      className="bg-gray-950 border border-gray-800 rounded-lg px-3 py-2 text-xs text-white placeholder-gray-600 focus:outline-none focus:border-orange-500" />
-                    <div className="grid grid-cols-2 gap-2">
-                      <input value={benefitStart} onChange={e => setBenefitStart(e.target.value)} type="date"
-                        className="bg-gray-950 border border-gray-800 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-orange-500" style={{ colorScheme: 'dark' }} />
-                      <input value={benefitEnd} onChange={e => setBenefitEnd(e.target.value)} type="date"
-                        className="bg-gray-950 border border-gray-800 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-orange-500" style={{ colorScheme: 'dark' }} />
-                    </div>
-                    <button onClick={() => submitBenefit(s)} disabled={benefitSubmitting}
-                      className="bg-purple-600 hover:bg-purple-700 disabled:opacity-50 text-white text-xs font-medium py-2 rounded-lg">
-                      {benefitSubmitting ? 'Adding...' : 'Add Promise'}
-                    </button>
-                  </div>
-                </div>
-              )}
             </div>
             )
           })}
         </div>
       )}
+
+      {/* Payments / Promises popup — same style as the View popup, with a tab switcher matching the two trigger buttons above */}
+      {expandedId && (() => {
+        const s = sponsors.find(x => x.id === expandedId)
+        if (!s) return null
+        const showPaymentForm = s.committed_amount === 0 || s.amount_pending > 0 || editingPaymentId
+        return (
+          <div
+            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm animate-fade-in"
+            onClick={closeSponsorModal}
+          >
+            <div
+              className="bg-[#F5EDE2] dark:bg-gray-900 border border-[#1A1208]/15 dark:border-gray-800 rounded-2xl w-full max-w-lg max-h-[85vh] shadow-2xl flex flex-col overflow-hidden"
+              onClick={e => e.stopPropagation()}
+            >
+              {/* Header — fixed */}
+              <div className="flex items-center justify-between px-5 pt-5 pb-3 shrink-0">
+                <div>
+                  <h3 className="text-sm font-bold text-[#1A1208] dark:text-white">{expandedPanel === 'payments' ? 'Payments' : 'Promises'}</h3>
+                  <p className="text-xs text-[#7a6a55] dark:text-gray-400 mt-0.5 font-medium">{s.company_name}{s.committed_amount > 0 ? ` · ${formatMoney(s.committed_amount)}` : ''}</p>
+                </div>
+                <button onClick={closeSponsorModal} className="text-[#7a6a55] dark:text-gray-500 hover:text-[#1A1208] dark:hover:text-white text-xl leading-none cursor-pointer">&times;</button>
+              </div>
+
+              {/* Tabs — fixed */}
+              <div className="flex items-center gap-2 px-5 pb-3 border-b border-[#1A1208]/10 dark:border-gray-800 shrink-0">
+                <button
+                  onClick={() => setExpandedPanel('payments')}
+                  className={`text-xs font-bold px-3 py-1.5 rounded-lg cursor-pointer transition-colors ${expandedPanel === 'payments' ? 'bg-[#E8650A]/10 text-[#E8650A] dark:bg-orange-400/10 dark:text-orange-400' : 'text-[#7a6a55] dark:text-gray-400 hover:bg-white dark:hover:bg-gray-800'}`}
+                >
+                  Payments ({s.payments.length})
+                </button>
+                <button
+                  onClick={() => setExpandedPanel('benefits')}
+                  className={`text-xs font-bold px-3 py-1.5 rounded-lg cursor-pointer transition-colors ${expandedPanel === 'benefits' ? 'bg-purple-500/10 text-purple-600 dark:text-purple-400' : 'text-[#7a6a55] dark:text-gray-400 hover:bg-white dark:hover:bg-gray-800'}`}
+                >
+                  Promises ({s.benefits.length})
+                </button>
+              </div>
+
+              {/* Payments tab */}
+              {expandedPanel === 'payments' && (
+                <>
+                  {/* Payment history — scrollable, ~2 records visible at a time */}
+                  <div className="px-5 pt-3 pb-1 overflow-y-auto shrink-0" style={{ maxHeight: '150px' }}>
+                    <p className="text-[10px] uppercase text-[#7a6a55] dark:text-gray-500 font-bold mb-1.5">Previous Payments</p>
+                    {s.payments.length === 0 && <p className="text-xs text-[#7a6a55] dark:text-gray-500 font-medium">No payments recorded yet.</p>}
+                    <div className="flex flex-col gap-2">
+                      {s.payments.map(p => (
+                        <div key={p.id} className="flex items-center justify-between bg-white dark:bg-gray-900 border border-[#1A1208]/10 dark:border-gray-800 rounded-lg px-3 py-2 gap-2">
+                          <div>
+                            <p className="text-xs text-[#1A1208] dark:text-white font-bold">
+                              {formatMoney(p.amount)} <span className="text-[#7a6a55] dark:text-gray-500 font-normal">· {paymentMethodLabel(p.payment_method)}</span>
+                            </p>
+                            <p className="text-[11px] text-[#7a6a55] dark:text-gray-500">
+                              {new Date(p.received_at).toLocaleString('en-IN', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                              {p.transaction_id ? ` · Txn: ${p.transaction_id}` : ''}
+                              {p.notes ? ` · ${p.notes}` : ''}
+                            </p>
+                          </div>
+                          {canEditPayment(p) && (
+                            <button onClick={() => startEditPayment(p)} className="text-[11px] text-[#E8650A]/80 dark:text-orange-400/80 hover:text-[#E8650A] dark:hover:text-orange-400 font-bold shrink-0 cursor-pointer">Edit</button>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Record a payment — fixed, always visible, never scrolls */}
+                  {showPaymentForm && (
+                    <div className="px-5 pt-3 pb-5 border-t border-[#1A1208]/10 dark:border-gray-800 shrink-0 flex flex-col gap-2 bg-[#F5EDE2] dark:bg-gray-900">
+                      <p className="text-xs font-bold text-[#1A1208] dark:text-gray-300">
+                        {editingPaymentId ? 'Edit payment' : 'Record a payment (installment)'}
+                      </p>
+                      <div className="grid grid-cols-2 gap-2">
+                        <input value={payAmount} onChange={e => setPayAmount(e.target.value)} type="number" min="0" step="0.01"
+                          placeholder={s.committed_amount > 0 ? `Amount (up to ${formatMoney(s.amount_pending)})` : 'Amount'}
+                          className="bg-white dark:bg-gray-950 border border-[#1A1208]/10 dark:border-gray-800 rounded-lg px-3 py-2 text-xs text-[#1A1208] dark:text-white placeholder-[#9e8c76] dark:placeholder-gray-600 focus:outline-none focus:border-[#E8650A] font-medium" />
+                        <select value={payMethod} onChange={e => setPayMethod(e.target.value)}
+                          className="bg-white dark:bg-gray-950 border border-[#1A1208]/10 dark:border-gray-800 rounded-lg px-3 py-2 text-xs text-[#1A1208] dark:text-white focus:outline-none focus:border-[#E8650A] font-medium">
+                          {SPONSOR_PAYMENT_METHODS.map(m => <option key={m.value} value={m.value}>{m.label}</option>)}
+                        </select>
+                      </div>
+                      <input value={payDate} onChange={e => setPayDate(e.target.value)} type="datetime-local"
+                        className="bg-white dark:bg-gray-950 border border-[#1A1208]/10 dark:border-gray-800 rounded-lg px-3 py-2 text-xs text-[#1A1208] dark:text-white focus:outline-none focus:border-[#E8650A] font-medium" />
+                      <input value={payTxnId} onChange={e => setPayTxnId(e.target.value)} placeholder="Transaction ID (optional)"
+                        className="bg-white dark:bg-gray-950 border border-[#1A1208]/10 dark:border-gray-800 rounded-lg px-3 py-2 text-xs text-[#1A1208] dark:text-white placeholder-[#9e8c76] dark:placeholder-gray-600 focus:outline-none focus:border-[#E8650A] font-medium" />
+                      <input value={payNotes} onChange={e => setPayNotes(e.target.value)} placeholder="Notes (optional)"
+                        className="bg-white dark:bg-gray-950 border border-[#1A1208]/10 dark:border-gray-800 rounded-lg px-3 py-2 text-xs text-[#1A1208] dark:text-white placeholder-[#9e8c76] dark:placeholder-gray-600 focus:outline-none focus:border-[#E8650A] font-medium" />
+                      <div className="flex gap-2">
+                        <button onClick={() => submitPayment(s)} disabled={paySubmitting}
+                          className="flex-1 bg-gradient-to-r from-[#E8650A] to-[#f97316] hover:from-[#d05807] hover:to-[#ea580c] disabled:opacity-50 text-white text-xs font-bold py-2 rounded-lg cursor-pointer transition-all">
+                          {paySubmitting ? 'Saving...' : editingPaymentId ? 'Save Changes' : 'Record Payment'}
+                        </button>
+                        {editingPaymentId && (
+                          <button onClick={resetPaymentForm} className="px-3 bg-[#F5EDE2] dark:bg-gray-800 text-[#1A1208] dark:text-gray-300 border border-[#1A1208]/10 dark:border-gray-700 text-xs font-bold rounded-lg cursor-pointer">Cancel</button>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </>
+              )}
+
+              {/* Promises tab */}
+              {expandedPanel === 'benefits' && (
+                <>
+                  {/* Promise history — scrollable, ~2 records visible at a time */}
+                  <div className="px-5 pt-3 pb-1 overflow-y-auto shrink-0" style={{ maxHeight: '150px' }}>
+                    <p className="text-[10px] uppercase text-[#7a6a55] dark:text-gray-500 font-bold mb-1.5">Promised Benefits</p>
+                    {s.benefits.length === 0 && <p className="text-xs text-[#7a6a55] dark:text-gray-500 font-medium">No promised benefits added yet.</p>}
+                    <div className="flex flex-col gap-2">
+                      {s.benefits.map(b => (
+                        <div key={b.id} className="flex items-center justify-between bg-white dark:bg-gray-900 border border-[#1A1208]/10 dark:border-gray-800 rounded-lg px-3 py-2 gap-2">
+                          <div className="flex-1">
+                            <p className="text-xs text-[#1A1208] dark:text-white font-bold">{b.benefit_name}</p>
+                            <p className="text-[11px] text-[#7a6a55] dark:text-gray-500">
+                              {b.repetition ? `${b.repetition} · ` : ''}
+                              {b.date_start ? new Date(b.date_start).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' }) : ''}
+                              {b.date_start && b.date_end ? ' – ' : ''}
+                              {b.date_end ? new Date(b.date_end).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' }) : ''}
+                              {(b.date_start || b.date_end) ? ' · ' : ''}
+                              {durationRemainingLabel(b)}
+                            </p>
+                          </div>
+                          <button
+                            onClick={() => toggleDelivered(b)}
+                            className={`text-[11px] px-2 py-1 rounded-lg font-bold shrink-0 cursor-pointer transition-colors ${
+                              b.delivered ? 'bg-emerald-500/10 text-emerald-600 dark:bg-green-900/50 dark:text-green-400' : 'bg-[#F5EDE2] dark:bg-gray-700 text-[#7a6a55] dark:text-gray-300'
+                            }`}
+                          >
+                            {b.delivered ? 'Delivered ✓' : 'Mark Delivered'}
+                          </button>
+                          <button onClick={() => deleteBenefit(b.id)} className="text-[11px] text-rose-600/70 dark:text-red-400/70 hover:text-rose-600 dark:hover:text-red-400 shrink-0 cursor-pointer font-bold">Remove</button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Add a promised benefit — fixed, always visible, never scrolls */}
+                  <div className="px-5 pt-3 pb-5 border-t border-[#1A1208]/10 dark:border-gray-800 shrink-0 flex flex-col gap-2 bg-[#F5EDE2] dark:bg-gray-900">
+                    <p className="text-xs font-bold text-[#1A1208] dark:text-gray-300">Add a promised benefit</p>
+                    <input value={benefitName} onChange={e => setBenefitName(e.target.value)} placeholder="Benefit name (e.g. Banner, Logo, Stall Space)"
+                      className="bg-white dark:bg-gray-950 border border-[#1A1208]/10 dark:border-gray-800 rounded-lg px-3 py-2 text-xs text-[#1A1208] dark:text-white placeholder-[#9e8c76] dark:placeholder-gray-600 focus:outline-none focus:border-[#E8650A] font-medium" />
+                    <input value={benefitRepetition} onChange={e => setBenefitRepetition(e.target.value)} placeholder="Repetition (e.g. 3x per day, optional)"
+                      className="bg-white dark:bg-gray-950 border border-[#1A1208]/10 dark:border-gray-800 rounded-lg px-3 py-2 text-xs text-[#1A1208] dark:text-white placeholder-[#9e8c76] dark:placeholder-gray-600 focus:outline-none focus:border-[#E8650A] font-medium" />
+                    <div className="grid grid-cols-2 gap-2">
+                      <input value={benefitStart} onChange={e => setBenefitStart(e.target.value)} type="date"
+                        className="bg-white dark:bg-gray-950 border border-[#1A1208]/10 dark:border-gray-800 rounded-lg px-3 py-2 text-xs text-[#1A1208] dark:text-white focus:outline-none focus:border-[#E8650A] font-medium" />
+                      <input value={benefitEnd} onChange={e => setBenefitEnd(e.target.value)} type="date"
+                        className="bg-white dark:bg-gray-950 border border-[#1A1208]/10 dark:border-gray-800 rounded-lg px-3 py-2 text-xs text-[#1A1208] dark:text-white focus:outline-none focus:border-[#E8650A] font-medium" />
+                    </div>
+                    <button onClick={() => submitBenefit(s)} disabled={benefitSubmitting}
+                      className="bg-purple-600 hover:bg-purple-700 disabled:opacity-50 text-white text-xs font-bold py-2 rounded-lg cursor-pointer transition-colors">
+                      {benefitSubmitting ? 'Adding...' : 'Add Promise'}
+                    </button>
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
+        )
+      })()}
     </div>
   )
 }

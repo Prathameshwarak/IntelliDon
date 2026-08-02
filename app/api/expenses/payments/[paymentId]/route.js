@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js'
 import { NextResponse } from 'next/server'
+import { EXPENSE_AMOUNT_REGEX, roundToTwoDecimals } from '@/lib/expensePaymentModes'
 
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL,
@@ -41,22 +42,26 @@ async function verifyCaller(request, mandalIdToCheck) {
 
 const VALID_MODES = ['cash', 'upi', 'bank_transfer', 'cheque', 'other']
 
+// 3-hour edit window for correcting an expense payment entry — mirrors
+// PAYMENT_EDIT_WINDOW_MS used for sponsor payments.
+const PAYMENT_EDIT_WINDOW_MS = 3 * 60 * 60 * 1000
+
 async function loadPaymentWithExpense(paymentId) {
   const { data: payment, error } = await supabaseAdmin
     .from('expense_payments')
-    .select('*, event_expenses!inner(id, mandal_id, amount)')
+    .select('*, event_expenses!inner(id, mandal_id, event_id, amount)')
     .eq('id', paymentId)
     .single()
   if (error || !payment) return null
   return payment
 }
 
-// PATCH — correct a payment entry (amount, date, mode, notes)
+// PATCH — correct a payment entry (amount, date, mode, transaction id, notes)
 export async function PATCH(request, { params }) {
   try {
     const { paymentId } = await params
     const body = await request.json()
-    const { amount, paid_at, payment_mode, notes } = body
+    const { amount, paid_at, payment_mode, transaction_id, notes } = body
 
     const payment = await loadPaymentWithExpense(paymentId)
     if (!payment) return NextResponse.json({ error: 'Payment not found' }, { status: 404 })
@@ -67,11 +72,33 @@ export async function PATCH(request, { params }) {
       return NextResponse.json({ error: authCheck.error }, { status: authCheck.status })
     }
 
+    if (Date.now() - new Date(payment.created_at).getTime() > PAYMENT_EDIT_WINDOW_MS) {
+      return NextResponse.json({ error: 'This payment can no longer be edited — the 3-hour edit window has passed' }, { status: 403 })
+    }
+
+    // Once the event's date range has ended, payments become read-only.
+    const { data: event } = await supabaseAdmin
+      .from('events')
+      .select('end_date')
+      .eq('id', expense.event_id)
+      .single()
+    const today = new Date().toISOString().split('T')[0]
+    if (event && event.end_date < today) {
+      return NextResponse.json({ error: `This event has ended (ended on ${event.end_date}). Payments can no longer be edited.` }, { status: 403 })
+    }
+
     if (amount !== undefined && (isNaN(amount) || Number(amount) <= 0)) {
       return NextResponse.json({ error: 'Amount must be a positive number' }, { status: 400 })
     }
+    if (amount !== undefined && !EXPENSE_AMOUNT_REGEX.test(String(amount).trim())) {
+      return NextResponse.json({ error: 'Amount can have at most 2 decimal places' }, { status: 400 })
+    }
     if (payment_mode && !VALID_MODES.includes(payment_mode)) {
       return NextResponse.json({ error: 'Invalid payment mode' }, { status: 400 })
+    }
+    if (transaction_id && transaction_id.trim()) {
+      if (transaction_id.trim().length > 25) return NextResponse.json({ error: 'Transaction ID must be 25 characters or fewer' }, { status: 400 })
+      if (!/^[A-Za-z0-9]+$/.test(transaction_id.trim())) return NextResponse.json({ error: 'Transaction ID must be alphanumeric' }, { status: 400 })
     }
 
     // Re-check the total against the expense amount, excluding this payment
@@ -82,16 +109,17 @@ export async function PATCH(request, { params }) {
         .eq('expense_id', expense.id)
         .neq('id', paymentId)
 
-      const othersTotal = (siblings || []).reduce((sum, p) => sum + Number(p.amount), 0)
+      const othersTotal = roundToTwoDecimals((siblings || []).reduce((sum, p) => sum + Number(p.amount), 0))
       if (othersTotal + Number(amount) > Number(expense.amount) + 0.01) {
         return NextResponse.json({ error: 'This amount would exceed the total expense amount' }, { status: 400 })
       }
     }
 
     const updates = {}
-    if (amount !== undefined) updates.amount = Number(amount)
+    if (amount !== undefined) updates.amount = roundToTwoDecimals(amount)
     if (paid_at !== undefined) updates.paid_at = paid_at
     if (payment_mode !== undefined) updates.payment_mode = payment_mode || null
+    if (transaction_id !== undefined) updates.transaction_id = transaction_id?.trim() || null
     if (notes !== undefined) updates.notes = notes?.trim() || null
 
     const { data: updated, error: updateError } = await supabaseAdmin
