@@ -11,6 +11,7 @@ export default function SharePage() {
   const [loading, setLoading] = useState(true)
   const [mandalName, setMandalName] = useState('')
   const [eventName, setEventName] = useState('')
+  const [hasActiveEvent, setHasActiveEvent] = useState(true)
   const [slug, setSlug] = useState('')
   const [donationLink, setDonationLink] = useState('')
   const [userRole, setUserRole] = useState('')
@@ -54,13 +55,22 @@ export default function SharePage() {
         setDonationLink(link)
 
         // Fetch active event name via API
-        const eventsRes = await fetch('/api/events', {
+        const eventsRes = await fetch(`/api/events?mandal_id=${mandal.id}`, {
           headers: { Authorization: `Bearer ${token}` }
         })
         const eventsData = await eventsRes.json()
         if (eventsData.events && eventsData.events.length > 0) {
-          const activeEv = eventsData.events.find((e: any) => e.is_active) || eventsData.events[0]
-          setEventName(activeEv.name || '')
+          const activeEv = eventsData.events.find((e: any) => e.is_active)
+          if (activeEv) {
+            setEventName(activeEv.name || '')
+            setHasActiveEvent(true)
+          } else {
+            setEventName('No Active Event')
+            setHasActiveEvent(false)
+          }
+        } else {
+          setEventName('No Active Event')
+          setHasActiveEvent(false)
         }
       } catch (e) {
         router.push('/login')
@@ -74,7 +84,7 @@ export default function SharePage() {
 
   // ── Generate QR once link is ready ────────────────────────────
   useEffect(() => {
-    if (!donationLink || !canvasRef.current) return
+    if (!donationLink || loading || !canvasRef.current) return
 
     QRCode.toCanvas(canvasRef.current, donationLink, {
       width: 240,
@@ -82,9 +92,13 @@ export default function SharePage() {
       color: { dark: '#000000', light: '#ffffff' },
       errorCorrectionLevel: 'M'
     }, (err) => {
-      if (!err) setQrGenerated(true)
+      if (!err) {
+        setQrGenerated(true)
+      } else {
+        console.error('QR generation error:', err)
+      }
     })
-  }, [donationLink])
+  }, [donationLink, loading])
 
   // ── Copy link ─────────────────────────────────────────────────
   function copyLink() {
@@ -96,6 +110,7 @@ export default function SharePage() {
 
   // ── Download QR as image ──────────────────────────────────────
   function downloadQR() {
+    if (!hasActiveEvent) return
     const canvas = canvasRef.current
     if (!canvas) return
 
@@ -143,7 +158,7 @@ export default function SharePage() {
   // ── Share on WhatsApp ─────────────────────────────────────────
   function shareWhatsApp() {
     const message = encodeURIComponent(
-      `🙏 Support ${mandalName} for ${eventName}!\n\nDonate online here:\n${donationLink}\n\nPowered by Intellidon`
+      `🙏 Support ${mandalName}${eventName ? ` for ${eventName}` : ''}!\n\nDonate online here:\n${donationLink}\n\nPowered by Intellidon`
     )
     window.open(`https://wa.me/?text=${message}`, '_blank')
   }
@@ -188,12 +203,46 @@ export default function SharePage() {
           </p>
         </div>
 
-        {/* QR Code */}
-        <div className="bg-white border border-[#1A1208]/10 dark:border-transparent rounded-2xl p-5 flex flex-col items-center gap-3 shadow-md">
-          <canvas ref={canvasRef} className="rounded-lg" />
+        {!hasActiveEvent && (
+          <div className="bg-amber-500/10 border border-amber-500/30 dark:border-amber-500/20 rounded-xl p-3.5 flex items-start gap-2.5 text-xs text-amber-800 dark:text-amber-300 font-medium leading-relaxed shadow-xs">
+            <span className="text-amber-600 dark:text-amber-400 text-base font-bold shrink-0">📌</span>
+            <div>
+              <strong className="font-bold text-[#1A1208] dark:text-white block mb-0.5">No Active Event</strong>
+              You must activate an event in the dashboard before donors can contribute.
+            </div>
+          </div>
+        )}
+
+        {/* QR Code Container */}
+        <div className="bg-white border border-[#1A1208]/10 dark:border-gray-800 rounded-2xl p-5 flex flex-col items-center gap-3 shadow-md relative overflow-hidden">
+          {!hasActiveEvent && (
+            <div className="absolute inset-0 z-10 bg-black/45 backdrop-blur-[3px] flex flex-col items-center justify-center p-4 text-center">
+              <div className="bg-amber-500 text-slate-950 font-bold px-3 py-1 rounded-full text-xs mb-2 shadow flex items-center gap-1">
+                <span>⚠️</span> No Active Event
+              </div>
+              <p className="text-white text-xs font-semibold max-w-[210px] leading-snug drop-shadow-md">
+                Donations are disabled because no event is currently active.
+              </p>
+              {['admin', 'manager'].includes(userRole) && (
+                <button
+                  onClick={() => router.push('/dashboard')}
+                  className="mt-3 px-3.5 py-1.5 bg-gradient-to-r from-[#E8650A] to-[#f97316] hover:from-[#d05807] hover:to-[#ea580c] text-white text-xs font-bold rounded-xl shadow-md cursor-pointer transition-transform hover:scale-105"
+                >
+                  ⚡ Activate an Event
+                </button>
+              )}
+            </div>
+          )}
+
+          <canvas ref={canvasRef} className={`rounded-lg transition-all ${!hasActiveEvent ? 'blur-md opacity-30 select-none' : ''}`} />
+
           <div className="text-center">
             <p className="text-gray-900 font-bold text-sm">{mandalName}</p>
-            <p className="text-[#E8650A] text-xs font-bold mt-0.5">{eventName}</p>
+            {hasActiveEvent ? (
+              <p className="text-[#E8650A] text-xs font-bold mt-0.5">{eventName}</p>
+            ) : (
+              <p className="text-amber-600 text-xs font-bold mt-0.5">No Active Event</p>
+            )}
           </div>
         </div>
 
@@ -233,7 +282,7 @@ export default function SharePage() {
           {/* Download QR */}
           <button
             onClick={downloadQR}
-            disabled={!qrGenerated}
+            disabled={!qrGenerated || !hasActiveEvent}
             className="w-full flex items-center justify-center gap-2 bg-[#F5EDE2] dark:bg-gray-700 hover:bg-[#ebdcc9] dark:hover:bg-gray-600 border border-[#1A1208]/10 dark:border-gray-600
               disabled:opacity-50 text-[#1A1208] dark:text-white font-bold py-3.5 rounded-xl text-xs transition-all cursor-pointer shadow-sm"
           >
