@@ -1,6 +1,16 @@
 'use client'
 import { generateExpenseReportPDF } from './generateExpenseReportPDF'
 
+export type ExpenseReportPayment = {
+  id: string
+  amount: number
+  paid_at: string
+  payment_mode: string | null
+  transaction_id: string | null
+  notes: string | null
+  created_at: string
+}
+
 export type ExpenseReportRow = {
   expense_date: string
   vendor_name: string
@@ -8,13 +18,15 @@ export type ExpenseReportRow = {
   title: string
   description: string | null
   amount: number
+  amount_paid: number
   transaction_id: string | null
   created_at: string
   created_by_name: string | null
   updated_at: string
+  payments: ExpenseReportPayment[]
 }
 
-export type ExpenseReportSummary = { total_amount: number; count: number }
+export type ExpenseReportSummary = { total_amount: number; total_paid: number; count: number }
 
 export type ExpenseReportFormat = 'pdf' | 'excel'
 
@@ -22,26 +34,58 @@ function formatDate(iso: string) {
   return new Date(iso).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })
 }
 
+function formatAmount2dp(n: number) {
+  return Number(n || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+}
+
 function csvEscape(v: string | number) {
   return `"${String(v ?? '').replace(/"/g, '""')}"`
 }
 
+// Excel/CSV columns per spec: Date, Vendor Name, Vendor Phone, Title,
+// Description, Transaction ID, Estimated Amount, Total Recorded Amount, and
+// every individual recorded payment with its own Date & Time — each payment
+// gets its own sub-row underneath the expense's summary row, distinguished
+// by the "Row Type" column, so nothing is collapsed or lost.
 function buildExcelBlob(expenses: ExpenseReportRow[]): Blob {
-  const headerRow = ['Expense Date', 'Vendor Name', 'Vendor Phone', 'Title', 'Description', 'Amount', 'Transaction ID', 'Created At', 'Created By', 'Updated At']
+  const headerRow = [
+    'Row Type', 'Expense Date', 'Vendor Name', 'Vendor Phone', 'Title', 'Description',
+    'Transaction ID', 'Estimated Amount', 'Total Recorded Amount',
+    'Payment Date & Time', 'Payment Amount', 'Payment Mode', 'Payment Transaction ID'
+  ]
   const lines = [headerRow.map(csvEscape).join(',')]
+
   for (const e of expenses) {
     lines.push([
+      'Expense',
       formatDate(e.expense_date),
       e.vendor_name,
       e.vendor_phone || '',
       e.title,
       e.description || '',
-      e.amount,
       e.transaction_id || '',
-      new Date(e.created_at).toLocaleString('en-IN'),
-      e.created_by_name || '',
-      new Date(e.updated_at).toLocaleString('en-IN')
+      formatAmount2dp(e.amount),
+      formatAmount2dp(e.amount_paid),
+      '', '', '', ''
     ].map(csvEscape).join(','))
+
+    for (const p of e.payments) {
+      lines.push([
+        'Payment',
+        formatDate(e.expense_date),
+        e.vendor_name,
+        e.vendor_phone || '',
+        e.title,
+        '',
+        '',
+        '',
+        '',
+        new Date(p.paid_at).toLocaleString('en-IN'),
+        formatAmount2dp(p.amount),
+        p.payment_mode || '',
+        p.transaction_id || ''
+      ].map(csvEscape).join(','))
+    }
   }
   return new Blob(['\uFEFF' + lines.join('\r\n')], { type: 'text/csv;charset=utf-8;' })
 }
