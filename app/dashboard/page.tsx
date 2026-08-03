@@ -2536,6 +2536,7 @@ export default function DashboardPage() {
               mandalId={mandalId}
               eventId={expenseManagerEvent.id}
               eventLabel={`${expenseManagerEvent.name} ${expenseManagerEvent.year}`}
+              eventExpired={expenseManagerEvent.is_expired || (!!expenseManagerEvent.end_date && expenseManagerEvent.end_date < new Date().toISOString().split('T')[0])}
               showToast={showToast}
               onBack={() => setExpenseManagerEvent(null)}
             />
