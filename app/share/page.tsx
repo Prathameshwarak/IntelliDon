@@ -54,7 +54,7 @@ export default function SharePage() {
         setDonationLink(link)
 
         // Fetch active event name via API
-        const eventsRes = await fetch('/api/events', {
+        const eventsRes = await fetch(`/api/events?mandal_id=${mandal.id}`, {
           headers: { Authorization: `Bearer ${token}` }
         })
         const eventsData = await eventsRes.json()
