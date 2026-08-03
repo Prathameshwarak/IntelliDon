@@ -69,7 +69,7 @@ export default function ExpenseManagerPanel({ mandalId, eventId, eventLabel, eve
 
   // ── Search + Sort ──────────────────────────────────────────
   const [search, setSearch] = useState('')
-  const [sortOption, setSortOption] = useState<SortOption>('date_asc')
+  const [sortOption, setSortOption] = useState<SortOption>('date_desc')
   const [filterOpen, setFilterOpen] = useState(false)
   const filterRef = useRef<HTMLDivElement>(null)
 

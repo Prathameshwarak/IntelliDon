@@ -1,6 +1,6 @@
 import { createClient } from '@supabase/supabase-js'
 import { NextResponse } from 'next/server'
-import { EXPENSE_PAYMENT_MODE_VALUES, EXPENSE_AMOUNT_REGEX, roundToTwoDecimals } from '@/lib/expensePaymentModes'
+import { EXPENSE_PAYMENT_MODE_VALUES, EXPENSE_AMOUNT_REGEX, roundToTwoDecimals, isExpenseActionWindowClosed, EXPENSE_ACTION_GRACE_DAYS } from '@/lib/expensePaymentModes'
 
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL,
@@ -206,11 +206,10 @@ export async function POST(request) {
       return NextResponse.json({ error: 'Event not found' }, { status: 404 })
     }
 
-    // Once the event's date range has ended, no new expenses can be added —
-    // the event can only be viewed/downloaded from this point on.
-    const today = new Date().toISOString().split('T')[0]
-    if (event.end_date < today) {
-      return NextResponse.json({ error: `This event has ended (ended on ${event.end_date}). Expenses can no longer be added.` }, { status: 403 })
+    // Expenses can be added until (Event End Date + 30 days) — after that
+    // the event's expenses become view/search/filter/export-only.
+    if (isExpenseActionWindowClosed(event.end_date)) {
+      return NextResponse.json({ error: `The ${EXPENSE_ACTION_GRACE_DAYS}-day window to add expenses for this event has closed (event ended on ${event.end_date}). You can still view, search, filter, and download existing records.` }, { status: 403 })
     }
 
     // Note: amount here is the expense's Estimated Amount. How/when it was
