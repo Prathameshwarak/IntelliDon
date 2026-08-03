@@ -193,3 +193,73 @@ export async function isOTPVerified(email: string): Promise<boolean> {
   const record = otpMap.get(key);
   return record?.verified === true;
 }
+
+// ── Verification Rate Limiter (Max 4 attempts, 10-min lock) ──
+interface VerifyAttemptRecord {
+  attempts: number;
+  lockUntil: number;
+}
+
+declare global {
+  var __otpVerifyRateMap: Map<string, VerifyAttemptRecord> | undefined;
+}
+
+const verifyRateMap = globalThis.__otpVerifyRateMap || new Map<string, VerifyAttemptRecord>();
+globalThis.__otpVerifyRateMap = verifyRateMap;
+
+/**
+ * Check if verification is currently allowed for the email.
+ * If 4 attempts were exceeded, locks out for 10 minutes (600,000 ms).
+ */
+export function checkVerifyRateLimit(email: string): { allowed: boolean; remainingSec: number; remainingAttempts: number } {
+  const key = email.trim().toLowerCase();
+  const record = verifyRateMap.get(key);
+
+  if (!record) {
+    return { allowed: true, remainingSec: 0, remainingAttempts: 4 };
+  }
+
+  if (record.lockUntil && Date.now() < record.lockUntil) {
+    const remainingSec = Math.ceil((record.lockUntil - Date.now()) / 1000);
+    return { allowed: false, remainingSec, remainingAttempts: 0 };
+  }
+
+  // If lockout expired, reset
+  if (record.lockUntil && Date.now() >= record.lockUntil) {
+    verifyRateMap.delete(key);
+    return { allowed: true, remainingSec: 0, remainingAttempts: 4 };
+  }
+
+  const remainingAttempts = Math.max(0, 4 - record.attempts);
+  return { allowed: true, remainingSec: 0, remainingAttempts };
+}
+
+/**
+ * Record a failed verification attempt. Lock for 10 minutes if 4 attempts reached.
+ */
+export function recordFailedVerifyAttempt(email: string): { locked: boolean; remainingAttempts: number; remainingSec: number } {
+  const key = email.trim().toLowerCase();
+  const record = verifyRateMap.get(key) || { attempts: 0, lockUntil: 0 };
+
+  record.attempts += 1;
+
+  if (record.attempts >= 4) {
+    record.lockUntil = Date.now() + 10 * 60 * 1000; // 10 minutes lockout
+    verifyRateMap.set(key, record);
+    const remainingSec = Math.ceil((record.lockUntil - Date.now()) / 1000);
+    return { locked: true, remainingAttempts: 0, remainingSec };
+  }
+
+  verifyRateMap.set(key, record);
+  const remainingAttempts = Math.max(0, 4 - record.attempts);
+  return { locked: false, remainingAttempts, remainingSec: 0 };
+}
+
+/**
+ * Reset failed verification attempts on successful OTP verification.
+ */
+export function resetFailedVerifyAttempts(email: string): void {
+  const key = email.trim().toLowerCase();
+  verifyRateMap.delete(key);
+}
+

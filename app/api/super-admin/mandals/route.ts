@@ -70,6 +70,7 @@ export async function GET(request: Request) {
           id,
           full_name,
           phone,
+          email,
           role
         ),
         subscriptions (

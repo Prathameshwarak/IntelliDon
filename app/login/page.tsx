@@ -395,11 +395,7 @@ export default function LoginPage() {
                   Password
                 </label>
                 <Link
-                  href="#"
-                  onClick={(e) => {
-                    e.preventDefault();
-                    setErrorMsg("Please contact your database administrator to reset your password.");
-                  }}
+                  href="/forgot-password"
                   className="text-xs font-semibold text-[#E8650A] hover:text-[#d05807] transition-colors"
                 >
                   Forgot Password?
