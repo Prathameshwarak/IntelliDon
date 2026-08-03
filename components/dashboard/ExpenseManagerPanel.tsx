@@ -20,7 +20,7 @@ type Props = {
   mandalId: string
   eventId: string
   eventLabel: string
-  eventExpired: boolean
+  eventExpired?: boolean
   showToast: (msg: string, type: 'success' | 'error') => void
   onBack: () => void
 }
@@ -62,7 +62,7 @@ const emptyForm = {
   amount: ''
 }
 
-export default function ExpenseManagerPanel({ mandalId, eventId, eventLabel, eventExpired, showToast, onBack }: Props) {
+export default function ExpenseManagerPanel({ mandalId, eventId, eventLabel, eventExpired = false, showToast, onBack }: Props) {
   const [expenses, setExpenses] = useState<Expense[]>([])
   const [summary, setSummary] = useState({ total_amount: 0, total_paid: 0, count: 0 })
   const [loading, setLoading] = useState(true)
