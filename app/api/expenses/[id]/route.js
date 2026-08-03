@@ -1,6 +1,6 @@
 import { createClient } from '@supabase/supabase-js'
 import { NextResponse } from 'next/server'
-import { EXPENSE_PAYMENT_MODE_VALUES, EXPENSE_AMOUNT_REGEX, roundToTwoDecimals } from '@/lib/expensePaymentModes'
+import { EXPENSE_PAYMENT_MODE_VALUES, EXPENSE_AMOUNT_REGEX, roundToTwoDecimals, isExpenseActionWindowClosed, EXPENSE_ACTION_GRACE_DAYS } from '@/lib/expensePaymentModes'
 
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL,
@@ -105,16 +105,15 @@ export async function PATCH(request, { params }) {
       return NextResponse.json({ error: authCheck.error }, { status: authCheck.status })
     }
 
-    // Once the event's date range has ended, expenses become read-only —
-    // only viewing/downloading is permitted from that point on.
+    // Expenses can be edited until (Event End Date + 30 days) — after that
+    // they become view/search/filter/export-only.
     const { data: event } = await supabaseAdmin
       .from('events')
       .select('end_date')
       .eq('id', existing.event_id)
       .single()
-    const today = new Date().toISOString().split('T')[0]
-    if (event && event.end_date < today) {
-      return NextResponse.json({ error: `This event has ended (ended on ${event.end_date}). Expenses can no longer be edited.` }, { status: 403 })
+    if (event && isExpenseActionWindowClosed(event.end_date)) {
+      return NextResponse.json({ error: `The ${EXPENSE_ACTION_GRACE_DAYS}-day window to edit expenses for this event has closed (event ended on ${event.end_date}). You can still view, search, filter, and download existing records.` }, { status: 403 })
     }
 
     const validationError = validateExpenseFields({ expense_date, vendor_name, vendor_phone, title, description, amount, transaction_id, payment_mode })

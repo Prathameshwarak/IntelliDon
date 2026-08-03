@@ -9,6 +9,7 @@ import UpgradeBanner from '@/components/UpgradeBanner'
 import KycVerificationPanel from '@/components/dashboard/KycVerificationPanel'
 import SponsorshipSection from '@/components/dashboard/SponsorshipSection'
 import ExpenseManagerPanel from '@/components/dashboard/ExpenseManagerPanel'
+import { isExpenseActionWindowClosed } from '@/lib/expensePaymentModes'
 import ThemeToggle from '@/components/ThemeToggle'
 import { downloadReceipt, shareReceipt, type ReceiptData } from '@/lib/downloadReceipt'
 
@@ -1678,7 +1679,7 @@ export default function DashboardPage() {
 
       {/* Toast */}
       {toast && (
-        <div className={`fixed top-4 right-4 z-100 px-4 py-3 rounded-lg text-sm font-medium shadow-xl
+        <div className={`fixed top-4 left-1/2 -translate-x-1/2 z-100 px-4 py-3 rounded-lg text-sm font-medium shadow-xl
           ${toast.type === 'success' ? 'bg-green-600' : 'bg-red-600'} text-white`}>
           {toast.msg}
         </div>
@@ -2536,6 +2537,7 @@ export default function DashboardPage() {
               mandalId={mandalId}
               eventId={expenseManagerEvent.id}
               eventLabel={`${expenseManagerEvent.name} ${expenseManagerEvent.year}`}
+              eventExpired={isExpenseActionWindowClosed(expenseManagerEvent.end_date)}
               showToast={showToast}
               onBack={() => setExpenseManagerEvent(null)}
             />
@@ -2576,121 +2578,132 @@ export default function DashboardPage() {
               </div>
 
               {showEventForm && CAN.createEvent(userRole) && (
-                <div className="bg-[#F5EDE2] dark:bg-gray-800 border border-[#1A1208]/10 dark:border-gray-700 rounded-xl p-4 flex flex-col gap-3 shadow-sm">
-                  <p className="text-sm font-bold text-[#1A1208] dark:text-white">
-                    {editingEventId ? 'Edit Event' : 'Create New Event'}
-                  </p>
+                <div
+                  className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm animate-fade-in"
+                  onClick={cancelEventForm}
+                >
+                  <div
+                    className="bg-[#F5EDE2] dark:bg-gray-900 border border-[#1A1208]/15 dark:border-gray-800 rounded-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto p-5 shadow-2xl flex flex-col gap-3"
+                    onClick={e => e.stopPropagation()}
+                  >
+                    <div className="flex items-center justify-between mb-1">
+                      <h3 className="text-sm font-bold text-[#1A1208] dark:text-white">
+                        {editingEventId ? 'Edit Event' : 'Create New Event'}
+                      </h3>
+                      <button onClick={cancelEventForm} className="text-[#7a6a55] dark:text-gray-500 hover:text-[#1A1208] dark:hover:text-white text-xl leading-none cursor-pointer">&times;</button>
+                    </div>
 
-                  {/* Event name */}
-                  <div>
-                    <label className="text-xs text-[#7a6a55] dark:text-gray-400 mb-1 block font-bold">Event Name *</label>
-                    <input
-                      value={eventName}
-                      onChange={e => setEventName(e.target.value)}
-                      placeholder="e.g. Ganeshotsav"
-                      className="w-full bg-white dark:bg-gray-900 border border-[#1A1208]/15 dark:border-gray-700 rounded-lg px-3 py-2.5 text-sm text-[#1A1208] dark:text-white placeholder-[#9e8c76] dark:placeholder-gray-500 font-medium focus:outline-none focus:border-[#E8650A]"
-                    />
-                  </div>
-
-                  {/* Year */}
-                  <div>
-                    <label className="text-xs text-[#7a6a55] dark:text-gray-400 mb-1 block font-bold">Year</label>
-                    <input
-                      value={eventYear}
-                      disabled
-                      type="number"
-                      className="w-full bg-white/60 dark:bg-gray-950 border border-[#1A1208]/10 dark:border-gray-800 rounded-lg px-3 py-2.5 text-sm text-[#7a6a55] dark:text-gray-500 font-mono font-medium cursor-not-allowed"
-                    />
-                  </div>
-
-                  {/* UPI ID — pre-filled from registration & editable */}
-                  <div>
-                    <label className="text-xs text-[#7a6a55] dark:text-gray-400 mb-1 block font-bold">UPI ID *</label>
-                    <input
-                      value={eventUpiId}
-                      onChange={e => setEventUpiId(e.target.value)}
-                      placeholder="e.g. mandal@okaxis"
-                      className="w-full bg-white dark:bg-gray-900 border border-[#1A1208]/15 dark:border-gray-700 rounded-lg px-3 py-2.5 text-sm text-[#1A1208] dark:text-white placeholder-[#9e8c76] dark:placeholder-gray-500 font-medium focus:outline-none focus:border-[#E8650A]"
-                    />
-                    <p className="text-xs text-[#7a6a55] dark:text-gray-500 mt-1 font-medium flex items-center justify-between">
-                      <span>Pre-filled from registration. You can edit this for the event.</span>
-                      {mandalKyc?.upi_id && eventUpiId !== mandalKyc.upi_id && (
-                        <button
-                          type="button"
-                          onClick={() => setEventUpiId(mandalKyc.upi_id)}
-                          className="text-[10px] text-[#E8650A] hover:underline font-bold cursor-pointer ml-2"
-                        >
-                          Reset to Org UPI ({mandalKyc.upi_id})
-                        </button>
-                      )}
-                    </p>
-                  </div>
-
-                  {/* Date row */}
-                  <div className="grid grid-cols-2 gap-3">
+                    {/* Event name */}
                     <div>
-                      <label className="text-xs text-[#7a6a55] dark:text-gray-400 mb-1 block font-bold">Start Date *</label>
+                      <label className="text-xs text-[#7a6a55] dark:text-gray-400 mb-1 block font-bold">Event Name *</label>
                       <input
-                        type="date"
-                        value={eventStartDate}
-                        onChange={e => { setEventStartDate(e.target.value); setDateError('') }}
-                        min={
-                          editingEventId && eventStartDate && eventStartDate < new Date().toISOString().split('T')[0]
-                            ? eventStartDate
-                            : new Date().toISOString().split('T')[0]
-                        }
-                        className="w-full bg-white dark:bg-gray-900 border border-[#1A1208]/15 dark:border-gray-700 rounded-lg px-3 py-2.5 text-sm text-[#1A1208] dark:text-white font-medium focus:outline-none focus:border-[#E8650A]"
+                        value={eventName}
+                        onChange={e => setEventName(e.target.value)}
+                        placeholder="e.g. Ganeshotsav"
+                        className="w-full bg-white dark:bg-gray-900 border border-[#1A1208]/15 dark:border-gray-700 rounded-lg px-3 py-2.5 text-sm text-[#1A1208] dark:text-white placeholder-[#9e8c76] dark:placeholder-gray-500 font-medium focus:outline-none focus:border-[#E8650A]"
                       />
                     </div>
+
+                    {/* Year */}
                     <div>
-                      <label className="text-xs text-[#7a6a55] dark:text-gray-400 mb-1 block font-bold">End Date *</label>
+                      <label className="text-xs text-[#7a6a55] dark:text-gray-400 mb-1 block font-bold">Year</label>
                       <input
-                        type="date"
-                        value={eventEndDate}
-                        onChange={e => { setEventEndDate(e.target.value); setDateError('') }}
-                        min={
-                          editingEventId && eventEndDate && eventEndDate < (eventStartDate || new Date().toISOString().split('T')[0])
-                            ? eventEndDate
-                            : (eventStartDate || new Date().toISOString().split('T')[0])
-                        }
-                        className="w-full bg-white dark:bg-gray-900 border border-[#1A1208]/15 dark:border-gray-700 rounded-lg px-3 py-2.5 text-sm text-[#1A1208] dark:text-white font-medium focus:outline-none focus:border-[#E8650A]"
+                        value={eventYear}
+                        disabled
+                        type="number"
+                        className="w-full bg-white/60 dark:bg-gray-950 border border-[#1A1208]/10 dark:border-gray-800 rounded-lg px-3 py-2.5 text-sm text-[#7a6a55] dark:text-gray-500 font-mono font-medium cursor-not-allowed"
                       />
                     </div>
-                  </div>
 
-                  {/* Duration preview */}
-                  {eventStartDate && eventEndDate && (() => {
-                    const days = Math.round(
-                      (new Date(eventEndDate).getTime() - new Date(eventStartDate).getTime())
-                      / (1000 * 60 * 60 * 24)
-                    )
-                    return days > 0 ? (
-                      <div className={`text-xs px-3 py-2 rounded-lg font-bold ${days > 50 ? 'bg-rose-500/10 text-rose-600 dark:text-red-400 border border-rose-500/20' : 'bg-white dark:bg-gray-700 text-[#1A1208] dark:text-gray-300 border border-[#1A1208]/10 dark:border-gray-600'}`}>
-                        Duration: <span className="font-bold">{days} days</span>
-                        {days > 50 && ' — exceeds 50 day limit'}
-                        {days <= 50 && ` of 50 day maximum`}
+                    {/* UPI ID — pre-filled from registration & editable */}
+                    <div>
+                      <label className="text-xs text-[#7a6a55] dark:text-gray-400 mb-1 block font-bold">UPI ID *</label>
+                      <input
+                        value={eventUpiId}
+                        onChange={e => setEventUpiId(e.target.value)}
+                        placeholder="e.g. mandal@okaxis"
+                        className="w-full bg-white dark:bg-gray-900 border border-[#1A1208]/15 dark:border-gray-700 rounded-lg px-3 py-2.5 text-sm text-[#1A1208] dark:text-white placeholder-[#9e8c76] dark:placeholder-gray-500 font-medium focus:outline-none focus:border-[#E8650A]"
+                      />
+                      <p className="text-xs text-[#7a6a55] dark:text-gray-500 mt-1 font-medium flex items-center justify-between">
+                        <span>Pre-filled from registration. You can edit this for the event.</span>
+                        {mandalKyc?.upi_id && eventUpiId !== mandalKyc.upi_id && (
+                          <button
+                            type="button"
+                            onClick={() => setEventUpiId(mandalKyc.upi_id)}
+                            className="text-[10px] text-[#E8650A] hover:underline font-bold cursor-pointer ml-2"
+                          >
+                            Reset to Org UPI ({mandalKyc.upi_id})
+                          </button>
+                        )}
+                      </p>
+                    </div>
+
+                    {/* Date row */}
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="text-xs text-[#7a6a55] dark:text-gray-400 mb-1 block font-bold">Start Date *</label>
+                        <input
+                          type="date"
+                          value={eventStartDate}
+                          onChange={e => { setEventStartDate(e.target.value); setDateError('') }}
+                          min={
+                            editingEventId && eventStartDate && eventStartDate < new Date().toISOString().split('T')[0]
+                              ? eventStartDate
+                              : new Date().toISOString().split('T')[0]
+                          }
+                          className="w-full bg-white dark:bg-gray-900 border border-[#1A1208]/15 dark:border-gray-700 rounded-lg px-3 py-2.5 text-sm text-[#1A1208] dark:text-white font-medium focus:outline-none focus:border-[#E8650A]"
+                        />
                       </div>
-                    ) : null
-                  })()}
-
-                  {/* Date error */}
-                  {dateError && (
-                    <div className="bg-rose-500/10 border border-rose-500/20 rounded-lg px-3 py-2">
-                      <p className="text-rose-600 dark:text-red-400 text-xs font-bold">{dateError}</p>
+                      <div>
+                        <label className="text-xs text-[#7a6a55] dark:text-gray-400 mb-1 block font-bold">End Date *</label>
+                        <input
+                          type="date"
+                          value={eventEndDate}
+                          onChange={e => { setEventEndDate(e.target.value); setDateError('') }}
+                          min={
+                            editingEventId && eventEndDate && eventEndDate < (eventStartDate || new Date().toISOString().split('T')[0])
+                              ? eventEndDate
+                              : (eventStartDate || new Date().toISOString().split('T')[0])
+                          }
+                          className="w-full bg-white dark:bg-gray-900 border border-[#1A1208]/15 dark:border-gray-700 rounded-lg px-3 py-2.5 text-sm text-[#1A1208] dark:text-white font-medium focus:outline-none focus:border-[#E8650A]"
+                        />
+                      </div>
                     </div>
-                  )}
 
-                  <div className="flex gap-2 pt-1">
-                    <button
-                      onClick={editingEventId ? updateEvent : createEvent}
-                      disabled={eventSubmitting}
-                      className="flex-1 bg-gradient-to-r from-[#E8650A] to-[#f97316] hover:from-[#d05807] hover:to-[#ea580c] disabled:opacity-50 text-white text-xs font-bold py-2.5 rounded-xl transition-all cursor-pointer shadow-md shadow-[#E8650A]/20"
-                    >
-                      {eventSubmitting ? 'Saving...' : editingEventId ? 'Save Changes' : 'Create Event'}
-                    </button>
-                    <button onClick={cancelEventForm} className="px-4 bg-[#F5EDE2] dark:bg-gray-700 hover:bg-[#ebdcc9] dark:hover:bg-gray-600 text-[#1A1208] dark:text-gray-300 border border-[#1A1208]/10 dark:border-gray-600 text-xs font-bold rounded-xl transition-colors cursor-pointer">
-                      Cancel
-                    </button>
+                    {/* Duration preview */}
+                    {eventStartDate && eventEndDate && (() => {
+                      const days = Math.round(
+                        (new Date(eventEndDate).getTime() - new Date(eventStartDate).getTime())
+                        / (1000 * 60 * 60 * 24)
+                      )
+                      return days > 0 ? (
+                        <div className={`text-xs px-3 py-2 rounded-lg font-bold ${days > 50 ? 'bg-rose-500/10 text-rose-600 dark:text-red-400 border border-rose-500/20' : 'bg-white dark:bg-gray-700 text-[#1A1208] dark:text-gray-300 border border-[#1A1208]/10 dark:border-gray-600'}`}>
+                          Duration: <span className="font-bold">{days} days</span>
+                          {days > 50 && ' — exceeds 50 day limit'}
+                          {days <= 50 && ` of 50 day maximum`}
+                        </div>
+                      ) : null
+                    })()}
+
+                    {/* Date error */}
+                    {dateError && (
+                      <div className="bg-rose-500/10 border border-rose-500/20 rounded-lg px-3 py-2">
+                        <p className="text-rose-600 dark:text-red-400 text-xs font-bold">{dateError}</p>
+                      </div>
+                    )}
+
+                    <div className="flex gap-2 pt-1">
+                      <button
+                        onClick={editingEventId ? updateEvent : createEvent}
+                        disabled={eventSubmitting}
+                        className="flex-1 bg-gradient-to-r from-[#E8650A] to-[#f97316] hover:from-[#d05807] hover:to-[#ea580c] disabled:opacity-50 text-white text-xs font-bold py-2.5 rounded-xl transition-all cursor-pointer shadow-md shadow-[#E8650A]/20"
+                      >
+                        {eventSubmitting ? 'Saving...' : editingEventId ? 'Save Changes' : 'Create Event'}
+                      </button>
+                      <button onClick={cancelEventForm} className="px-4 bg-white dark:bg-gray-700 hover:bg-[#ebdcc9] dark:hover:bg-gray-600 text-[#1A1208] dark:text-gray-300 border border-[#1A1208]/10 dark:border-gray-600 text-xs font-bold rounded-xl transition-colors cursor-pointer">
+                        Cancel
+                      </button>
+                    </div>
                   </div>
                 </div>
               )}
@@ -2706,6 +2719,84 @@ export default function DashboardPage() {
                   return (
                     <div key={ev.id} className={`bg-white dark:bg-gray-800 border rounded-xl p-4 shadow-sm transition-all
                     ${isExpired || isSuspended ? 'border-[#1A1208]/10 dark:border-gray-700 opacity-60' : 'border-[#1A1208]/15 dark:border-gray-700'}`}>
+                      {/* ── Mobile-only layout (< sm) ── */}
+                      <div className="sm:hidden flex flex-col gap-2">
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="flex-1 min-w-0">
+                            <p className="font-bold text-[#1A1208] dark:text-white text-sm truncate">{ev.name} {ev.year}</p>
+                            <p className="text-xs text-[#7a6a55] dark:text-gray-400 mt-1 font-mono font-medium truncate">
+                              {ev.upi_id ? `UPI: ${ev.upi_id}` : 'No UPI ID'}
+                            </p>
+                            <span className={`inline-block mt-1.5 text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider
+                            ${isSuspended
+                                ? 'bg-rose-500/10 text-rose-600 dark:text-red-400 border border-rose-500/20'
+                                : isExpired
+                                  ? 'bg-[#F5EDE2] dark:bg-gray-700 text-[#7a6a55] dark:text-gray-400 border border-[#1A1208]/10 dark:border-gray-600'
+                                  : ev.is_active
+                                    ? 'bg-emerald-500/10 text-emerald-600 dark:text-green-400 border border-emerald-500/20'
+                                    : 'bg-[#F5EDE2] dark:bg-gray-700 text-[#7a6a55] dark:text-gray-400 border border-[#1A1208]/10 dark:border-gray-600'}`}>
+                              {isSuspended ? 'Suspended' : isExpired ? 'Expired' : ev.is_active ? 'Active' : 'Inactive'}
+                            </span>
+                          </div>
+
+                          {/* Toggle (immediately left of Edit) + Edit Event (top-right) */}
+                          <div className="flex items-center gap-2 shrink-0">
+                            {!isExpired && !isSuspended && CAN.toggleEvent(userRole) && (
+                              <button
+                                onClick={() => toggleEvent(ev.id, ev.is_active)}
+                                role="switch"
+                                aria-checked={ev.is_active}
+                                aria-label={ev.is_active ? 'Deactivate event' : 'Activate event'}
+                                title={ev.is_active ? 'Deactivate event' : 'Activate event'}
+                                className={`relative w-11 h-6 rounded-full shrink-0 cursor-pointer transition-colors shadow-inner ${
+                                  ev.is_active ? 'bg-gradient-to-r from-[#E8650A] to-[#f97316]' : 'bg-gray-300 dark:bg-gray-600'
+                                }`}
+                              >
+                                <span className={`absolute top-0.5 flex items-center justify-center w-5 h-5 rounded-full bg-white shadow text-[10px] leading-none transition-all ${
+                                  ev.is_active ? 'left-[22px]' : 'left-0.5'
+                                }`}>
+                                  {ev.is_active ? '⚡' : '⏻'}
+                                </span>
+                              </button>
+                            )}
+                            {!isExpired && !isSuspended && CAN.createEvent(userRole) && (
+                              <button
+                                onClick={() => startEditingEvent(ev)}
+                                className="text-xs text-[#E8650A] dark:text-orange-400 hover:underline transition-colors font-bold cursor-pointer"
+                              >
+                                Edit
+                              </button>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Duration + Remaining Days, with Manage Expenses beside it */}
+                        <div className="flex items-end justify-between gap-2 pt-2 border-t border-[#1A1208]/10 dark:border-gray-700">
+                          <div className="min-w-0">
+                            <p className="text-xs text-[#7a6a55] dark:text-gray-400 font-medium">
+                              {new Date(ev.start_date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}
+                              {' – '}
+                              {new Date(ev.end_date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
+                            </p>
+                            {ev.days_remaining > 0 && !isExpired && !isSuspended ? (
+                              <p className="text-xs text-[#E8650A] dark:text-orange-400 font-bold mt-0.5">{ev.days_remaining} days left</p>
+                            ) : isExpired ? (
+                              <p className="text-xs text-[#7a6a55] dark:text-gray-500 font-medium mt-0.5">Permanently off</p>
+                            ) : null}
+                          </div>
+                          {CAN.manageExpenses(userRole) && (
+                            <button
+                              onClick={() => setExpenseManagerEvent(ev)}
+                              className="text-xs bg-[#F5EDE2] dark:bg-gray-700/60 hover:bg-[#ebdcc9] dark:hover:bg-gray-700 text-[#1A1208] dark:text-gray-200 border border-[#1A1208]/10 dark:border-gray-600 px-3 py-1.5 rounded-lg transition-colors font-bold cursor-pointer shrink-0"
+                            >
+                              💰 Manage Expenses
+                            </button>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* ── Existing layout, unchanged (sm and up) ── */}
+                      <div className="hidden sm:block">
                       <div className="flex items-start justify-between gap-3">
                         <div className="flex-1">
                           <p className="font-bold text-[#1A1208] dark:text-white text-sm">{ev.name} {ev.year}</p>
@@ -2769,6 +2860,7 @@ export default function DashboardPage() {
                           </button>
                         </div>
                       )}
+                      </div>
                     </div>
                   )
                 })
@@ -2798,10 +2890,20 @@ export default function DashboardPage() {
               <p className="mt-1"><span className="text-[#1A1208] dark:text-gray-300 font-bold">Sevak (Collector)</span> — can only enter new donations from their phone. Cannot see reports.</p>
             </div>
 
-            {/* Add member form */}
+            {/* Add member popup */}
             {showMemberForm && (
-              <div className="bg-[#F5EDE2] dark:bg-gray-800 border border-[#1A1208]/10 dark:border-gray-700 rounded-xl p-4 flex flex-col gap-3 shadow-sm">
-                <p className="text-sm font-bold text-[#1A1208] dark:text-white">Add Team Member</p>
+              <div
+                className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm animate-fade-in"
+                onClick={() => setShowMemberForm(false)}
+              >
+                <div
+                  className="bg-[#F5EDE2] dark:bg-gray-900 border border-[#1A1208]/15 dark:border-gray-800 rounded-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto p-5 shadow-2xl flex flex-col gap-3"
+                  onClick={e => e.stopPropagation()}
+                >
+                  <div className="flex items-center justify-between mb-1">
+                    <h3 className="text-sm font-bold text-[#1A1208] dark:text-white">Add Team Member</h3>
+                    <button onClick={() => setShowMemberForm(false)} className="text-[#7a6a55] dark:text-gray-500 hover:text-[#1A1208] dark:hover:text-white text-xl leading-none cursor-pointer">&times;</button>
+                  </div>
                 <div className="grid grid-cols-2 gap-2">
                   {(['collector', 'manager'] as const).map(r => (
                     <button
@@ -2904,7 +3006,8 @@ export default function DashboardPage() {
                     className="flex-1 bg-gradient-to-r from-[#E8650A] to-[#f97316] hover:from-[#d05807] hover:to-[#ea580c] disabled:opacity-50 text-white text-xs font-bold py-2.5 rounded-xl transition-all cursor-pointer shadow-md shadow-[#E8650A]/20">
                     {memberSubmitting ? 'Adding...' : `Add ${memberRole === 'collector' ? 'Sevak' : 'Khajindar'}`}
                   </button>
-                  <button onClick={() => setShowMemberForm(false)} className="px-4 bg-[#F5EDE2] dark:bg-gray-700 hover:bg-[#ebdcc9] dark:hover:bg-gray-600 text-[#1A1208] dark:text-gray-300 border border-[#1A1208]/10 dark:border-gray-600 text-xs font-bold rounded-xl transition-colors cursor-pointer">Cancel</button>
+                  <button onClick={() => setShowMemberForm(false)} className="px-4 bg-white dark:bg-gray-700 hover:bg-[#ebdcc9] dark:hover:bg-gray-600 text-[#1A1208] dark:text-gray-300 border border-[#1A1208]/10 dark:border-gray-600 text-xs font-bold rounded-xl transition-colors cursor-pointer">Cancel</button>
+                </div>
                 </div>
               </div>
             )}
