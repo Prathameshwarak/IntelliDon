@@ -137,7 +137,7 @@ export async function PATCH(
   try {
     const { id } = await params
     const body = await request.json()
-    const { password } = body
+    const { password, email } = body
 
     if (!id || !password) {
       return NextResponse.json({ error: 'User ID and password are required' }, { status: 400 })
@@ -147,7 +147,17 @@ export async function PATCH(
       return NextResponse.json({ error: 'Password must be at least 8 characters' }, { status: 400 })
     }
 
-    const { error } = await supabaseAdmin.auth.admin.updateUserById(id, {
+    let targetUserId = id
+    if (email) {
+      const cleanEmail = email.trim().toLowerCase()
+      const { data: authUsers } = await supabaseAdmin.auth.admin.listUsers()
+      const match = authUsers?.users?.find((u) => u.email && u.email.trim().toLowerCase() === cleanEmail)
+      if (match) {
+        targetUserId = match.id
+      }
+    }
+
+    const { error } = await supabaseAdmin.auth.admin.updateUserById(targetUserId, {
       password: password
     })
 

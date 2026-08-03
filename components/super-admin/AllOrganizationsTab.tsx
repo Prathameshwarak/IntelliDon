@@ -7,6 +7,7 @@ type User = {
   id: string
   full_name: string | null
   phone: string | null
+  email?: string | null
   role: string
 }
 
@@ -85,6 +86,16 @@ export default function AllOrganizationsTab({ showToast }: AllOrganizationsTabPr
   const [newPasswordValue, setNewPasswordValue] = useState('')
   const [resettingPassword, setResettingPassword] = useState(false)
 
+  // Change Password Modal OTP States
+  const [resetPasswordStep, setResetPasswordStep] = useState<1 | 2 | 3>(1)
+  const [resetPasswordEmail, setResetPasswordEmail] = useState('')
+  const [resetOtpCode, setResetOtpCode] = useState(['', '', '', '', '', ''])
+  const [resetOtpLoading, setResetOtpLoading] = useState(false)
+  const [resetOtpError, setResetOtpError] = useState('')
+  const [resetOtpSuccessMsg, setResetOtpSuccessMsg] = useState('')
+  const [resetCooldownTimer, setResetCooldownTimer] = useState(0)
+  const [resetOtpVerified, setResetOtpVerified] = useState(false)
+
   // Create organization modal states
   const [showCreateModal, setShowCreateModal] = useState(false)
   const [creating, setCreating] = useState(false)
@@ -156,6 +167,13 @@ export default function AllOrganizationsTab({ showToast }: AllOrganizationsTabPr
       return () => clearInterval(timer)
     }
   }, [adminCooldownTimer])
+
+  useEffect(() => {
+    if (resetCooldownTimer > 0) {
+      const timer = setInterval(() => setResetCooldownTimer((t) => t - 1), 1000)
+      return () => clearInterval(timer)
+    }
+  }, [resetCooldownTimer])
 
   // Auto-verify Admin Email if it matches Organization Email and Org Email is verified
   useEffect(() => {
@@ -464,9 +482,126 @@ export default function AllOrganizationsTab({ showToast }: AllOrganizationsTabPr
     }
   }
 
+  function openChangePasswordModal(userId: string, emailFromContext?: string | null) {
+    const adminUser = viewingOrg?.users?.find(u => u.role === 'admin' || u.id === userId)
+    const targetEmail = emailFromContext || adminUser?.email || viewingOrg?.admin_email || detailedUser?.email || ''
+    setResetPasswordUserId(userId || adminUser?.id || 'admin')
+    setResetPasswordEmail(targetEmail)
+    setResetPasswordStep(1)
+    setNewPasswordValue('')
+    setResetOtpCode(['', '', '', '', '', ''])
+    setResetOtpError('')
+    setResetOtpSuccessMsg('')
+    setResetOtpVerified(false)
+  }
+
+  const handleSendChangePasswordOtp = async () => {
+    setResetOtpError('')
+    setResetOtpSuccessMsg('')
+
+    if (!resetPasswordEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(resetPasswordEmail.trim())) {
+      setResetOtpError('Valid admin email address is required to send OTP.')
+      return
+    }
+
+    setResetOtpLoading(true)
+    try {
+      const res = await fetch('/api/auth/forgot-password/send-otp', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: resetPasswordEmail.trim() }),
+      })
+      const data = await res.json()
+      if (!res.ok || !data.success) {
+        if (data.remainingSec) {
+          setResetCooldownTimer(data.remainingSec)
+        }
+        setResetOtpError(data.error || 'Failed to send OTP code.')
+        return
+      }
+      setResetPasswordStep(2)
+      setResetCooldownTimer(120)
+      setResetOtpSuccessMsg(`OTP code sent to ${resetPasswordEmail.trim()}`)
+    } catch (err: any) {
+      setResetOtpError(err.message || 'Could not send OTP code.')
+    } finally {
+      setResetOtpLoading(false)
+    }
+  }
+
+  const handleVerifyChangePasswordOtp = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setResetOtpError('')
+    setResetOtpSuccessMsg('')
+
+    const code = resetOtpCode.join('').trim()
+    if (code.length !== 6 || !/^\d{6}$/.test(code)) {
+      setResetOtpError('Please enter the 6-digit verification code.')
+      return
+    }
+
+    setResetOtpLoading(true)
+    try {
+      const res = await fetch('/api/auth/forgot-password/verify-otp', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: resetPasswordEmail.trim(),
+          otp: code,
+        }),
+      })
+      const data = await res.json()
+      if (!res.ok || !data.success) {
+        throw new Error(data.error || 'Invalid OTP code.')
+      }
+
+      setResetOtpVerified(true)
+      setResetPasswordStep(3)
+      setResetOtpSuccessMsg('OTP verified successfully! Please enter new password.')
+    } catch (err: any) {
+      setResetOtpError(err.message || 'OTP verification failed.')
+    } finally {
+      setResetOtpLoading(false)
+    }
+  }
+
+  const handleResetOtpChange = (index: number, value: string) => {
+    if (!/^\d*$/.test(value)) return
+    const newOtp = [...resetOtpCode]
+    newOtp[index] = value.slice(-1)
+    setResetOtpCode(newOtp)
+
+    if (value && index < 5) {
+      const nextInput = document.getElementById(`change-pass-otp-${index + 1}`)
+      nextInput?.focus()
+    }
+  }
+
+  const handleResetOtpKeyDown = (index: number, e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Backspace' && !resetOtpCode[index] && index > 0) {
+      const prevInput = document.getElementById(`change-pass-otp-${index - 1}`)
+      prevInput?.focus()
+    }
+  }
+
+  const handleResetOtpPaste = (e: React.ClipboardEvent<HTMLInputElement>) => {
+    e.preventDefault()
+    const pastedData = e.clipboardData.getData('text').trim()
+    if (/^\d{6}$/.test(pastedData)) {
+      setResetOtpCode(pastedData.split(''))
+      const lastInput = document.getElementById(`change-pass-otp-5`)
+      lastInput?.focus()
+    }
+  }
+
   async function handlePasswordReset(e: React.FormEvent) {
     e.preventDefault()
     if (!resetPasswordUserId || newPasswordValue.length < 8) return
+
+    if (!resetOtpVerified) {
+      setResetOtpError('OTP verification is required before updating password.')
+      return
+    }
 
     setResettingPassword(true)
     try {
@@ -478,7 +613,7 @@ export default function AllOrganizationsTab({ showToast }: AllOrganizationsTabPr
           'Content-Type': 'application/json',
           ...(token ? { Authorization: `Bearer ${token}` } : {})
         },
-        body: JSON.stringify({ password: newPasswordValue })
+        body: JSON.stringify({ password: newPasswordValue, email: resetPasswordEmail.trim() })
       })
       const data = await res.json()
       if (data.error) throw new Error(data.error)
@@ -486,6 +621,8 @@ export default function AllOrganizationsTab({ showToast }: AllOrganizationsTabPr
       showToast('Password updated successfully!', 'success')
       setResetPasswordUserId(null)
       setNewPasswordValue('')
+      setResetPasswordStep(1)
+      setResetOtpVerified(false)
 
       if (detailedUser && detailedUser.id === resetPasswordUserId) {
         setDetailedUser((prev: any) => prev ? { ...prev, password_change: new Date().toISOString() } : prev)
@@ -1326,7 +1463,7 @@ export default function AllOrganizationsTab({ showToast }: AllOrganizationsTabPr
                   {viewingOrg.users?.find(u => u.role === 'admin') && (
                     <button
                       type="button"
-                      onClick={() => setResetPasswordUserId(viewingOrg.users?.find(u => u.role === 'admin')?.id || null)}
+                      onClick={() => openChangePasswordModal(viewingOrg.users?.find(u => u.role === 'admin')?.id || '', viewingOrg.admin_email)}
                       className="px-2.5 py-1 bg-white dark:bg-gray-800 hover:bg-[#F5EDE2] dark:hover:bg-gray-700 text-[#E8650A] dark:text-orange-400 border border-[#E8650A]/20 dark:border-gray-700 font-bold rounded-lg text-[10px] transition-colors cursor-pointer"
                     >
                       Change Password
@@ -1711,7 +1848,7 @@ export default function AllOrganizationsTab({ showToast }: AllOrganizationsTabPr
                       <div className="pt-2 border-t border-[#1A1208]/10 dark:border-gray-800 flex justify-end">
                         <button
                           type="button"
-                          onClick={() => setResetPasswordUserId(detailedUser.id)}
+                          onClick={() => openChangePasswordModal(detailedUser.id, detailedUser.email)}
                           className="px-2.5 py-1.5 bg-white dark:bg-gray-800 hover:bg-[#F5EDE2] dark:hover:bg-gray-700 border border-[#1A1208]/15 dark:border-gray-700 text-[#E8650A] dark:text-orange-400 font-bold rounded-lg text-[9px] transition-colors cursor-pointer"
                         >
                           Change Password
@@ -1758,20 +1895,25 @@ export default function AllOrganizationsTab({ showToast }: AllOrganizationsTabPr
         </div>
       )}
 
-      {/* Change Password Modal */}
+      {/* Change Password Modal with OTP Flow */}
       {resetPasswordUserId && (
         <div className="fixed inset-0 z-55 bg-black/60 dark:bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-white dark:bg-gray-900 border border-[#1A1208]/15 dark:border-gray-800 rounded-2xl w-full max-w-sm overflow-hidden shadow-2xl flex flex-col">
+          <div className="bg-white dark:bg-gray-900 border border-[#1A1208]/15 dark:border-gray-800 rounded-2xl w-full max-w-md overflow-hidden shadow-2xl flex flex-col">
+            
             {/* Header */}
             <div className="p-5 border-b border-[#1A1208]/10 dark:border-gray-800 flex justify-between items-center bg-[#F5EDE2] dark:bg-gray-950/20">
               <div>
-                <h3 className="text-sm font-bold text-[#1A1208] dark:text-white">Change User Password</h3>
-                <p className="text-[10px] text-[#7a6a55] dark:text-gray-400 font-mono mt-0.5">Admin Security Credential Update</p>
+                <h3 className="text-sm font-bold text-[#1A1208] dark:text-white">Change Admin Password</h3>
+                <p className="text-[10px] text-[#7a6a55] dark:text-gray-400 font-mono mt-0.5">
+                  Target: {resetPasswordEmail || 'Admin Account'}
+                </p>
               </div>
               <button 
                 onClick={() => {
                   setResetPasswordUserId(null)
                   setNewPasswordValue('')
+                  setResetPasswordStep(1)
+                  setResetOtpVerified(false)
                 }}
                 className="text-[#7a6a55] dark:text-gray-400 hover:text-[#1A1208] dark:hover:text-white text-xs p-1 cursor-pointer font-bold"
               >
@@ -1779,40 +1921,176 @@ export default function AllOrganizationsTab({ showToast }: AllOrganizationsTabPr
               </button>
             </div>
 
-            {/* Form */}
-            <form onSubmit={handlePasswordReset} className="p-5 space-y-4">
-              <div>
-                <label className="block text-xs font-bold text-[#7a6a55] dark:text-gray-300 mb-1.5">New Password *</label>
-                <input
-                  type="text"
-                  required
-                  placeholder="Min 8 characters"
-                  value={newPasswordValue}
-                  onChange={e => setNewPasswordValue(e.target.value)}
-                  className="w-full bg-white dark:bg-gray-800 border border-[#1A1208]/15 dark:border-gray-700 rounded-lg px-3 py-2 text-xs text-[#1A1208] dark:text-white placeholder-[#9e8c76] dark:placeholder-gray-500 focus:outline-none focus:border-[#E8650A] font-mono font-medium"
-                />
-              </div>
+            {/* Step Indicators */}
+            <div className="px-5 pt-4 flex items-center justify-between border-b border-[#1A1208]/10 dark:border-gray-800 pb-3 text-[10px] font-bold font-mono">
+              <span className={resetPasswordStep === 1 ? 'text-[#E8650A]' : 'text-gray-400'}>1. Send OTP</span>
+              <span>→</span>
+              <span className={resetPasswordStep === 2 ? 'text-[#E8650A]' : 'text-gray-400'}>2. Verify OTP</span>
+              <span>→</span>
+              <span className={resetPasswordStep === 3 ? 'text-[#E8650A]' : 'text-gray-400'}>3. Set Password</span>
+            </div>
 
-              <div className="flex gap-3 justify-end pt-2">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setResetPasswordUserId(null)
-                    setNewPasswordValue('')
-                  }}
-                  className="px-4 py-2 bg-[#F5EDE2] dark:bg-gray-800 hover:bg-[#ebdcc9] dark:hover:bg-gray-700 text-[#1A1208] dark:text-gray-300 font-bold rounded-xl text-xs transition-colors cursor-pointer border border-[#1A1208]/10 dark:border-gray-700"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={resettingPassword || newPasswordValue.length < 8}
-                  className="px-4 py-2 bg-gradient-to-r from-[#E8650A] to-[#f97316] hover:from-[#d05807] hover:to-[#ea580c] text-white font-bold rounded-xl text-xs transition-colors cursor-pointer disabled:opacity-50 shadow-md shadow-[#E8650A]/20"
-                >
-                  {resettingPassword ? 'Updating...' : 'Update Password'}
-                </button>
-              </div>
-            </form>
+            <div className="p-5 space-y-4">
+              {/* Error Message */}
+              {resetOtpError && (
+                <div className="bg-rose-500/10 border border-rose-500/25 text-rose-600 dark:text-rose-400 text-xs rounded-xl p-3 flex items-start space-x-2">
+                  <svg className="w-4 h-4 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                  </svg>
+                  <span>{resetOtpError}</span>
+                </div>
+              )}
+
+              {/* Success Message */}
+              {resetOtpSuccessMsg && !resetOtpError && (
+                <div className="bg-emerald-500/10 border border-emerald-500/25 text-emerald-700 dark:text-emerald-400 text-xs rounded-xl p-3 flex items-center space-x-2">
+                  <svg className="w-4 h-4 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
+                  </svg>
+                  <span>{resetOtpSuccessMsg}</span>
+                </div>
+              )}
+
+              {/* STEP 1: SEND OTP */}
+              {resetPasswordStep === 1 && (
+                <div className="space-y-4">
+                  <div className="space-y-1.5">
+                    <label className="block text-xs font-bold text-[#7a6a55] dark:text-gray-300">
+                      Admin Email Address *
+                    </label>
+                    <input
+                      type="email"
+                      readOnly
+                      value={resetPasswordEmail}
+                      placeholder="admin@mandal.com"
+                      className="w-full bg-[#F5EDE2]/50 dark:bg-gray-800/50 border border-[#1A1208]/15 dark:border-gray-700 rounded-lg px-3 py-2 text-xs text-[#1A1208] dark:text-white font-mono font-bold cursor-not-allowed select-none opacity-90 focus:outline-none"
+                    />
+                  </div>
+
+                  <p className="text-[11px] text-[#7a6a55] dark:text-gray-400 leading-relaxed">
+                    We will send a 6-digit OTP verification code to the email address above.
+                  </p>
+
+                  <div className="flex gap-3 justify-end pt-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setResetPasswordUserId(null)
+                        setNewPasswordValue('')
+                      }}
+                      className="px-4 py-2 bg-[#F5EDE2] dark:bg-gray-800 hover:bg-[#ebdcc9] dark:hover:bg-gray-700 text-[#1A1208] dark:text-gray-300 font-bold rounded-xl text-xs transition-colors cursor-pointer border border-[#1A1208]/10 dark:border-gray-700"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleSendChangePasswordOtp}
+                      disabled={resetOtpLoading || !resetPasswordEmail.trim()}
+                      className="px-4 py-2 bg-gradient-to-r from-[#E8650A] to-[#f97316] hover:from-[#d05807] hover:to-[#ea580c] text-white font-bold rounded-xl text-xs transition-colors cursor-pointer disabled:opacity-50 shadow-md shadow-[#E8650A]/20"
+                    >
+                      {resetOtpLoading ? 'Sending OTP...' : 'Send OTP Code'}
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* STEP 2: VERIFY OTP */}
+              {resetPasswordStep === 2 && (
+                <form onSubmit={handleVerifyChangePasswordOtp} className="space-y-4">
+                  <div className="space-y-1.5">
+                    <label className="block text-xs font-bold text-[#7a6a55] dark:text-gray-300">Enter 6-Digit OTP *</label>
+                    <div className="flex justify-between items-center gap-2">
+                      {resetOtpCode.map((digit, idx) => (
+                        <input
+                          key={idx}
+                          id={`change-pass-otp-${idx}`}
+                          type="text"
+                          inputMode="numeric"
+                          maxLength={1}
+                          value={digit}
+                          onChange={(e) => handleResetOtpChange(idx, e.target.value)}
+                          onKeyDown={(e) => handleResetOtpKeyDown(idx, e)}
+                          onPaste={idx === 0 ? handleResetOtpPaste : undefined}
+                          className="w-10 h-12 text-center text-lg font-bold font-mono bg-white dark:bg-gray-800 border border-[#1A1208]/15 dark:border-gray-700 rounded-lg text-[#1A1208] dark:text-white focus:outline-none focus:border-[#E8650A]"
+                        />
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="flex items-center justify-between text-[11px] text-[#7a6a55] dark:text-gray-400">
+                    <span>Didn&apos;t receive code?</span>
+                    {resetCooldownTimer > 0 ? (
+                      <span className="font-mono text-[#E8650A]">Resend in {resetCooldownTimer}s</span>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={handleSendChangePasswordOtp}
+                        className="font-bold text-[#E8650A] hover:underline cursor-pointer"
+                      >
+                        Resend OTP
+                      </button>
+                    )}
+                  </div>
+
+                  <div className="flex gap-3 justify-end pt-2">
+                    <button
+                      type="button"
+                      onClick={() => setResetPasswordStep(1)}
+                      className="px-3 py-2 bg-[#F5EDE2] dark:bg-gray-800 hover:bg-[#ebdcc9] dark:hover:bg-gray-700 text-[#1A1208] dark:text-gray-300 font-bold rounded-xl text-xs transition-colors cursor-pointer border border-[#1A1208]/10 dark:border-gray-700"
+                    >
+                      Back
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={resetOtpLoading}
+                      className="px-4 py-2 bg-gradient-to-r from-[#E8650A] to-[#f97316] hover:from-[#d05807] hover:to-[#ea580c] text-white font-bold rounded-xl text-xs transition-colors cursor-pointer disabled:opacity-50 shadow-md shadow-[#E8650A]/20"
+                    >
+                      {resetOtpLoading ? 'Verifying...' : 'Verify OTP Code'}
+                    </button>
+                  </div>
+                </form>
+              )}
+
+              {/* STEP 3: SET NEW PASSWORD */}
+              {resetPasswordStep === 3 && (
+                <form onSubmit={handlePasswordReset} className="space-y-4">
+                  <div>
+                    <label className="block text-xs font-bold text-[#7a6a55] dark:text-gray-300 mb-1.5">New Password *</label>
+                    <input
+                      type="text"
+                      required
+                      placeholder="Min 8 characters"
+                      value={newPasswordValue}
+                      onChange={e => setNewPasswordValue(e.target.value)}
+                      className="w-full bg-white dark:bg-gray-800 border border-[#1A1208]/15 dark:border-gray-700 rounded-lg px-3 py-2 text-xs text-[#1A1208] dark:text-white placeholder-[#9e8c76] dark:placeholder-gray-500 focus:outline-none focus:border-[#E8650A] font-mono font-medium"
+                    />
+                  </div>
+
+                  <div className="flex gap-3 justify-end pt-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setResetPasswordUserId(null)
+                        setNewPasswordValue('')
+                        setResetPasswordStep(1)
+                        setResetOtpVerified(false)
+                      }}
+                      className="px-4 py-2 bg-[#F5EDE2] dark:bg-gray-800 hover:bg-[#ebdcc9] dark:hover:bg-gray-700 text-[#1A1208] dark:text-gray-300 font-bold rounded-xl text-xs transition-colors cursor-pointer border border-[#1A1208]/10 dark:border-gray-700"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={resettingPassword || newPasswordValue.length < 8}
+                      className="px-4 py-2 bg-gradient-to-r from-[#E8650A] to-[#f97316] hover:from-[#d05807] hover:to-[#ea580c] text-white font-bold rounded-xl text-xs transition-colors cursor-pointer disabled:opacity-50 shadow-md shadow-[#E8650A]/20"
+                    >
+                      {resettingPassword ? 'Updating...' : 'Update Password'}
+                    </button>
+                  </div>
+                </form>
+              )}
+
+            </div>
           </div>
         </div>
       )}
