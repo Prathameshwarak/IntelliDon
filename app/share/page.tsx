@@ -74,7 +74,7 @@ export default function SharePage() {
 
   // ── Generate QR once link is ready ────────────────────────────
   useEffect(() => {
-    if (!donationLink || !canvasRef.current) return
+    if (!donationLink || loading || !canvasRef.current) return
 
     QRCode.toCanvas(canvasRef.current, donationLink, {
       width: 240,
@@ -82,9 +82,13 @@ export default function SharePage() {
       color: { dark: '#000000', light: '#ffffff' },
       errorCorrectionLevel: 'M'
     }, (err) => {
-      if (!err) setQrGenerated(true)
+      if (!err) {
+        setQrGenerated(true)
+      } else {
+        console.error('QR generation error:', err)
+      }
     })
-  }, [donationLink])
+  }, [donationLink, loading])
 
   // ── Copy link ─────────────────────────────────────────────────
   function copyLink() {
