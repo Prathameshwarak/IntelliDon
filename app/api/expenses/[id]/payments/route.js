@@ -1,6 +1,6 @@
 import { createClient } from '@supabase/supabase-js'
 import { NextResponse } from 'next/server'
-import { EXPENSE_AMOUNT_REGEX, roundToTwoDecimals } from '@/lib/expensePaymentModes'
+import { EXPENSE_AMOUNT_REGEX, roundToTwoDecimals, isExpenseActionWindowClosed, EXPENSE_ACTION_GRACE_DAYS } from '@/lib/expensePaymentModes'
 
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL,
@@ -78,16 +78,15 @@ export async function POST(request, { params }) {
       return NextResponse.json({ error: authCheck.error }, { status: authCheck.status })
     }
 
-    // Once the event's date range has ended, no new payments can be
-    // recorded — the event can only be viewed/downloaded from that point on.
+    // Payments can be recorded until (Event End Date + 30 days) — after
+    // that the event's expenses become view/search/filter/export-only.
     const { data: event } = await supabaseAdmin
       .from('events')
       .select('end_date')
       .eq('id', expense.event_id)
       .single()
-    const today = new Date().toISOString().split('T')[0]
-    if (event && event.end_date < today) {
-      return NextResponse.json({ error: `This event has ended (ended on ${event.end_date}). Payments can no longer be recorded.` }, { status: 403 })
+    if (event && isExpenseActionWindowClosed(event.end_date)) {
+      return NextResponse.json({ error: `The ${EXPENSE_ACTION_GRACE_DAYS}-day window to record payments for this event has closed (event ended on ${event.end_date}). You can still view, search, filter, and download existing records.` }, { status: 403 })
     }
 
     // Don't allow paying more than what's actually owed
