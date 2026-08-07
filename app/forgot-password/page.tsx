@@ -249,12 +249,12 @@ export default function ForgotPasswordPage() {
       </header>
 
       {/* FORM CARD CONTAINER */}
-      <div className="w-full max-w-md mx-auto my-auto px-6 py-8">
-        <div className="bg-white dark:bg-[#0b0f19] border border-[#1A1208]/10 dark:border-white/10 rounded-3xl p-8 shadow-xl dark:shadow-2xl space-y-6 relative overflow-hidden">
+      <div className="w-full max-w-md mx-auto my-auto px-4 sm:px-6 py-4 sm:py-8">
+        <div className="bg-white dark:bg-[#0b0f19] border border-[#1A1208]/10 dark:border-white/10 rounded-2xl sm:rounded-3xl p-4 xs:p-6 sm:p-8 shadow-xl dark:shadow-2xl space-y-5 sm:space-y-6 relative overflow-hidden">
           
           {/* STEP INDICATOR DOTS */}
           <div className="flex items-center justify-between border-b border-[#1A1208]/10 dark:border-white/10 pb-4">
-            <span className="text-xs font-bold uppercase tracking-wider text-[#C49A3C] font-mono">
+            <span className="text-[11px] sm:text-xs font-bold uppercase tracking-wider text-[#C49A3C] font-mono">
               Admin Password Recovery
             </span>
             <div className="flex items-center space-x-1.5">
@@ -299,7 +299,7 @@ export default function ForgotPasswordPage() {
           {step === 1 && (
             <form onSubmit={handleSendOtp} className="space-y-5">
               <div className="space-y-2">
-                <h2 className="text-2xl font-extrabold tracking-tight text-[#1A1208] dark:text-white">
+                <h2 className="text-xl sm:text-2xl font-extrabold tracking-tight text-[#1A1208] dark:text-white">
                   Reset Admin Password
                 </h2>
                 <p className="text-xs text-[#7a6a55] dark:text-slate-400 leading-relaxed">
@@ -326,7 +326,7 @@ export default function ForgotPasswordPage() {
                       if (errorMsg) setErrorMsg("");
                     }}
                     placeholder="admin@mandalname.com"
-                    className="w-full pl-11 pr-4 py-3 bg-[#FDF8F3] dark:bg-[#07090e] border border-[#1A1208]/15 dark:border-slate-800 rounded-xl text-[#1A1208] dark:text-white placeholder-[#9e8c76] dark:placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-[#E8650A]/20 focus:border-[#E8650A] transition-all"
+                    className="w-full pl-11 pr-4 py-3 bg-[#FDF8F3] dark:bg-[#07090e] border border-[#1A1208]/15 dark:border-slate-800 rounded-xl text-[#1A1208] dark:text-white placeholder-[#9e8c76] dark:placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-[#E8650A]/20 focus:border-[#E8650A] transition-all text-sm"
                     required
                   />
                 </div>
@@ -356,20 +356,20 @@ export default function ForgotPasswordPage() {
           {step === 2 && (
             <form onSubmit={handleVerifyOtp} className="space-y-5">
               <div className="space-y-2">
-                <h2 className="text-2xl font-extrabold tracking-tight text-[#1A1208] dark:text-white">
+                <h2 className="text-xl sm:text-2xl font-extrabold tracking-tight text-[#1A1208] dark:text-white">
                   Enter Verification Code
                 </h2>
-                <p className="text-xs text-[#7a6a55] dark:text-slate-400 leading-relaxed">
-                  We sent a 6-digit OTP code to <span className="font-semibold text-[#E8650A]">{email}</span>.
+                <p className="text-xs text-[#7a6a55] dark:text-slate-400 leading-relaxed break-words">
+                  We sent a 6-digit OTP code to <span className="font-semibold text-[#E8650A] break-all">{email}</span>.
                 </p>
               </div>
 
               {/* 6 Digit Box Inputs */}
-              <div className="space-y-2 pt-2">
+              <div className="space-y-2 pt-1">
                 <label className="text-xs font-bold uppercase tracking-wider text-[#1A1208] dark:text-slate-300 block text-center">
                   6-Digit OTP
                 </label>
-                <div className="flex justify-between items-center gap-2">
+                <div className="flex justify-center items-center gap-1 xs:gap-1.5 sm:gap-2.5 w-full">
                   {otp.map((digit, idx) => (
                     <input
                       key={idx}
@@ -381,14 +381,14 @@ export default function ForgotPasswordPage() {
                       onChange={(e) => handleOtpChange(idx, e.target.value)}
                       onKeyDown={(e) => handleOtpKeyDown(idx, e)}
                       onPaste={idx === 0 ? handleOtpPaste : undefined}
-                      className="w-12 h-14 text-center text-xl font-bold font-mono bg-[#FDF8F3] dark:bg-[#07090e] border border-[#1A1208]/15 dark:border-slate-800 rounded-xl text-[#1A1208] dark:text-white focus:outline-none focus:ring-2 focus:ring-[#E8650A]/30 focus:border-[#E8650A] transition-all"
+                      className="w-9 h-11 xs:w-11 xs:h-13 sm:w-12 sm:h-14 flex-1 max-w-[42px] sm:max-w-[48px] text-center text-base xs:text-lg sm:text-xl font-bold font-mono bg-[#FDF8F3] dark:bg-[#07090e] border border-[#1A1208]/15 dark:border-slate-800 rounded-lg sm:rounded-xl text-[#1A1208] dark:text-white focus:outline-none focus:ring-2 focus:ring-[#E8650A]/30 focus:border-[#E8650A] transition-all p-0"
                     />
                   ))}
                 </div>
               </div>
 
               {/* Resend Cooldown Timer */}
-              <div className="flex items-center justify-between text-xs pt-1">
+              <div className="flex items-center justify-between text-xs pt-1 flex-wrap gap-2">
                 <span className="text-[#7a6a55] dark:text-slate-400">
                   Didn&apos;t receive code?
                 </span>
@@ -407,18 +407,18 @@ export default function ForgotPasswordPage() {
                 )}
               </div>
 
-              <div className="flex gap-3">
+              <div className="flex flex-col xs:flex-row sm:flex-row gap-2.5 sm:gap-3 pt-1">
                 <button
                   type="button"
                   onClick={() => setStep(1)}
-                  className="w-1/3 py-3 px-3 bg-[#F5EDE2] dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-[#1A1208] dark:text-slate-200 font-bold rounded-xl transition-all text-xs"
+                  className="w-full xs:w-1/3 py-3 px-3 bg-[#F5EDE2] dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-[#1A1208] dark:text-slate-200 font-bold rounded-xl transition-all text-xs cursor-pointer text-center"
                 >
                   Change Email
                 </button>
                 <button
                   type="submit"
                   disabled={loading}
-                  className="w-2/3 py-3.5 px-4 bg-gradient-to-r from-[#E8650A] to-[#f97316] hover:from-[#d05807] hover:to-[#ea580c] text-white font-bold rounded-xl shadow-lg shadow-[#E8650A]/25 transition-all duration-300 flex items-center justify-center space-x-2 cursor-pointer disabled:opacity-50 text-sm"
+                  className="w-full xs:w-2/3 py-3.5 px-4 bg-gradient-to-r from-[#E8650A] to-[#f97316] hover:from-[#d05807] hover:to-[#ea580c] text-white font-bold rounded-xl shadow-lg shadow-[#E8650A]/25 transition-all duration-300 flex items-center justify-center space-x-2 cursor-pointer disabled:opacity-50 text-sm"
                 >
                   {loading ? (
                     <span>Verifying Code...</span>

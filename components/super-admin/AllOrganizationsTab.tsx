@@ -1051,7 +1051,7 @@ export default function AllOrganizationsTab({ showToast }: AllOrganizationsTabPr
                   {/* Organization Email with OTP verification */}
                   <div>
                     <label className="block text-xs font-bold text-[#7a6a55] dark:text-gray-300 mb-1">Organization Email *</label>
-                    <div className="flex items-center gap-2">
+                    <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
                       <input 
                         type="email" 
                         value={orgEmail} 
@@ -1064,13 +1064,13 @@ export default function AllOrganizationsTab({ showToast }: AllOrganizationsTabPr
                         }}
                         required
                         placeholder="contact@mandalname.org"
-                        className={`w-full bg-white dark:bg-gray-950 border rounded-lg px-3 py-2 text-xs text-[#1A1208] dark:text-white placeholder-[#9e8c76] dark:placeholder-gray-500 focus:outline-none font-medium ${
+                        className={`w-full flex-1 min-w-0 bg-white dark:bg-gray-950 border rounded-lg px-3 py-2 text-xs text-[#1A1208] dark:text-white placeholder-[#9e8c76] dark:placeholder-gray-500 focus:outline-none font-medium ${
                           orgEmailVerified ? 'border-emerald-500 text-emerald-600 font-bold' : orgOtpError ? 'border-rose-500' : 'border-[#1A1208]/15 dark:border-gray-800 focus:border-[#E8650A]'
                         }`}
                       />
 
                       {orgEmailVerified ? (
-                        <span className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-emerald-500/15 border border-emerald-500/30 text-emerald-600 dark:text-emerald-400 text-[10px] font-bold whitespace-nowrap">
+                        <span className="inline-flex items-center justify-center gap-1 px-2.5 py-1.5 rounded-lg bg-emerald-500/15 border border-emerald-500/30 text-emerald-600 dark:text-emerald-400 text-[10px] font-bold whitespace-nowrap">
                           <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
                             <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
                           </svg>
@@ -1081,7 +1081,7 @@ export default function AllOrganizationsTab({ showToast }: AllOrganizationsTabPr
                           type="button"
                           onClick={() => handleSendOtp('org')}
                           disabled={orgOtpLoading || !orgEmail.trim() || orgCooldownTimer > 0}
-                          className="px-3 py-2 bg-[#E8650A] hover:bg-[#d05807] disabled:opacity-50 text-white font-bold text-[10px] rounded-lg transition-all whitespace-nowrap cursor-pointer flex items-center gap-1"
+                          className="w-full sm:w-auto px-3 py-2 bg-[#E8650A] hover:bg-[#d05807] disabled:opacity-50 text-white font-bold text-[10px] rounded-lg transition-all whitespace-nowrap cursor-pointer flex items-center justify-center gap-1"
                         >
                           {orgOtpLoading ? 'Sending...' : orgCooldownTimer > 0 ? `Resend (${orgCooldownTimer}s)` : orgOtpSent ? 'Resend OTP' : 'Send OTP'}
                         </button>
@@ -1094,26 +1094,27 @@ export default function AllOrganizationsTab({ showToast }: AllOrganizationsTabPr
                     {/* Organization Email OTP Verification Card */}
                     {orgOtpSent && !orgEmailVerified && (
                       <div className="mt-2 p-3 bg-[#F5EDE2] dark:bg-gray-950 border border-[#E8650A]/30 rounded-xl space-y-2">
-                        <div className="flex items-center justify-between text-[10px]">
+                        <div className="flex flex-col xs:flex-row xs:items-center justify-between text-[10px] gap-1">
                           <span className="font-semibold text-[#1A1208] dark:text-gray-300">Enter 6-Digit OTP</span>
                           <span className="font-mono text-[#E8650A] font-bold">
                             Expires in {Math.floor(orgOtpTimer / 60)}:{(orgOtpTimer % 60).toString().padStart(2, '0')}
                           </span>
                         </div>
-                        <div className="flex gap-2">
+                        <div className="flex flex-col xs:flex-row sm:flex-row gap-2">
                           <input
                             type="text"
+                            inputMode="numeric"
                             maxLength={6}
                             value={orgOtpCode}
                             onChange={(e) => setOrgOtpCode(e.target.value.replace(/[^0-9]/g, ''))}
                             placeholder="6-digit code"
-                            className="flex-1 px-3 py-1.5 text-xs font-mono font-bold tracking-widest bg-white dark:bg-gray-900 border border-[#1A1208]/15 dark:border-gray-700 rounded-lg focus:outline-none focus:border-[#E8650A]"
+                            className="w-full flex-1 min-w-0 px-3 py-1.5 text-xs font-mono font-bold tracking-widest text-center bg-white dark:bg-gray-900 border border-[#1A1208]/15 dark:border-gray-700 rounded-lg focus:outline-none focus:border-[#E8650A]"
                           />
                           <button
                             type="button"
                             onClick={() => handleVerifyOtp('org')}
                             disabled={orgOtpLoading || orgOtpCode.length !== 6}
-                            className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white font-bold text-[10px] rounded-lg transition-colors cursor-pointer"
+                            className="w-full xs:w-auto px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white font-bold text-[10px] rounded-lg transition-colors cursor-pointer flex items-center justify-center whitespace-nowrap"
                           >
                             {orgOtpLoading ? 'Verifying...' : 'Verify OTP'}
                           </button>
@@ -1250,7 +1251,7 @@ export default function AllOrganizationsTab({ showToast }: AllOrganizationsTabPr
                   {/* Admin Email */}
                   <div className="sm:col-span-2">
                     <label className="block text-xs font-bold text-[#7a6a55] dark:text-gray-300 mb-1">Admin Email Address *</label>
-                    <div className="flex items-center gap-2">
+                    <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
                       <input 
                         type="email" 
                         value={adminEmail} 
@@ -1269,13 +1270,13 @@ export default function AllOrganizationsTab({ showToast }: AllOrganizationsTabPr
                         readOnly={adminEmailVerified}
                         required
                         placeholder="admin@email.com"
-                        className={`w-full bg-white dark:bg-gray-950 border rounded-lg px-3 py-2 text-xs text-[#1A1208] dark:text-white placeholder-[#9e8c76] dark:placeholder-gray-500 focus:outline-none font-medium ${
+                        className={`w-full flex-1 min-w-0 bg-white dark:bg-gray-950 border rounded-lg px-3 py-2 text-xs text-[#1A1208] dark:text-white placeholder-[#9e8c76] dark:placeholder-gray-500 focus:outline-none font-medium ${
                           adminEmailVerified ? 'border-emerald-500 text-emerald-600 font-bold' : adminOtpError ? 'border-rose-500' : 'border-[#1A1208]/15 dark:border-gray-800 focus:border-[#E8650A]'
                         }`}
                       />
 
                       {adminEmailVerified ? (
-                        <div className="flex items-center gap-1.5">
+                        <div className="flex items-center justify-center gap-1.5">
                           <span className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-emerald-500/15 border border-emerald-500/30 text-emerald-600 dark:text-emerald-400 text-[10px] font-bold whitespace-nowrap">
                             <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
                               <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
@@ -1307,7 +1308,7 @@ export default function AllOrganizationsTab({ showToast }: AllOrganizationsTabPr
                           type="button"
                           onClick={() => handleSendOtp('admin')}
                           disabled={adminOtpLoading || !adminEmail.trim() || adminCooldownTimer > 0}
-                          className="px-3 py-2 bg-[#E8650A] hover:bg-[#d05807] disabled:opacity-50 text-white font-bold text-[10px] rounded-lg transition-all whitespace-nowrap cursor-pointer flex items-center gap-1"
+                          className="w-full sm:w-auto px-3 py-2 bg-[#E8650A] hover:bg-[#d05807] disabled:opacity-50 text-white font-bold text-[10px] rounded-lg transition-all whitespace-nowrap cursor-pointer flex items-center justify-center gap-1"
                         >
                           {adminOtpLoading ? 'Sending...' : adminCooldownTimer > 0 ? `Resend (${adminCooldownTimer}s)` : adminOtpSent ? 'Resend OTP' : 'Send OTP'}
                         </button>
@@ -1320,26 +1321,27 @@ export default function AllOrganizationsTab({ showToast }: AllOrganizationsTabPr
                     {/* Admin Email OTP Verification Card */}
                     {adminOtpSent && !adminEmailVerified && (
                       <div className="mt-2 p-3 bg-[#F5EDE2] dark:bg-gray-950 border border-[#E8650A]/30 rounded-xl space-y-2">
-                        <div className="flex items-center justify-between text-[10px]">
+                        <div className="flex flex-col xs:flex-row xs:items-center justify-between text-[10px] gap-1">
                           <span className="font-semibold text-[#1A1208] dark:text-gray-300">Enter 6-Digit OTP</span>
                           <span className="font-mono text-[#E8650A] font-bold">
                             Expires in {Math.floor(adminOtpTimer / 60)}:{(adminOtpTimer % 60).toString().padStart(2, '0')}
                           </span>
                         </div>
-                        <div className="flex gap-2">
+                        <div className="flex flex-col xs:flex-row sm:flex-row gap-2">
                           <input
                             type="text"
+                            inputMode="numeric"
                             maxLength={6}
                             value={adminOtpCode}
                             onChange={(e) => setAdminOtpCode(e.target.value.replace(/[^0-9]/g, ''))}
                             placeholder="6-digit code"
-                            className="flex-1 px-3 py-1.5 text-xs font-mono font-bold tracking-widest bg-white dark:bg-gray-900 border border-[#1A1208]/15 dark:border-gray-700 rounded-lg focus:outline-none focus:border-[#E8650A]"
+                            className="w-full flex-1 min-w-0 px-3 py-1.5 text-xs font-mono font-bold tracking-widest text-center bg-white dark:bg-gray-900 border border-[#1A1208]/15 dark:border-gray-700 rounded-lg focus:outline-none focus:border-[#E8650A]"
                           />
                           <button
                             type="button"
                             onClick={() => handleVerifyOtp('admin')}
                             disabled={adminOtpLoading || adminOtpCode.length !== 6}
-                            className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white font-bold text-[10px] rounded-lg transition-colors cursor-pointer"
+                            className="w-full xs:w-auto px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white font-bold text-[10px] rounded-lg transition-colors cursor-pointer flex items-center justify-center whitespace-nowrap"
                           >
                             {adminOtpLoading ? 'Verifying...' : 'Verify OTP'}
                           </button>
@@ -1999,7 +2001,7 @@ export default function AllOrganizationsTab({ showToast }: AllOrganizationsTabPr
                 <form onSubmit={handleVerifyChangePasswordOtp} className="space-y-4">
                   <div className="space-y-1.5">
                     <label className="block text-xs font-bold text-[#7a6a55] dark:text-gray-300">Enter 6-Digit OTP *</label>
-                    <div className="flex justify-between items-center gap-2">
+                    <div className="flex justify-center items-center gap-1 xs:gap-1.5 sm:gap-2 w-full">
                       {resetOtpCode.map((digit, idx) => (
                         <input
                           key={idx}
@@ -2011,13 +2013,13 @@ export default function AllOrganizationsTab({ showToast }: AllOrganizationsTabPr
                           onChange={(e) => handleResetOtpChange(idx, e.target.value)}
                           onKeyDown={(e) => handleResetOtpKeyDown(idx, e)}
                           onPaste={idx === 0 ? handleResetOtpPaste : undefined}
-                          className="w-10 h-12 text-center text-lg font-bold font-mono bg-white dark:bg-gray-800 border border-[#1A1208]/15 dark:border-gray-700 rounded-lg text-[#1A1208] dark:text-white focus:outline-none focus:border-[#E8650A]"
+                          className="w-8 h-10 xs:w-9 xs:h-11 sm:w-10 sm:h-12 flex-1 max-w-[40px] text-center text-base sm:text-lg font-bold font-mono bg-white dark:bg-gray-800 border border-[#1A1208]/15 dark:border-gray-700 rounded-lg text-[#1A1208] dark:text-white focus:outline-none focus:border-[#E8650A] p-0"
                         />
                       ))}
                     </div>
                   </div>
 
-                  <div className="flex items-center justify-between text-[11px] text-[#7a6a55] dark:text-gray-400">
+                  <div className="flex items-center justify-between text-[11px] text-[#7a6a55] dark:text-gray-400 flex-wrap gap-2">
                     <span>Didn&apos;t receive code?</span>
                     {resetCooldownTimer > 0 ? (
                       <span className="font-mono text-[#E8650A]">Resend in {resetCooldownTimer}s</span>

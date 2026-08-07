@@ -867,8 +867,8 @@ export default function RegisterPage() {
                   <label htmlFor="orgEmail" className="text-xs font-bold text-[#1A1208] dark:text-slate-300 uppercase tracking-wider">
                     Organization Email Address *
                   </label>
-                  <div className="relative flex items-center gap-2">
-                    <div className="relative flex-1">
+                  <div className="relative flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+                    <div className="relative flex-1 min-w-0">
                       <span className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-[#7a6a55] dark:text-slate-400">
                         <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
@@ -894,7 +894,7 @@ export default function RegisterPage() {
                     </div>
 
                     {orgEmailVerified ? (
-                      <span className="inline-flex items-center gap-1.5 px-3.5 py-3 rounded-xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-600 dark:text-emerald-400 text-xs font-bold whitespace-nowrap">
+                      <span className="inline-flex items-center justify-center gap-1.5 px-3.5 py-3 rounded-xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-600 dark:text-emerald-400 text-xs font-bold whitespace-nowrap">
                         <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
                           <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
                         </svg>
@@ -905,7 +905,7 @@ export default function RegisterPage() {
                         type="button"
                         onClick={() => handleSendOtp("org")}
                         disabled={orgOtpLoading || !formData.orgEmail.trim() || orgCooldownTimer > 0}
-                        className="px-4 py-3 bg-[#E8650A] hover:bg-[#d05807] disabled:opacity-50 text-white font-bold text-xs rounded-xl shadow-md transition-all duration-200 whitespace-nowrap cursor-pointer flex items-center gap-1.5"
+                        className="w-full sm:w-auto px-4 py-3 bg-[#E8650A] hover:bg-[#d05807] disabled:opacity-50 text-white font-bold text-xs rounded-xl shadow-md transition-all duration-200 whitespace-nowrap cursor-pointer flex items-center justify-center gap-1.5"
                       >
                         {orgOtpLoading ? (
                           <>
@@ -939,8 +939,8 @@ export default function RegisterPage() {
 
                   {/* OTP Entry Card for Organization Email */}
                   {orgOtpSent && !orgEmailVerified && (
-                    <div className="mt-2.5 p-4 bg-[#F5EDE2] dark:bg-slate-900/90 border border-[#E8650A]/30 rounded-xl space-y-3 animate-fade-in-up">
-                      <div className="flex items-center justify-between text-xs">
+                    <div className="mt-2.5 p-3.5 sm:p-4 bg-[#F5EDE2] dark:bg-slate-900/90 border border-[#E8650A]/30 rounded-xl space-y-3 animate-fade-in-up">
+                      <div className="flex flex-col xs:flex-row xs:items-center justify-between text-xs gap-1">
                         <span className="font-semibold text-[#1A1208] dark:text-slate-200">
                           Enter 6-digit OTP sent to email
                         </span>
@@ -949,20 +949,21 @@ export default function RegisterPage() {
                         </span>
                       </div>
 
-                      <div className="flex gap-2">
+                      <div className="flex flex-col xs:flex-row sm:flex-row gap-2">
                         <input
                           type="text"
+                          inputMode="numeric"
                           maxLength={6}
                           value={orgOtpCode}
                           onChange={(e) => setOrgOtpCode(e.target.value.replace(/[^0-9]/g, ""))}
                           placeholder="6-digit OTP"
-                          className="flex-1 px-3 py-2.5 bg-white dark:bg-[#0b0f19] border border-[#1A1208]/15 dark:border-slate-700 rounded-xl text-center tracking-widest font-mono text-base font-bold text-[#1A1208] dark:text-white focus:outline-none focus:border-[#E8650A]"
+                          className="w-full flex-1 px-3 py-2.5 bg-white dark:bg-[#0b0f19] border border-[#1A1208]/15 dark:border-slate-700 rounded-xl text-center tracking-widest font-mono text-base font-bold text-[#1A1208] dark:text-white focus:outline-none focus:border-[#E8650A] min-w-0"
                         />
                         <button
                           type="button"
                           onClick={() => handleVerifyOtp("org")}
                           disabled={orgOtpLoading || orgOtpCode.length !== 6}
-                          className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white text-xs font-bold rounded-xl transition-all cursor-pointer flex items-center justify-center gap-1.5 shadow-md"
+                          className="w-full xs:w-auto px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white text-xs font-bold rounded-xl transition-all cursor-pointer flex items-center justify-center gap-1.5 shadow-md whitespace-nowrap"
                         >
                           {orgOtpLoading ? "Verifying..." : "Verify OTP"}
                         </button>
@@ -1088,8 +1089,8 @@ export default function RegisterPage() {
                   <label htmlFor="adminEmail" className="text-xs font-bold text-[#1A1208] dark:text-slate-300 uppercase tracking-wider">
                     Admin Email Address *
                   </label>
-                  <div className="relative flex items-center gap-2">
-                    <div className="relative flex-1">
+                  <div className="relative flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+                    <div className="relative flex-1 min-w-0">
                       <span className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-[#7a6a55] dark:text-slate-400">
                         <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
@@ -1116,7 +1117,7 @@ export default function RegisterPage() {
                     </div>
 
                     {adminEmailVerified ? (
-                      <div className="flex items-center gap-1.5">
+                      <div className="flex items-center justify-center gap-1.5">
                         <span className="inline-flex items-center gap-1.5 px-3.5 py-3 rounded-xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-600 dark:text-emerald-400 text-xs font-bold whitespace-nowrap">
                           <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
                             <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
@@ -1148,7 +1149,7 @@ export default function RegisterPage() {
                         type="button"
                         onClick={() => handleSendOtp("admin")}
                         disabled={adminOtpLoading || !formData.adminEmail.trim() || adminCooldownTimer > 0}
-                        className="px-4 py-3 bg-[#E8650A] hover:bg-[#d05807] disabled:opacity-50 text-white font-bold text-xs rounded-xl shadow-md transition-all duration-200 whitespace-nowrap cursor-pointer flex items-center gap-1.5"
+                        className="w-full sm:w-auto px-4 py-3 bg-[#E8650A] hover:bg-[#d05807] disabled:opacity-50 text-white font-bold text-xs rounded-xl shadow-md transition-all duration-200 whitespace-nowrap cursor-pointer flex items-center justify-center gap-1.5"
                       >
                         {adminOtpLoading ? (
                           <>
@@ -1182,8 +1183,8 @@ export default function RegisterPage() {
 
                   {/* OTP Entry Card for Admin Email */}
                   {adminOtpSent && !adminEmailVerified && (
-                    <div className="mt-2.5 p-4 bg-[#F5EDE2] dark:bg-slate-900/90 border border-[#E8650A]/30 rounded-xl space-y-3 animate-fade-in-up">
-                      <div className="flex items-center justify-between text-xs">
+                    <div className="mt-2.5 p-3.5 sm:p-4 bg-[#F5EDE2] dark:bg-slate-900/90 border border-[#E8650A]/30 rounded-xl space-y-3 animate-fade-in-up">
+                      <div className="flex flex-col xs:flex-row xs:items-center justify-between text-xs gap-1">
                         <span className="font-semibold text-[#1A1208] dark:text-slate-200">
                           Enter 6-digit OTP sent to email
                         </span>
@@ -1192,20 +1193,21 @@ export default function RegisterPage() {
                         </span>
                       </div>
 
-                      <div className="flex gap-2">
+                      <div className="flex flex-col xs:flex-row sm:flex-row gap-2">
                         <input
                           type="text"
+                          inputMode="numeric"
                           maxLength={6}
                           value={adminOtpCode}
                           onChange={(e) => setAdminOtpCode(e.target.value.replace(/[^0-9]/g, ""))}
                           placeholder="6-digit OTP"
-                          className="flex-1 px-3 py-2.5 bg-white dark:bg-[#0b0f19] border border-[#1A1208]/15 dark:border-slate-700 rounded-xl text-center tracking-widest font-mono text-base font-bold text-[#1A1208] dark:text-white focus:outline-none focus:border-[#E8650A]"
+                          className="w-full flex-1 px-3 py-2.5 bg-white dark:bg-[#0b0f19] border border-[#1A1208]/15 dark:border-slate-700 rounded-xl text-center tracking-widest font-mono text-base font-bold text-[#1A1208] dark:text-white focus:outline-none focus:border-[#E8650A] min-w-0"
                         />
                         <button
                           type="button"
                           onClick={() => handleVerifyOtp("admin")}
                           disabled={adminOtpLoading || adminOtpCode.length !== 6}
-                          className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white text-xs font-bold rounded-xl transition-all cursor-pointer flex items-center justify-center gap-1.5 shadow-md"
+                          className="w-full xs:w-auto px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white text-xs font-bold rounded-xl transition-all cursor-pointer flex items-center justify-center gap-1.5 shadow-md whitespace-nowrap"
                         >
                           {adminOtpLoading ? "Verifying..." : "Verify OTP"}
                         </button>
