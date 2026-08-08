@@ -177,34 +177,33 @@ export async function POST(request) {
       return NextResponse.json({ error: 'Could not record donation' }, { status: 500 })
     }
 
-    let receiptData = null
-    if (isCollectorRecorded && donation) {
-      let logoUrl = null
-      if (mandal?.doc_logo) {
-        try {
-          const { data: signedData } = await supabaseAdmin.storage
-            .from('kyc-documents')
-            .createSignedUrl(mandal.doc_logo, 60 * 60 * 24 * 365)
-          logoUrl = signedData?.signedUrl || null
-        } catch (e) {
-          console.warn('Logo URL error:', e)
-        }
+    let logoUrl = null
+    if (mandal?.doc_logo) {
+      try {
+        const { data: signedData } = await supabaseAdmin.storage
+          .from('kyc-documents')
+          .createSignedUrl(mandal.doc_logo, 60 * 60 * 24 * 365)
+        logoUrl = signedData?.signedUrl || null
+      } catch (e) {
+        console.warn('Logo URL error:', e)
       }
+    }
 
-      receiptData = buildReceiptData({
-        donation,
-        mandal,
-        event,
-        collectorName,
-        logoUrl
-      })
-      const { error: updateError } = await supabaseAdmin
-        .from('donations')
-        .update({ receipt_data: receiptData })
-        .eq('id', donation.id)
-      if (updateError) {
-        console.error('Receipt data update error:', updateError)
-      }
+    const receiptData = buildReceiptData({
+      donation,
+      mandal,
+      event,
+      collectorName,
+      logoUrl
+    })
+    receiptData.verified = isCollectorRecorded
+
+    const { error: updateError } = await supabaseAdmin
+      .from('donations')
+      .update({ receipt_data: receiptData })
+      .eq('id', donation.id)
+    if (updateError) {
+      console.error('Receipt data update error:', updateError)
     }
 
     // ── 8. Return response ────────────────────────────────────
@@ -213,6 +212,7 @@ export async function POST(request) {
       donation: {
         id: donation.id,
         receipt_number: donation.receipt_number,
+        receipt_code: receiptData.receiptCode,
         donor_name: donation.donor_name,
         amount: donation.amount,
         payment_mode: donation.payment_mode,

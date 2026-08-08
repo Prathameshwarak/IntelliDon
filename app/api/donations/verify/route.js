@@ -59,6 +59,7 @@ export async function PATCH(request) {
         .select(`
           id,
           receipt_number,
+          receipt_data,
           donor_name,
           donor_phone,
           donor_address,

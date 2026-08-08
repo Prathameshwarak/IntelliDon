@@ -3,6 +3,7 @@ import { generateReceiptPDF } from './generateReceiptPDF'
 
 export type ReceiptData = {
   receiptNumber: string
+  receiptCode?: string | null
   mandalName: string
   mandalAddress: string
   mandalPhone: string

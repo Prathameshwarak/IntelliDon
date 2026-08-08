@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation'
 import UpiQR from '@/components/UpiQR'
 import ThemeToggle from '@/components/ThemeToggle'
 import { downloadReceipt, shareReceipt, type ReceiptData } from '@/lib/downloadReceipt'
+import ReceiptQRModal from '@/components/ReceiptQRModal'
 
 type Event = {
   id: string
@@ -30,6 +31,7 @@ type DuplicateWarning = {
 
 type SuccessData = {
   receipt_number: string
+  receipt_code?: string | null
   donor_name: string
   amount: number
   payment_mode: string
@@ -97,6 +99,7 @@ export default function CollectPage() {
   const [historyStatusFilter, setHistoryStatusFilter] = useState('all')
   const [historyModeFilter, setHistoryModeFilter] = useState('all')
   const [copiedId, setCopiedId] = useState<string | null>(null)
+  const [showQrModal, setShowQrModal] = useState(false)
 
   // Ranking & Leaderboard States
   const [rankings, setRankings] = useState<CollectorRankingItem[]>([])
@@ -255,8 +258,10 @@ export default function CollectPage() {
   function buildProvisionalReceiptData(): ReceiptData | null {
     if (!successData || !mandal || !selectedEvent) return null
     const isVerified = successData.status === 'verified'
+    const code = successData.receipt_code || successData.receipt_data?.receiptCode || null
     return {
       receiptNumber: successData.receipt_number,
+      receiptCode: code,
       mandalName: mandal.name,
       mandalAddress: [mandal.address, mandal.city].filter(Boolean).join(', '),
       mandalPhone: mandal.phone || '',
@@ -1086,6 +1091,9 @@ export default function CollectPage() {
                       maxLength={10}
                       className="w-full bg-white dark:bg-gray-900 border border-[#1A1208]/15 dark:border-gray-700 rounded-lg px-3 py-3 text-sm text-[#1A1208] dark:text-white placeholder-[#9e8c76] dark:placeholder-gray-500 focus:outline-none focus:border-[#E8650A] font-medium"
                     />
+                    <p className="text-[11px] text-[#E8650A] dark:text-orange-400 font-medium mt-1">
+                      💡 Tip: Adding donor's phone number enables them to download their receipt using their mobile number anytime.
+                    </p>
                   </div>
 
                   <div>
@@ -1275,11 +1283,24 @@ export default function CollectPage() {
                   <p className="text-emerald-700 dark:text-green-400 font-extrabold text-xl mb-1">Donation Recorded!</p>
                   <p className="text-[#7a6a55] dark:text-gray-300 text-sm font-bold">{successData.donor_name}</p>
 
-                  {/* Receipt number */}
-                  <div className="mt-5 bg-white dark:bg-gray-950 rounded-lg py-3 px-4 border border-[#1A1208]/10 dark:border-gray-800 shadow-xs">
-                    <p className="text-[#7a6a55] dark:text-gray-400 text-xs mb-1 font-bold">Receipt Number</p>
-                    <p className="text-[#1A1208] dark:text-white font-mono font-extrabold text-xl tracking-wide">
-                      {successData.receipt_number}
+                  {/* Receipt Number & 4-Digit Code */}
+                  <div className="mt-5 grid grid-cols-2 gap-2">
+                    <div className="bg-white dark:bg-gray-950 rounded-lg py-3 px-3 border border-[#1A1208]/10 dark:border-gray-800 shadow-xs">
+                      <p className="text-[#7a6a55] dark:text-gray-400 text-[11px] mb-0.5 font-bold">Receipt No</p>
+                      <p className="text-[#1A1208] dark:text-white font-mono font-extrabold text-base tracking-wide truncate">
+                        {successData.receipt_number}
+                      </p>
+                    </div>
+                    <div className="bg-orange-500/10 dark:bg-orange-500/20 rounded-lg py-3 px-3 border border-orange-500/30 shadow-xs">
+                      <p className="text-[#E8650A] dark:text-orange-400 text-[11px] mb-0.5 font-bold">4-Digit Code</p>
+                      <p className="text-[#E8650A] dark:text-orange-400 font-mono font-extrabold text-lg tracking-wider">
+                        {successData.receipt_code || successData.receipt_data?.receiptCode || '--'}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="mt-2 bg-orange-500/10 border border-orange-500/20 rounded-lg p-2.5 text-center">
+                    <p className="text-xs font-bold text-[#E8650A] dark:text-orange-400">
+                      🔑 This 4-digit alphanumeric code will help the donor to download their receipt anytime.
                     </p>
                   </div>
 
@@ -1302,20 +1323,34 @@ export default function CollectPage() {
                 {/* Receipt links & actions */}
                 {successData.receipt_data || buildProvisionalReceiptData() ? (
                   <div className="flex flex-col gap-2">
+                    {/* 1. Show Receipt QR Code for Donor (Top, Full Width) */}
                     <button
-                      onClick={() => downloadReceipt(successData.receipt_data || buildProvisionalReceiptData()!)}
-                      className="w-full flex items-center justify-center gap-2 bg-[#E8650A] hover:bg-[#d05807] text-white
-                        font-bold py-4 rounded-xl text-base transition-colors shadow-md cursor-pointer"
+                      onClick={() => setShowQrModal(true)}
+                      className="w-full py-3.5 text-sm font-bold rounded-xl transition-all shadow-sm border bg-amber-500/10 hover:bg-amber-500/20 text-[#E8650A] dark:text-orange-400 border-amber-500/30 cursor-pointer flex items-center justify-center gap-2"
                     >
-                      <span>↓</span>
-                      <span>Download Receipt</span>
+                      <span>📱</span>
+                      <span>Show Receipt QR Code for Donor</span>
                     </button>
-                    <button
-                      onClick={() => shareReceipt(successData.receipt_data || buildProvisionalReceiptData()!)}
-                      className="w-full py-4 text-base font-bold rounded-xl transition-all shadow-sm border bg-white dark:bg-gray-800 text-[#1A1208] dark:text-white border-[#1A1208]/10 dark:border-gray-700 hover:bg-[#ebdcc9] dark:hover:bg-gray-700 cursor-pointer"
-                    >
-                      Share Receipt
-                    </button>
+
+                    {/* 2. Download & Share in Same Row */}
+                    <div className="flex gap-2 w-full">
+                      <button
+                        onClick={() => downloadReceipt(successData.receipt_data || buildProvisionalReceiptData()!)}
+                        className="flex-1 flex items-center justify-center gap-1.5 bg-[#E8650A] hover:bg-[#d05807] text-white
+                          font-bold py-3 px-3 rounded-xl text-xs sm:text-sm transition-colors shadow-sm cursor-pointer"
+                      >
+                        <span>↓</span>
+                        <span>Download</span>
+                      </button>
+
+                      <button
+                        onClick={() => shareReceipt(successData.receipt_data || buildProvisionalReceiptData()!)}
+                        className="flex-1 flex items-center justify-center gap-1.5 py-3 px-3 text-xs sm:text-sm font-bold rounded-xl transition-all shadow-sm border bg-white dark:bg-gray-800 text-[#1A1208] dark:text-white border-[#1A1208]/10 dark:border-gray-700 hover:bg-[#ebdcc9] dark:hover:bg-gray-700 cursor-pointer"
+                      >
+                        <span>💬</span>
+                        <span>Share</span>
+                      </button>
+                    </div>
                     {successData.status === 'verified' ? (
                       <p className="text-xs text-emerald-700 dark:text-green-500 font-bold">🟢 VERIFIED - Verified by Collector</p>
                     ) : (
@@ -1496,9 +1531,14 @@ export default function CollectPage() {
                     {/* Bottom Row: Date, Mode, Receipt Number */}
                     <div className="flex justify-between items-end text-xs">
                       <div className="flex flex-col gap-0.5">
-                        <div className="flex items-center gap-1.5">
+                        <div className="flex items-center gap-1.5 flex-wrap">
                           <span className="text-[#7a6a55] dark:text-gray-400 font-bold">Receipt:</span>
                           <span className="font-mono font-bold text-[#1A1208] dark:text-gray-300">{d.receipt_number}</span>
+                          {(d.receipt_code || d.receipt_data?.receiptCode) && (
+                            <span className="font-mono font-bold text-[#E8650A] dark:text-orange-400 bg-orange-500/10 px-1.5 py-0.5 rounded text-[10px]">
+                              Code: {d.receipt_code || d.receipt_data?.receiptCode}
+                            </span>
+                          )}
                         </div>
                         <div className="flex items-center gap-1.5 mt-0.5 text-[#9e8c76] dark:text-gray-500 text-[10px] font-medium">
                           <span>
@@ -1552,18 +1592,18 @@ export default function CollectPage() {
         {/* DUPLICATE PHONE MODAL */}
         {/* ======================================================== */}
         {duplicateModalData && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-fade-in">
-            <div className="bg-[#F5EDE2] dark:bg-gray-900 border border-[#1A1208]/15 dark:border-gray-800 rounded-2xl w-full max-w-sm p-6 shadow-2xl text-center text-[#1A1208] dark:text-white">
-              <div className="w-12 h-12 bg-amber-500/10 text-amber-600 dark:text-yellow-500 rounded-full flex items-center justify-center text-2xl mb-4 mx-auto border border-amber-500/20">
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-xs">
+            <div className="bg-[#FAF6F0] dark:bg-gray-900 rounded-2xl w-full max-w-sm p-6 shadow-xl border border-[#1A1208]/10 dark:border-gray-800 text-center">
+              <div className="w-12 h-12 bg-amber-500/10 text-amber-600 dark:text-yellow-400 rounded-full flex items-center justify-center text-2xl mb-4 mx-auto font-bold">
                 ⚠️
               </div>
-              <h3 className="text-lg font-bold text-[#1A1208] dark:text-white mb-2">Previous Donation Found</h3>
-              <p className="text-sm text-[#7a6a55] dark:text-gray-400 leading-relaxed mb-4 font-medium">
-                A donation for <strong className="text-[#1A1208] dark:text-white font-bold">{duplicateModalData.eventName}</strong> has been done previously with this phone number.
+              <h3 className="text-base sm:text-lg font-extrabold text-[#1A1208] dark:text-white mb-2">Previous Donation Found</h3>
+              <p className="text-xs sm:text-sm text-[#7a6a55] dark:text-gray-300 leading-relaxed mb-4 font-medium">
+                A donation for <strong className="text-[#1A1208] dark:text-white">{duplicateModalData.eventName}</strong> has been done previously with this phone number.
               </p>
               <div className="bg-white dark:bg-gray-950 border border-[#1A1208]/10 dark:border-gray-800 rounded-xl p-3 mb-6">
-                <span className="text-[10px] text-[#7a6a55] dark:text-gray-500 block font-bold uppercase tracking-wider">Receipt ID</span>
-                <span className="text-sm font-mono font-extrabold text-[#1A1208] dark:text-gray-300">{duplicateModalData.receiptId}</span>
+                <span className="text-[10px] text-[#9e8c76] dark:text-gray-400 block font-bold uppercase tracking-wider">Receipt ID</span>
+                <span className="text-xs sm:text-sm font-mono font-extrabold text-[#1A1208] dark:text-gray-200">{duplicateModalData.receiptId}</span>
               </div>
 
               <div className="flex gap-3">
@@ -1588,6 +1628,16 @@ export default function CollectPage() {
             </div>
           </div>
         )}
+
+        {/* Receipt QR Code Modal for Donor */}
+        <ReceiptQRModal
+          isOpen={showQrModal}
+          onClose={() => setShowQrModal(false)}
+          receiptCode={successData?.receipt_code || successData?.receipt_data?.receiptCode || ''}
+          receiptNumber={successData?.receipt_number || ''}
+          donorName={successData?.donor_name || ''}
+          mandalName={mandal?.name || ''}
+        />
       </div>
     </div>
   )
