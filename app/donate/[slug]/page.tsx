@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useRef } from 'react'
 import { useParams } from 'next/navigation'
+import Link from 'next/link'
 import UpiQR from '@/components/UpiQR'
 import { downloadReceipt, type ReceiptData } from '@/lib/downloadReceipt'
 
@@ -52,6 +53,7 @@ export default function PublicDonatePage() {
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
   const [receiptNumber, setReceiptNumber] = useState('')
+  const [receiptCode, setReceiptCode] = useState('')
   const [donationId, setDonationId] = useState('')
   const [downloadingReceipt, setDownloadingReceipt] = useState(false)
 
@@ -71,6 +73,7 @@ export default function PublicDonatePage() {
 
       const receiptData: ReceiptData = {
         receiptNumber,
+        receiptCode: receiptCode || null,
         mandalName: mandal.name,
         mandalAddress: [mandal.address, mandal.city].filter(Boolean).join(', '),
         mandalPhone: mandal.phone || '',
@@ -224,6 +227,7 @@ export default function PublicDonatePage() {
       }
 
       setReceiptNumber(data.donation.receipt_number)
+      setReceiptCode(data.donation.receipt_code || data.donation.receipt_data?.receiptCode || '')
       setDonationId(data.donation.id)
       setStep('success')
 
@@ -249,16 +253,32 @@ export default function PublicDonatePage() {
   // ── Error page ────────────────────────────────────────────────
   if (step === 'error') {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4">
-        <div className="max-w-sm w-full text-center">
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4 py-8">
+        <div className="max-w-sm w-full bg-white rounded-2xl p-6 border border-gray-200 shadow-sm text-center">
           <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
             <span className="text-red-500 text-2xl">✕</span>
           </div>
           <h1 className="text-lg font-semibold text-gray-900 mb-2">Link not valid</h1>
           <p className="text-gray-500 text-sm">{pageError}</p>
-          <p className="text-gray-400 text-xs mt-4">
+          <p className="text-gray-400 text-xs mt-3">
             Contact the organisation for the correct donation link.
           </p>
+
+          {/* Download Receipt option even if link is invalid */}
+          <div className="mt-6 pt-5 border-t border-gray-150">
+            <p className="text-xs text-gray-600 font-medium mb-3">
+              Looking for your donation receipt?
+            </p>
+            <Link
+              href="/download-receipt"
+              className="w-full bg-[#E05305] hover:bg-[#c94803] text-white font-bold py-3 px-4 rounded-xl text-sm transition-all flex items-center justify-center gap-2 cursor-pointer shadow-xs"
+            >
+              <span>📥 Download Donation Receipt</span>
+            </Link>
+            <p className="text-[11px] text-gray-400 mt-2">
+              Enter your 4-digit code or mobile number to fetch your receipt.
+            </p>
+          </div>
         </div>
       </div>
     )
@@ -275,9 +295,14 @@ export default function PublicDonatePage() {
             <p className="text-base font-semibold text-gray-900">{mandal?.name}</p>
             {mandal?.city && <p className="text-xs text-gray-400">{mandal.city}</p>}
           </div>
-          <div className="text-right">
-            <p className="text-xs text-gray-400">{event?.name}</p>
-            <p className="text-xs text-gray-400">{event?.year}</p>
+          <div className="text-right flex flex-col items-end gap-1">
+            <p className="text-xs text-gray-400">{event?.name} {event?.year}</p>
+            <Link
+              href={`/donate/${slug}/receipt`}
+              className="inline-flex items-center gap-1 text-[11px] font-bold text-orange-600 hover:text-orange-700 bg-orange-50 hover:bg-orange-100 border border-orange-200 px-2.5 py-1 rounded-lg transition-colors"
+            >
+              <span>📥 Download Receipt</span>
+            </Link>
           </div>
         </div>
       </div>
@@ -321,6 +346,9 @@ export default function PublicDonatePage() {
                 className="w-full border border-gray-300 rounded-xl px-4 py-3 text-sm text-gray-900
                   placeholder-gray-400 focus:outline-none focus:border-orange-400 focus:ring-2 focus:ring-orange-100 bg-white"
               />
+              <p className="text-[11px] text-orange-600 font-medium mt-1">
+                💡 Adding your phone number enables you to download your receipt using your mobile number anytime.
+              </p>
             </div>
 
             {/* Address */}
@@ -566,13 +594,25 @@ export default function PublicDonatePage() {
                 Thank you, {donorName}. Your donation to {mandal?.name} has been recorded.
               </p>
 
-              {/* Receipt number */}
-              <div className="mt-5 bg-gray-50 border border-gray-200 rounded-xl py-4 px-4">
-                <p className="text-xs text-gray-400 mb-1">Your Receipt Number</p>
-                <p className="text-gray-900 font-mono font-bold text-xl tracking-wide">
-                  {receiptNumber}
+              {/* Receipt Number & 4-Digit Code */}
+              <div className="mt-5 grid grid-cols-2 gap-3">
+                <div className="bg-gray-50 border border-gray-200 rounded-xl py-3 px-3">
+                  <p className="text-[11px] text-gray-400 font-semibold mb-0.5">Receipt No</p>
+                  <p className="text-gray-900 font-mono font-bold text-base tracking-wide">
+                    {receiptNumber}
+                  </p>
+                </div>
+                <div className="bg-orange-50 border border-orange-200 rounded-xl py-3 px-3">
+                  <p className="text-[11px] text-orange-600 font-semibold mb-0.5">4-Digit Download Code</p>
+                  <p className="text-orange-600 font-mono font-extrabold text-lg tracking-wider">
+                    {receiptCode || '--'}
+                  </p>
+                </div>
+              </div>
+              <div className="mt-2.5 bg-orange-50 border border-orange-200 rounded-xl p-2.5 text-center">
+                <p className="text-xs font-semibold text-orange-700">
+                  🔑 This 4-digit alphanumeric code will help you to download your receipt anytime using your phone number or code.
                 </p>
-                <p className="text-xs text-gray-400 mt-2">Save this number for your records</p>
               </div>
 
               {/* Amount */}
