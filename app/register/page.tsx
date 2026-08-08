@@ -18,6 +18,60 @@ const confettiParticles = Array.from({ length: 60 }).map((_, i) => ({
   rotation: `${Math.random() * 360}deg`,
 }));
 
+// Helper function to compress images client-side before uploading
+const compressImageFile = async (file: File): Promise<File> => {
+  if (!file || !file.type.startsWith('image/')) return file;
+  if (file.size <= 500 * 1024) return file; // Skip compression for small files <= 500KB
+
+  return new Promise((resolve) => {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        let { width, height } = img;
+        const maxDim = 1920;
+
+        if (width > maxDim || height > maxDim) {
+          if (width > height) {
+            height = Math.round((height * maxDim) / width);
+            width = maxDim;
+          } else {
+            width = Math.round((width * maxDim) / height);
+            height = maxDim;
+          }
+        }
+
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) return resolve(file);
+
+        ctx.drawImage(img, 0, 0, width, height);
+        canvas.toBlob(
+          (blob) => {
+            if (!blob || blob.size >= file.size) {
+              resolve(file);
+            } else {
+              const compressed = new File([blob], file.name.replace(/\.[^/.]+$/, "") + ".jpg", {
+                type: 'image/jpeg',
+                lastModified: Date.now(),
+              });
+              resolve(compressed);
+            }
+          },
+          'image/jpeg',
+          0.8
+        );
+      };
+      img.onerror = () => resolve(file);
+      img.src = e.target?.result as string;
+    };
+    reader.onerror = () => resolve(file);
+    reader.readAsDataURL(file);
+  });
+};
+
 export default function RegisterPage() {
   const router = useRouter();
 
@@ -437,6 +491,14 @@ export default function RegisterPage() {
         return;
       }
 
+      // Check total document payload size
+      const totalBytes = Object.values(docs).reduce((acc, f) => acc + (f?.size || 0), 0);
+      if (totalBytes > 20 * 1024 * 1024) {
+        setErrorMsg(`Total document size (${(totalBytes / (1024 * 1024)).toFixed(1)}MB) exceeds the 20MB limit. Please upload smaller files.`);
+        setLoading(false);
+        return;
+      }
+
       // Build FormData
       const fd = new FormData();
       fd.append('name', formData.name);
@@ -462,10 +524,19 @@ export default function RegisterPage() {
         body: fd,
       });
 
-      const result = await response.json();
-
       if (!response.ok) {
-        throw new Error(result.error || "Failed to register Mandal");
+        let errorMessage = "Failed to register Mandal";
+        if (response.status === 413) {
+          errorMessage = "Uploaded files are too large for the server (413 Content Too Large). Please compress your PDF files or upload smaller documents.";
+        } else {
+          try {
+            const result = await response.json();
+            errorMessage = result.error || errorMessage;
+          } catch (e) {
+            errorMessage = `Server error (${response.status}): ${response.statusText}`;
+          }
+        }
+        throw new Error(errorMessage);
       }
 
       setSuccess(true);
@@ -940,7 +1011,7 @@ export default function RegisterPage() {
                   {/* OTP Entry Card for Organization Email */}
                   {orgOtpSent && !orgEmailVerified && (
                     <div className="mt-2.5 p-3.5 sm:p-4 bg-[#F5EDE2] dark:bg-slate-900/90 border border-[#E8650A]/30 rounded-xl space-y-3 animate-fade-in-up">
-                      <div className="flex flex-col xs:flex-row xs:items-center justify-between text-xs gap-1">
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between text-xs gap-1">
                         <span className="font-semibold text-[#1A1208] dark:text-slate-200">
                           Enter 6-digit OTP sent to email
                         </span>
@@ -949,7 +1020,7 @@ export default function RegisterPage() {
                         </span>
                       </div>
 
-                      <div className="flex flex-col xs:flex-row sm:flex-row gap-2">
+                      <div className="flex flex-col sm:flex-row gap-2.5 items-stretch sm:items-center">
                         <input
                           type="text"
                           inputMode="numeric"
@@ -957,13 +1028,13 @@ export default function RegisterPage() {
                           value={orgOtpCode}
                           onChange={(e) => setOrgOtpCode(e.target.value.replace(/[^0-9]/g, ""))}
                           placeholder="6-digit OTP"
-                          className="w-full flex-1 px-3 py-2.5 bg-white dark:bg-[#0b0f19] border border-[#1A1208]/15 dark:border-slate-700 rounded-xl text-center tracking-widest font-mono text-base font-bold text-[#1A1208] dark:text-white focus:outline-none focus:border-[#E8650A] min-w-0"
+                          className="w-full sm:flex-1 sm:w-auto px-4 py-2.5 bg-white dark:bg-[#0b0f19] border border-[#1A1208]/15 dark:border-slate-700 rounded-xl text-center tracking-widest font-mono text-base font-bold text-[#1A1208] dark:text-white focus:outline-none focus:border-[#E8650A] min-w-0 sm:min-w-[180px] shadow-sm"
                         />
                         <button
                           type="button"
                           onClick={() => handleVerifyOtp("org")}
                           disabled={orgOtpLoading || orgOtpCode.length !== 6}
-                          className="w-full xs:w-auto px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white text-xs font-bold rounded-xl transition-all cursor-pointer flex items-center justify-center gap-1.5 shadow-md whitespace-nowrap"
+                          className="w-full sm:w-auto sm:px-6 py-2.5 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white text-xs font-bold rounded-xl transition-all cursor-pointer flex items-center justify-center gap-1.5 shadow-md whitespace-nowrap flex-shrink-0"
                         >
                           {orgOtpLoading ? "Verifying..." : "Verify OTP"}
                         </button>
@@ -1184,7 +1255,7 @@ export default function RegisterPage() {
                   {/* OTP Entry Card for Admin Email */}
                   {adminOtpSent && !adminEmailVerified && (
                     <div className="mt-2.5 p-3.5 sm:p-4 bg-[#F5EDE2] dark:bg-slate-900/90 border border-[#E8650A]/30 rounded-xl space-y-3 animate-fade-in-up">
-                      <div className="flex flex-col xs:flex-row xs:items-center justify-between text-xs gap-1">
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between text-xs gap-1">
                         <span className="font-semibold text-[#1A1208] dark:text-slate-200">
                           Enter 6-digit OTP sent to email
                         </span>
@@ -1193,7 +1264,7 @@ export default function RegisterPage() {
                         </span>
                       </div>
 
-                      <div className="flex flex-col xs:flex-row sm:flex-row gap-2">
+                      <div className="flex flex-col sm:flex-row gap-2.5 items-stretch sm:items-center">
                         <input
                           type="text"
                           inputMode="numeric"
@@ -1201,13 +1272,13 @@ export default function RegisterPage() {
                           value={adminOtpCode}
                           onChange={(e) => setAdminOtpCode(e.target.value.replace(/[^0-9]/g, ""))}
                           placeholder="6-digit OTP"
-                          className="w-full flex-1 px-3 py-2.5 bg-white dark:bg-[#0b0f19] border border-[#1A1208]/15 dark:border-slate-700 rounded-xl text-center tracking-widest font-mono text-base font-bold text-[#1A1208] dark:text-white focus:outline-none focus:border-[#E8650A] min-w-0"
+                          className="w-full sm:flex-1 sm:w-auto px-4 py-2.5 bg-white dark:bg-[#0b0f19] border border-[#1A1208]/15 dark:border-slate-700 rounded-xl text-center tracking-widest font-mono text-base font-bold text-[#1A1208] dark:text-white focus:outline-none focus:border-[#E8650A] min-w-0 sm:min-w-[180px] shadow-sm"
                         />
                         <button
                           type="button"
                           onClick={() => handleVerifyOtp("admin")}
                           disabled={adminOtpLoading || adminOtpCode.length !== 6}
-                          className="w-full xs:w-auto px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white text-xs font-bold rounded-xl transition-all cursor-pointer flex items-center justify-center gap-1.5 shadow-md whitespace-nowrap"
+                          className="w-full sm:w-auto sm:px-6 py-2.5 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white text-xs font-bold rounded-xl transition-all cursor-pointer flex items-center justify-center gap-1.5 shadow-md whitespace-nowrap flex-shrink-0"
                         >
                           {adminOtpLoading ? "Verifying..." : "Verify OTP"}
                         </button>
@@ -1541,7 +1612,7 @@ export default function RegisterPage() {
                         {docs[doc.key] ? (
                           <div className="flex items-center justify-between px-2">
                             <span className="text-xs text-emerald-600 dark:text-emerald-400 font-bold truncate">
-                              ✓ {docs[doc.key]?.name}
+                              ✓ {docs[doc.key]?.name} ({( (docs[doc.key]?.size || 0) / (1024 * 1024) < 1 ? `${Math.round((docs[doc.key]?.size || 0) / 1024)} KB` : `${((docs[doc.key]?.size || 0) / (1024 * 1024)).toFixed(1)} MB` )})
                             </span>
                             <button
                               type="button"
@@ -1559,13 +1630,15 @@ export default function RegisterPage() {
                           type="file"
                           accept=".pdf,.jpg,.jpeg,.png"
                           className="hidden"
-                          onChange={e => {
+                          onChange={async (e) => {
                             const file = e.target.files?.[0] || null;
-                            if (file && file.size > 5 * 1024 * 1024) {
-                              setErrorMsg(`${doc.label} exceeds 5MB limit`);
+                            if (!file) return;
+                            if (file.size > 10 * 1024 * 1024) {
+                              setErrorMsg(`${doc.label} exceeds 10MB limit`);
                               return;
                             }
-                            setDocs(prev => ({ ...prev, [doc.key]: file }));
+                            const processedFile = await compressImageFile(file);
+                            setDocs(prev => ({ ...prev, [doc.key]: processedFile }));
                           }}
                         />
                       </div>
