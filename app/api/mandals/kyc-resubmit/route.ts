@@ -91,7 +91,7 @@ export async function POST(request: Request) {
       .single()
 
     if (mandalFetchErr || !mandal) {
-      return NextResponse.json({ error: 'Could not fetch organization data' }, { status: 550 })
+      return NextResponse.json({ error: 'Could not fetch organization data' }, { status: 500 })
     }
 
     // Parse existing kyc_notes structure
@@ -160,7 +160,7 @@ export async function POST(request: Request) {
 
     if (updateError) {
       console.error('Update mandal kyc docs error:', updateError)
-      return NextResponse.json({ error: 'Could not update document submissions' }, { status: 550 })
+      return NextResponse.json({ error: 'Could not update document submissions' }, { status: 500 })
     }
 
     // Also update users record for the administrator account

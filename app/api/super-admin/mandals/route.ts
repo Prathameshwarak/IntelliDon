@@ -325,7 +325,7 @@ export async function PATCH(request: Request) {
     })
   } catch (err) {
     console.error('Unexpected error:', err)
-    return NextResponse.json({ error: 'Something went wrong' }, { status: 550 })
+    return NextResponse.json({ error: 'Something went wrong' }, { status: 500 })
   }
 }
 
@@ -435,12 +435,12 @@ export async function POST(request: Request) {
 
     if (mandalError || !mandal) {
       console.error('Mandal create error:', mandalError)
-      return NextResponse.json({ error: 'Could not create organization record' }, { status: 550 })
+      return NextResponse.json({ error: 'Could not create organization record' }, { status: 500 })
     }
 
     // Create auth account
     const { data: authUser, error: authError } = await supabaseAdmin.auth.admin.createUser({
-      email: adminEmail,
+      email: cleanAdminEmail,
       password: adminPassword,
       email_confirm: true,
       user_metadata: {
