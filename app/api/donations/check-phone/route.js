@@ -16,22 +16,23 @@ export async function GET(request) {
       return NextResponse.json({ error: 'Missing event_id or phone' }, { status: 400 })
     }
 
-    // Get event name
-    const { data: event } = await supabaseAdmin
-      .from('events')
-      .select('name, year')
-      .eq('id', event_id)
-      .single()
+    // Event name and existing-donation lookup are independent of each
+    // other, so fetch them concurrently instead of one after another.
+    const [{ data: event }, { data: existing }] = await Promise.all([
+      supabaseAdmin
+        .from('events')
+        .select('name, year')
+        .eq('id', event_id)
+        .single(),
+      supabaseAdmin
+        .from('donations')
+        .select('receipt_number')
+        .eq('event_id', event_id)
+        .eq('donor_phone', phone.trim())
+        .maybeSingle()
+    ])
 
     const eventName = event ? `${event.name} ${event.year}` : 'this event'
-
-    // Check existing donation
-    const { data: existing } = await supabaseAdmin
-      .from('donations')
-      .select('receipt_number')
-      .eq('event_id', event_id)
-      .eq('donor_phone', phone.trim())
-      .maybeSingle()
 
     if (existing) {
       return NextResponse.json({

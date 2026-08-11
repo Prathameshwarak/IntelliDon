@@ -1,7 +1,7 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
-import QRCode from 'qrcode'
+import { useState } from 'react'
+import ReceiptQRCanvas, { getReceiptDownloadUrl } from './ReceiptQRCanvas'
 
 type ReceiptQRModalProps = {
   isOpen: boolean
@@ -20,38 +20,8 @@ export default function ReceiptQRModal({
   donorName,
   mandalName
 }: ReceiptQRModalProps) {
-  const canvasRef = useRef<HTMLCanvasElement>(null)
   const [copied, setCopied] = useState(false)
-  const [qrUrl, setQrUrl] = useState('')
-
-  useEffect(() => {
-    if (!isOpen || typeof window === 'undefined') return
-
-    const targetUrl = `${window.location.origin}/download-receipt?q=${encodeURIComponent(receiptCode)}`
-    setQrUrl(targetUrl)
-
-    // Generate QR Code on canvas after DOM update
-    setTimeout(() => {
-      if (canvasRef.current) {
-        QRCode.toCanvas(
-          canvasRef.current,
-          targetUrl,
-          {
-            width: 240,
-            margin: 2,
-            color: {
-              dark: '#1A1208',
-              light: '#FFFFFF'
-            },
-            errorCorrectionLevel: 'M'
-          },
-          (err) => {
-            if (err) console.error('Receipt QR error:', err)
-          }
-        )
-      }
-    }, 50)
-  }, [isOpen, receiptCode])
+  const qrUrl = getReceiptDownloadUrl(receiptCode)
 
   if (!isOpen) return null
 
@@ -88,7 +58,7 @@ export default function ReceiptQRModal({
 
         {/* QR Code Container */}
         <div className="bg-white p-4 rounded-2xl border border-gray-200 shadow-md mb-3 flex flex-col items-center">
-          <canvas ref={canvasRef} className="rounded-lg" />
+          <ReceiptQRCanvas receiptCode={receiptCode} size={240} className="rounded-lg" />
           <div className="mt-2 text-center">
             <span className="text-[10px] text-gray-400 uppercase font-bold tracking-wider block">
               Pre-entered 4-Digit Code
