@@ -169,6 +169,6 @@ export async function PATCH(
     return NextResponse.json({ success: true, message: 'Password updated successfully' })
   } catch (err: any) {
     console.error('Unexpected error in PATCH users reset password:', err)
-    return NextResponse.json({ error: 'Something went wrong' }, { status: 550 })
+    return NextResponse.json({ error: 'Something went wrong' }, { status: 500 })
   }
 }

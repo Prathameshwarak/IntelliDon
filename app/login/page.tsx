@@ -1,10 +1,9 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import Link from "next/link";
 import { useTheme } from "@/lib/theme";
 import { useRouter } from "next/navigation";
-import { supabase } from "@/lib/supabase";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -105,36 +104,43 @@ export default function LoginPage() {
         throw new Error("Could not log in. Session details missing.");
       }
 
-      // 2. Synchronize authenticated session in client-side Supabase instance
-      const { error: sessionError } = await supabase.auth.setSession({
-        access_token: data.session.access_token,
-        refresh_token: data.session.refresh_token,
-      });
-
-      if (sessionError) {
-        console.warn("Set session error:", sessionError.message);
-      }
-
+      // 2. Determine redirect path before any state changes
       const userRole = data.profile?.role || "";
-      setAdminName(data.profile?.full_name || "");
-      setMandalName(data.profile?.mandal_name || "");
+      let redirectPath = "/";
+      if (userRole === "super_admin") redirectPath = "/super-admin";
+      else if (userRole === "admin" || userRole === "manager") redirectPath = "/dashboard";
+      else if (userRole === "collector") redirectPath = "/collect";
+
+      // 3. Persist session tokens in localStorage for client-side Supabase access
+      //    (avoid calling supabase.auth.setSession() here — it fires onAuthStateChange
+      //     which re-renders the component and resets state before redirect fires)
+      try {
+        localStorage.setItem(
+          `sb-${new URL(process.env.NEXT_PUBLIC_SUPABASE_URL || "").hostname.split(".")[0]}-auth-token`,
+          JSON.stringify({
+            access_token: data.session.access_token,
+            refresh_token: data.session.refresh_token,
+            expires_at: data.session.expires_at,
+            expires_in: data.session.expires_in,
+            token_type: data.session.token_type,
+            user: data.user,
+          })
+        );
+      } catch {
+        // localStorage might be unavailable in some environments, that's okay
+      }
 
       localStorage.setItem("remember_me", rememberMe ? "true" : "false");
       localStorage.setItem("login_time", Date.now().toString());
       localStorage.setItem("last_active", Date.now().toString());
 
-      // 3. Show success state and redirect
+      // 4. Show success overlay then redirect
+      setAdminName(data.profile?.full_name || "");
+      setMandalName(data.profile?.mandal_name || "");
       setSuccess(true);
+
       setTimeout(() => {
-        if (userRole === "super_admin") {
-          router.push("/super-admin");
-        } else if (userRole === "admin" || userRole === "manager") {
-          router.push("/dashboard");
-        } else if (userRole === "collector") {
-          router.push("/collect");
-        } else {
-          router.push("/");
-        }
+        router.replace(redirectPath);
       }, 1800);
 
     } catch (err: unknown) {

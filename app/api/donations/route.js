@@ -60,13 +60,49 @@ export async function POST(request) {
       return NextResponse.json({ error: 'Amount must be a positive number' }, { status: 400 })
     }
 
-    // ── 2. Check mandal is active ─────────────────────────────
-    const { data: mandal, error: mandalError } = await supabaseAdmin
-      .from('mandals')
-      .select('id, name, address, city, phone, status, doc_logo')
-      .eq('id', mandal_id)
-      .single()
+    // ── 2/3/4. Look up mandal, event, duplicate-phone, collector name and
+    // collector role together. None of these queries depend on each other's
+    // results, so running them concurrently (instead of one-by-one) cuts the
+    // number of sequential database round-trips without changing any of the
+    // checks below or their outcomes.
+    const today = new Date().toISOString().split('T')[0]
+    const hasPhone = !!(donor_phone && donor_phone.trim())
 
+    const [
+      { data: mandal, error: mandalError },
+      { data: event, error: eventError },
+      duplicateResult,
+      collectorNameResult,
+      collectorRoleResult
+    ] = await Promise.all([
+      supabaseAdmin
+        .from('mandals')
+        .select('id, name, address, city, phone, status, doc_logo')
+        .eq('id', mandal_id)
+        .single(),
+      supabaseAdmin
+        .from('events')
+        .select('id, name, year, is_active, is_suspended, start_date, end_date')
+        .eq('id', event_id)
+        .eq('mandal_id', mandal_id)
+        .single(),
+      hasPhone
+        ? supabaseAdmin
+            .from('donations')
+            .select('id, receipt_number, amount')
+            .eq('event_id', event_id)
+            .eq('donor_phone', donor_phone.trim())
+            .maybeSingle()
+        : Promise.resolve({ data: null }),
+      collected_by
+        ? supabaseAdmin.from('users').select('full_name').eq('id', collected_by).single()
+        : Promise.resolve({ data: null }),
+      collected_by
+        ? supabaseAdmin.from('users').select('role').eq('id', collected_by).single()
+        : Promise.resolve({ data: null })
+    ])
+
+    // ── 2. Check mandal is active ─────────────────────────────
     if (mandalError || !mandal) {
       return NextResponse.json({ error: 'Mandal not found' }, { status: 404 })
     }
@@ -76,14 +112,6 @@ export async function POST(request) {
     }
 
     // ── 3. Check event ────────────────────────────────────────
-    const today = new Date().toISOString().split('T')[0]
-    const { data: event, error: eventError } = await supabaseAdmin
-      .from('events')
-      .select('id, name, year, is_active, is_suspended, start_date, end_date')
-      .eq('id', event_id)
-      .eq('mandal_id', mandal_id)
-      .single()
-
     if (eventError || !event) {
       return NextResponse.json({ error: 'Event not found' }, { status: 404 })
     }
@@ -108,12 +136,7 @@ export async function POST(request) {
     // Blocks a restricted team member from submitting to an event
     // outside their assigned list, even via a direct API call.
     if (collected_by) {
-      const { data: collectorRow } = await supabaseAdmin
-        .from('users')
-        .select('role')
-        .eq('id', collected_by)
-        .single()
-
+      const collectorRow = collectorRoleResult.data
       if (collectorRow && collectorRow.role !== 'admin') {
         const { data: accessRows } = await supabaseAdmin
           .from('user_event_access')
@@ -127,66 +150,55 @@ export async function POST(request) {
     }
 
     // ── 4. Duplicate phone check ──────────────────────────────
-    let isDuplicate = false
-    let existingDonation = null
-    if (donor_phone && donor_phone.trim()) {
-      const { data } = await supabaseAdmin
-        .from('donations')
-        .select('id, receipt_number, amount')
-        .eq('event_id', event_id)
-        .eq('donor_phone', donor_phone.trim())
-        .maybeSingle()
-      existingDonation = data
-      isDuplicate = !!existingDonation
-    }
+    const existingDonation = duplicateResult.data
+    const isDuplicate = !!existingDonation
 
-    // Fetch collector full_name if collected_by is provided
-    let collectorName = null
-    if (collected_by) {
-      const { data: collector } = await supabaseAdmin
-        .from('users')
-        .select('full_name')
-        .eq('id', collected_by)
-        .single()
-      collectorName = collector?.full_name || null
-    }
+    // Collector full_name (already fetched above if collected_by is provided)
+    const collectorName = collectorNameResult.data?.full_name || null
 
     const isCollectorRecorded = (payment_mode === 'cash' || payment_mode === 'upi_collector') && !!collected_by
-    const { data: donation, error: donationError } = await supabaseAdmin
-      .from('donations')
-      .insert({
-        mandal_id,
-        event_id,
-        donor_name: donor_name.trim(),
-        donor_phone: donor_phone?.trim() || '',
-        donor_address: donor_address?.trim() || null,
-        amount: Number(amount),
-        payment_mode,
-        collected_by: collected_by || null,
-        screenshot_url: screenshot_url || null,
-        status: isCollectorRecorded ? 'verified' : 'pending',
-        verified_by: isCollectorRecorded ? collected_by : null,
-        verified_at: isCollectorRecorded ? new Date().toISOString() : null,
-        verification_type: isCollectorRecorded ? 'collector' : null
-      })
-      .select()
-      .single()
+
+    // ── 5. Insert the donation and resolve the mandal logo URL together —
+    // the logo lookup only depends on the mandal fetched above, not on the
+    // insert, so it doesn't need to wait for it.
+    const [insertResult, logoResult] = await Promise.all([
+      supabaseAdmin
+        .from('donations')
+        .insert({
+          mandal_id,
+          event_id,
+          donor_name: donor_name.trim(),
+          donor_phone: donor_phone?.trim() || '',
+          donor_address: donor_address?.trim() || null,
+          amount: Number(amount),
+          payment_mode,
+          collected_by: collected_by || null,
+          screenshot_url: screenshot_url || null,
+          status: isCollectorRecorded ? 'verified' : 'pending',
+          verified_by: isCollectorRecorded ? collected_by : null,
+          verified_at: isCollectorRecorded ? new Date().toISOString() : null,
+          verification_type: isCollectorRecorded ? 'collector' : null
+        })
+        .select()
+        .single(),
+      mandal?.doc_logo
+        ? supabaseAdmin.storage
+            .from('kyc-documents')
+            .createSignedUrl(mandal.doc_logo, 60 * 60 * 24 * 365)
+            .then(({ data }) => data?.signedUrl || null)
+            .catch((e) => {
+              console.warn('Logo URL error:', e)
+              return null
+            })
+        : Promise.resolve(null)
+    ])
+
+    const { data: donation, error: donationError } = insertResult
+    const logoUrl = logoResult
 
     if (donationError) {
       console.error('Donation insert error:', donationError)
       return NextResponse.json({ error: 'Could not record donation' }, { status: 500 })
-    }
-
-    let logoUrl = null
-    if (mandal?.doc_logo) {
-      try {
-        const { data: signedData } = await supabaseAdmin.storage
-          .from('kyc-documents')
-          .createSignedUrl(mandal.doc_logo, 60 * 60 * 24 * 365)
-        logoUrl = signedData?.signedUrl || null
-      } catch (e) {
-        console.warn('Logo URL error:', e)
-      }
     }
 
     const receiptData = buildReceiptData({

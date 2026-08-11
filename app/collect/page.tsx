@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation'
 import UpiQR from '@/components/UpiQR'
 import ThemeToggle from '@/components/ThemeToggle'
 import { downloadReceipt, shareReceipt, type ReceiptData } from '@/lib/downloadReceipt'
-import ReceiptQRModal from '@/components/ReceiptQRModal'
+import ReceiptQRCanvas, { getReceiptDownloadUrl } from '@/components/ReceiptQRCanvas'
 
 type Event = {
   id: string
@@ -91,7 +91,7 @@ export default function CollectPage() {
   const [duplicateModalData, setDuplicateModalData] = useState<{ eventName: string; receiptId: string } | null>(null)
 
   // Dashboard & History & Ranking States
-  const [activeTab, setActiveTab] = useState<Tab>('dashboard')
+  const [activeTab, setActiveTab] = useState<Tab>('collect')
   const [donations, setDonations] = useState<any[]>([])
   const [donationsLoading, setDonationsLoading] = useState(false)
   const [donationsError, setDonationsError] = useState('')
@@ -99,7 +99,7 @@ export default function CollectPage() {
   const [historyStatusFilter, setHistoryStatusFilter] = useState('all')
   const [historyModeFilter, setHistoryModeFilter] = useState('all')
   const [copiedId, setCopiedId] = useState<string | null>(null)
-  const [showQrModal, setShowQrModal] = useState(false)
+  const [toast, setToast] = useState<{ msg: string; type: 'success' | 'error' } | null>(null)
 
   // Ranking & Leaderboard States
   const [rankings, setRankings] = useState<CollectorRankingItem[]>([])
@@ -193,8 +193,10 @@ export default function CollectPage() {
         setEvents(data.events)
         if (data.events.length === 1) setSelectedEvent(data.events[0])
 
-        // Initial loading of collections history
-        await loadDonations(data.mandal.id, userId)
+        // Kick off collections history load in the background (used by the
+        // Dashboard/History/Ranking tabs) without blocking the Collect form,
+        // which is now the default tab and doesn't need this data to render.
+        loadDonations(data.mandal.id, userId)
       } catch (e) {
         router.push('/login')
       } finally {
@@ -341,6 +343,12 @@ export default function CollectPage() {
     setSuccessData(null)
     setError('')
     setStep('form')
+  }
+
+  // Show a brief top-of-screen toast (same pattern used across the app)
+  function showToast(msg: string, type: 'success' | 'error') {
+    setToast({ msg, type })
+    setTimeout(() => setToast(null), 3000)
   }
 
   // Handle robust copy to clipboard (supporting iOS & Android safely)
@@ -596,6 +604,14 @@ export default function CollectPage() {
 
   return (
     <div className="min-h-screen bg-[#FDF8F3] dark:bg-gray-950 text-[#1A1208] dark:text-white pb-12 transition-colors duration-300">
+      {/* Toast */}
+      {toast && (
+        <div className={`fixed top-4 left-1/2 -translate-x-1/2 z-100 px-4 py-3 rounded-lg text-sm font-medium shadow-xl
+          ${toast.type === 'success' ? 'bg-green-600' : 'bg-red-600'} text-white`}>
+          {toast.msg}
+        </div>
+      )}
+
       {/* Top Header (Matches Admin/Manager Dashboard style exactly) */}
       <div className="bg-[#F5EDE2] dark:bg-gray-900 border-b border-[#1A1208]/10 dark:border-gray-800 px-3 sm:px-6 py-3 sm:py-4 flex flex-wrap items-center justify-between gap-2">
         <div className="min-w-0">
@@ -627,20 +643,23 @@ export default function CollectPage() {
       </div>
 
       {/* Main Content Area */}
-      <div className="max-w-md mx-auto px-4 py-6">
+      <div className="max-w-md mx-auto px-4 py-4 sm:py-6">
 
         {/* Tab Navigation (Consistent styling with primary dashboard tab bar) */}
-        <div className="flex gap-1 bg-[#F5EDE2] dark:bg-gray-900 rounded-xl p-1 border border-[#1A1208]/10 dark:border-gray-800 mb-6 w-full overflow-x-auto shadow-xs">
-          {(['dashboard', 'collect', 'history', 'ranking'] as Tab[]).map(t => (
+        {/* Compact, fully-shrinkable buttons (no flex-shrink-0, no overflow-x-auto) so all
+            4 tabs always fit in one row on mobile without needing to scroll. */}
+        <div className="flex gap-0.5 sm:gap-1 bg-[#F5EDE2] dark:bg-gray-900 rounded-lg sm:rounded-xl p-0.5 sm:p-1 border border-[#1A1208]/10 dark:border-gray-800 mb-3 sm:mb-6 w-full shadow-xs">
+          {(['collect', 'dashboard', 'history', 'ranking'] as Tab[]).map(t => (
             <button
               key={t}
               onClick={() => setActiveTab(t)}
-              className={`px-3 py-2 rounded-lg text-xs font-bold capitalize transition-all whitespace-nowrap flex-shrink-0 flex-1 cursor-pointer
+              className={`min-w-0 flex-1 px-0.5 sm:px-3 py-1.5 sm:py-2 rounded-md sm:rounded-lg text-[10px] sm:text-xs font-bold capitalize transition-all whitespace-nowrap truncate cursor-pointer
                 ${activeTab === t
                   ? 'bg-gradient-to-r from-[#E8650A] to-[#f97316] text-white shadow-md'
                   : 'text-[#7a6a55] dark:text-gray-400 hover:text-[#1A1208] dark:hover:text-white'}`}
             >
-              {t === 'collect' ? '➕ Collect' : t === 'dashboard' ? '📊 Dashboard' : t === 'ranking' ? '🏆 Ranking' : '📜 History'}
+              <span className="sm:hidden">{t === 'collect' ? '➕' : t === 'dashboard' ? '📊' : t === 'ranking' ? '🏆' : '📜'} {t}</span>
+              <span className="hidden sm:inline">{t === 'collect' ? '➕ Collect' : t === 'dashboard' ? '📊 Dashboard' : t === 'ranking' ? '🏆 Ranking' : '📜 History'}</span>
             </button>
           ))}
         </div>
@@ -1265,119 +1284,110 @@ export default function CollectPage() {
             )}
 
             {/* STEP: Success */}
-            {step === 'success' && successData && (
-              <div className="flex flex-col gap-4 text-center">
-                <div className="bg-[#F5EDE2] dark:bg-gray-900 border border-[#1A1208]/10 dark:border-gray-800 rounded-xl p-6 shadow-sm">
+            {step === 'success' && successData && (() => {
+              const receiptCode = successData.receipt_code || successData.receipt_data?.receiptCode || ''
+              const finalReceiptData = successData.receipt_data || buildProvisionalReceiptData()
+              const isVerified = successData.status === 'verified'
+              const paymentIcon = successData.payment_mode === 'cash' ? '💵' : '📱'
 
-                  {/* Success icon */}
-                  <div className="w-16 h-16 bg-emerald-500/10 border border-emerald-500/30 rounded-full flex items-center justify-center mx-auto mb-4 shadow-xs">
-                    <span className="text-emerald-700 dark:text-green-400 text-2xl font-bold">✓</span>
+              // QR click: copy the existing donor receipt link instead of opening a popup/modal
+              const handleQrClick = async () => {
+                if (!receiptCode) return
+                await handleCopyLink(getReceiptDownloadUrl(receiptCode), 'success-qr-link')
+                showToast('Receipt link copied!', 'success')
+              }
+
+              const renderField = (icon: string, label: string, value: string, bordered: boolean) => (
+                <div className={`flex items-center gap-2 sm:gap-3 min-w-0 ${bordered ? 'pl-3 sm:pl-6 border-l border-[#1A1208]/10 dark:border-gray-800' : ''}`}>
+                  <div className="w-7 h-7 sm:w-10 sm:h-10 flex-shrink-0 flex items-center justify-center rounded-lg bg-orange-500/10 dark:bg-orange-500/15 text-[#E8650A] dark:text-orange-400 text-xs sm:text-base font-bold">
+                    {icon}
                   </div>
-
-                  {successData.status === 'verified' && (
-                    <div className="mb-3 inline-block bg-emerald-500/10 border border-emerald-500/30 text-emerald-700 dark:text-green-400 text-xs font-bold px-3 py-1 rounded-full">
-                      🟢 VERIFIED &bull; Verified by Collector
-                    </div>
-                  )}
-
-                  <p className="text-emerald-700 dark:text-green-400 font-extrabold text-xl mb-1">Donation Recorded!</p>
-                  <p className="text-[#7a6a55] dark:text-gray-300 text-sm font-bold">{successData.donor_name}</p>
-
-                  {/* Receipt Number & 4-Digit Code */}
-                  <div className="mt-5 grid grid-cols-2 gap-2">
-                    <div className="bg-white dark:bg-gray-950 rounded-lg py-3 px-3 border border-[#1A1208]/10 dark:border-gray-800 shadow-xs">
-                      <p className="text-[#7a6a55] dark:text-gray-400 text-[11px] mb-0.5 font-bold">Receipt No</p>
-                      <p className="text-[#1A1208] dark:text-white font-mono font-extrabold text-base tracking-wide truncate">
-                        {successData.receipt_number}
-                      </p>
-                    </div>
-                    <div className="bg-orange-500/10 dark:bg-orange-500/20 rounded-lg py-3 px-3 border border-orange-500/30 shadow-xs">
-                      <p className="text-[#E8650A] dark:text-orange-400 text-[11px] mb-0.5 font-bold">4-Digit Code</p>
-                      <p className="text-[#E8650A] dark:text-orange-400 font-mono font-extrabold text-lg tracking-wider">
-                        {successData.receipt_code || successData.receipt_data?.receiptCode || '--'}
-                      </p>
-                    </div>
-                  </div>
-                  <div className="mt-2 bg-orange-500/10 border border-orange-500/20 rounded-lg p-2.5 text-center">
-                    <p className="text-xs font-bold text-[#E8650A] dark:text-orange-400">
-                      🔑 This 4-digit alphanumeric code will help the donor to download their receipt anytime.
-                    </p>
-                  </div>
-
-                  {/* Amount */}
-                  <div className="mt-2 bg-white dark:bg-gray-950 rounded-lg py-3 px-4 border border-[#1A1208]/10 dark:border-gray-800 shadow-xs">
-                    <p className="text-[#7a6a55] dark:text-gray-400 text-xs mb-1 font-bold">Amount</p>
-                    <p className="text-[#1A1208] dark:text-white font-extrabold text-3xl">
-                      ₹{Number(successData.amount).toLocaleString('en-IN')}
-                    </p>
-                  </div>
-
-                  {/* Payment mode */}
-                  <div className="mt-2 bg-white dark:bg-gray-950 rounded-lg py-2 px-4 border border-[#1A1208]/10 dark:border-gray-800 shadow-xs">
-                    <p className="text-[#7a6a55] dark:text-gray-300 text-xs font-bold">
-                      {successData.payment_mode === 'cash' ? '💵 Cash' : '📱 UPI'}
-                    </p>
+                  <div className="min-w-0">
+                    <p className="text-[9px] sm:text-xs text-[#7a6a55] dark:text-gray-400 font-bold truncate">{label}</p>
+                    <p className="text-xs sm:text-lg text-[#1A1208] dark:text-white font-extrabold truncate">{value}</p>
                   </div>
                 </div>
+              )
 
-                {/* Receipt links & actions */}
-                {successData.receipt_data || buildProvisionalReceiptData() ? (
-                  <div className="flex flex-col gap-2">
-                    {/* 1. Show Receipt QR Code for Donor (Top, Full Width) */}
-                    <button
-                      onClick={() => setShowQrModal(true)}
-                      className="w-full py-3.5 text-sm font-bold rounded-xl transition-all shadow-sm border bg-amber-500/10 hover:bg-amber-500/20 text-[#E8650A] dark:text-orange-400 border-amber-500/30 cursor-pointer flex items-center justify-center gap-2"
-                    >
-                      <span>📱</span>
-                      <span>Show Receipt QR Code for Donor</span>
-                    </button>
+              return (
+                // Tightened gaps/paddings throughout this card so the whole success screen
+                // (card + Next Donation button) fits in one mobile viewport without scrolling.
+                <div className="flex flex-col gap-3 sm:gap-4">
+                  <div className="relative bg-[#F5EDE2] dark:bg-gray-900 border border-[#1A1208]/10 dark:border-gray-800 rounded-2xl p-3 sm:p-8 shadow-sm overflow-hidden">
 
-                    {/* 2. Download & Share in Same Row */}
-                    <div className="flex gap-2 w-full">
+                    {/* Download icon - top right, immediate access to the receipt PDF */}
+                    {finalReceiptData && (
                       <button
-                        onClick={() => downloadReceipt(successData.receipt_data || buildProvisionalReceiptData()!)}
-                        className="flex-1 flex items-center justify-center gap-1.5 bg-[#E8650A] hover:bg-[#d05807] text-white
-                          font-bold py-3 px-3 rounded-xl text-xs sm:text-sm transition-colors shadow-sm cursor-pointer"
+                        onClick={() => downloadReceipt(finalReceiptData)}
+                        title="Download Receipt PDF"
+                        aria-label="Download Receipt PDF"
+                        className="absolute top-2.5 right-2.5 sm:top-6 sm:right-6 w-7 h-7 sm:w-10 sm:h-10 flex-shrink-0 flex items-center justify-center rounded-full bg-white/70 dark:bg-gray-800 border border-[#1A1208]/10 dark:border-gray-700 text-[#E8650A] dark:text-orange-400 hover:bg-white dark:hover:bg-gray-700 shadow-xs transition-colors cursor-pointer text-sm sm:text-lg"
                       >
-                        <span>↓</span>
-                        <span>Download</span>
+                        ↓
                       </button>
-
-                      <button
-                        onClick={() => shareReceipt(successData.receipt_data || buildProvisionalReceiptData()!)}
-                        className="flex-1 flex items-center justify-center gap-1.5 py-3 px-3 text-xs sm:text-sm font-bold rounded-xl transition-all shadow-sm border bg-white dark:bg-gray-800 text-[#1A1208] dark:text-white border-[#1A1208]/10 dark:border-gray-700 hover:bg-[#ebdcc9] dark:hover:bg-gray-700 cursor-pointer"
-                      >
-                        <span>💬</span>
-                        <span>Share</span>
-                      </button>
-                    </div>
-                    {successData.status === 'verified' ? (
-                      <p className="text-xs text-emerald-700 dark:text-green-500 font-bold">🟢 VERIFIED - Verified by Collector</p>
-                    ) : (
-                      <p className="text-xs text-amber-700 dark:text-yellow-500 font-bold">Pending verification</p>
                     )}
-                  </div>
-                ) : (
-                  <div className="bg-[#F5EDE2] dark:bg-gray-800 border border-[#1A1208]/10 dark:border-gray-700 rounded-xl px-4 py-3 text-center">
-                    <p className="text-[#7a6a55] dark:text-gray-400 text-xs font-medium">Receipt PDF unavailable right now.</p>
-                    <p className="text-[#9e8c76] dark:text-gray-500 text-xs mt-1 font-medium">
-                      Share receipt number <span className="font-mono text-[#1A1208] dark:text-white font-bold">{successData.receipt_number}</span> with the donor.
-                    </p>
-                  </div>
-                )}
 
-                <p className="text-[#7a6a55] dark:text-gray-500 text-xs px-4 leading-relaxed font-medium">
-                  Share the receipt download link directly on WhatsApp or copy it to send manually.
-                </p>
+                    {/* Heading */}
+                    <h2 className="text-center text-emerald-700 dark:text-green-400 font-extrabold text-base sm:text-2xl mb-2.5 sm:mb-8 pr-9 sm:pr-0">
+                      Donation Recorded!
+                    </h2>
 
-                <button
-                  onClick={resetForm}
-                  className="w-full bg-gradient-to-r from-[#E8650A] to-[#f97316] hover:from-[#d05807] hover:to-[#ea580c] text-white font-bold py-4 rounded-xl text-base transition-colors shadow-md cursor-pointer"
-                >
-                  + Next Donation
-                </button>
-              </div>
-            )}
+                    {/* Row 1: Receipt No | 4-Digit Code */}
+                    <div className="grid grid-cols-2 gap-2 sm:gap-4 pb-2 sm:pb-5 border-b border-[#1A1208]/10 dark:border-gray-800">
+                      {renderField('🧾', 'Receipt No.', successData.receipt_number, false)}
+                      {renderField('#', '4-Digit Code', receiptCode || '--', true)}
+                    </div>
+
+                    {/* Row 2: Donor Name | Amount (with the payment mode icon) */}
+                    <div className="grid grid-cols-2 gap-2 sm:gap-4 py-2 sm:py-5 border-b border-[#1A1208]/10 dark:border-gray-800">
+                      {renderField('👤', 'Donor Name', successData.donor_name, false)}
+                      {renderField(paymentIcon, 'Amount', `₹${Number(successData.amount).toLocaleString('en-IN')}`, true)}
+                    </div>
+
+                    {/* Row 3: "Scan to download Receipt" (left) + QR (right) — click to copy the receipt link, no popup/enlarge.
+                        The QR box is sized as a % of the card's OWN content width (min/max-capped), not
+                        viewport sm:/md: breakpoints. Those breakpoints track the browser/preview window,
+                        not the card's actual rendered width (the card is capped at max-w-md) — that
+                        mismatch is what caused the box to be sized too big for the card and get clipped
+                        by the card's overflow-hidden. The text column is flex-1 min-w-0 so it always
+                        shrinks to leave room, meaning the row can never overflow the card either. */}
+                    <div className="flex items-center justify-between gap-3 sm:gap-6 pt-2.5 sm:pt-6">
+                      <div className="flex-1 min-w-0 flex flex-col gap-1.5 sm:gap-3">
+                        <p className="text-[#7a6a55] dark:text-gray-400 font-bold text-xs sm:text-lg leading-snug">
+                          Scan to<br />download Receipt
+                        </p>
+                        {isVerified && (
+                          <div className="inline-flex items-center gap-1 self-start max-w-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-700 dark:text-green-400 text-[10px] sm:text-sm font-bold px-2 sm:px-3 py-1 sm:py-1.5 rounded-full">
+                            <span>✓</span>
+                            <span className="truncate">Verified by {collectorName || 'Collector'}</span>
+                          </div>
+                        )}
+                      </div>
+
+                      {receiptCode && (
+                        <button
+                          onClick={handleQrClick}
+                          title="Click to copy receipt link"
+                          className="flex-shrink-0 box-border overflow-hidden aspect-square w-[34%] min-w-[76px] max-w-[190px] bg-white p-1.5 sm:p-3 rounded-lg sm:rounded-2xl border border-gray-200 shadow-sm cursor-pointer"
+                        >
+                          {/* aspect-square is applied to this button (a plain block element, not a
+                              replaced element like canvas) so it reliably stays a true square; the
+                              canvas just fills it at w-full h-full. */}
+                          <ReceiptQRCanvas receiptCode={receiptCode} size={240} className="block w-full h-full rounded-md" />
+                        </button>
+                      )}
+                    </div>
+                  </div>
+
+                  <button
+                    onClick={resetForm}
+                    className="w-full bg-gradient-to-r from-[#E8650A] to-[#f97316] hover:from-[#d05807] hover:to-[#ea580c] text-white font-bold py-3 sm:py-4 rounded-xl text-sm sm:text-base transition-colors shadow-md cursor-pointer"
+                  >
+                    + Next Donation
+                  </button>
+                </div>
+              )
+            })()}
           </div>
         )}
 
@@ -1628,16 +1638,6 @@ export default function CollectPage() {
             </div>
           </div>
         )}
-
-        {/* Receipt QR Code Modal for Donor */}
-        <ReceiptQRModal
-          isOpen={showQrModal}
-          onClose={() => setShowQrModal(false)}
-          receiptCode={successData?.receipt_code || successData?.receipt_data?.receiptCode || ''}
-          receiptNumber={successData?.receipt_number || ''}
-          donorName={successData?.donor_name || ''}
-          mandalName={mandal?.name || ''}
-        />
       </div>
     </div>
   )

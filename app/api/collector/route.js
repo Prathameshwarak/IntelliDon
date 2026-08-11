@@ -55,30 +55,35 @@ export async function GET(request) {
       }
     }
 
-    // Get the mandal details
-    const { data: mandal, error: mandalError } = await supabaseAdmin
-      .from('mandals')
-      .select('id, name, city, address, phone, status')
-      .eq('id', userRow.mandal_id)
-      .single()
+    // Get the mandal details and this mandal's active events for today
+    // together — the events query only needs userRow.mandal_id (already
+    // known), so it doesn't need to wait on the mandal lookup to finish.
+    const today = new Date().toISOString().split('T')[0]
+    const [
+      { data: mandal, error: mandalError },
+      { data: eventsData }
+    ] = await Promise.all([
+      supabaseAdmin
+        .from('mandals')
+        .select('id, name, city, address, phone, status')
+        .eq('id', userRow.mandal_id)
+        .single(),
+      supabaseAdmin
+        .from('events')
+        .select('id, name, year, upi_id, upi_qr_url, start_date, end_date, is_suspended, is_active')
+        .eq('mandal_id', userRow.mandal_id)
+        .eq('is_active', true)
+        .lte('start_date', today)
+        .gte('end_date', today)
+        .order('year', { ascending: false })
+    ])
 
     if (mandalError || !mandal) {
       return NextResponse.json({ error: 'Mandal not found' }, { status: 404 })
     }
 
-    // Get active events for this mandal valid for today
-    const today = new Date().toISOString().split('T')[0]
-    let { data: events, error: eventsError } = await supabaseAdmin
-      .from('events')
-      .select('id, name, year, upi_id, upi_qr_url, start_date, end_date, is_suspended, is_active')
-      .eq('mandal_id', userRow.mandal_id)
-      .eq('is_active', true)
-      .lte('start_date', today)
-      .gte('end_date', today)
-      .order('year', { ascending: false })
-
     // Filter out any suspended events
-    events = (events || []).filter(e => !e.is_suspended)
+    const events = (eventsData || []).filter(e => !e.is_suspended)
 
     return NextResponse.json({
       user: {
