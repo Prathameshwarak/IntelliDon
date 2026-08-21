@@ -86,7 +86,7 @@ export async function POST(request: Request) {
     // Fetch current mandal to get existing KYC notes
     const { data: mandal, error: mandalFetchErr } = await supabaseAdmin
       .from('mandals')
-      .select('kyc_notes')
+      .select('kyc_notes, status')
       .eq('id', mandalId)
       .single()
 
@@ -138,10 +138,18 @@ export async function POST(request: Request) {
     const serializedNotes = JSON.stringify(parsedNotes)
     const updatePayload: Record<string, any> = {
       ...docUrls,
-      status: 'pending', // Reset overall status to pending for super admin review list
+      // Document review status always resets to pending — a new/re-uploaded document
+      // must never be treated as auto-verified.
       kyc_status: 'pending',
       kyc_notes: serializedNotes,
       submitted_at: new Date().toISOString()
+    }
+    // Only move the overall mandal status into the super-admin review queue if it
+    // isn't already active — an already-active org re-uploading a KYC document
+    // (e.g. from Organization > KYC) should not lose dashboard access while the
+    // document is reviewed.
+    if (mandal.status !== 'active') {
+      updatePayload.status = 'pending'
     }
 
     if (name) updatePayload.name = name

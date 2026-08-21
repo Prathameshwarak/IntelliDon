@@ -28,6 +28,10 @@ export type SubscriptionInfo = {
   status: 'active' | 'suspended'
   ends_at: string | null
   notes: string | null
+  starts_at?: string | null
+  amount?: number | null
+  last_payment_at?: string | null
+  last_payment_amount?: number | null
 }
 
 export function isSubscriptionExpired(sub: SubscriptionInfo | null): boolean {
