@@ -3,7 +3,8 @@
 import { useState, useEffect, Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
 import Link from 'next/link'
-import { downloadReceipt, shareReceipt, type ReceiptData } from '@/lib/downloadReceipt'
+import { downloadReceipt, type ReceiptData } from '@/lib/downloadReceipt'
+import { generateReceiptPDF } from '@/lib/generateReceiptPDF'
 
 type ReceiptSearchResult = {
   id: string
@@ -95,12 +96,38 @@ function DownloadReceiptContent() {
   async function handleShareWhatsApp(item: ReceiptSearchResult) {
     setDownloadingId(item.id)
     try {
-      // 1. Auto-download PDF locally onto user's device
+      const fileName = `Receipt-${item.receipt_data.receiptNumber}.pdf`
+      const pdfBytes = await generateReceiptPDF(item.receipt_data)
+      const blob = new Blob([pdfBytes as any], { type: 'application/pdf' })
+      const file = new File([blob], fileName, { type: 'application/pdf' })
+
+      const shareData: ShareData = {
+        files: [file],
+        title: `Donation Receipt ${item.receipt_data.receiptNumber}`
+      }
+
+      const canNativeShare =
+        typeof navigator !== 'undefined' &&
+        typeof navigator.share === 'function' &&
+        typeof navigator.canShare === 'function' &&
+        navigator.canShare(shareData)
+
+      if (canNativeShare) {
+        try {
+          await navigator.share(shareData)
+          return
+        } catch (err: any) {
+          if (err?.name === 'AbortError' || err?.name === 'InvalidStateError') {
+            return
+          }
+        }
+      }
+
+      // Fallback: auto-download PDF and open general WhatsApp
       await downloadReceipt(item.receipt_data)
-      // 2. Redirect to WhatsApp / share with custom bilingual message & receipt link
-      await shareReceipt(item.receipt_data)
+      window.open('https://api.whatsapp.com/send', '_blank')
     } catch (err) {
-      console.error('Share error:', err)
+      console.error('PDF Share error:', err)
     } finally {
       setDownloadingId(null)
     }
