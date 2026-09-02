@@ -94,7 +94,17 @@ export default function LoginPage() {
         }),
       });
 
-      const data = await response.json();
+      const contentType = response.headers.get("content-type");
+      let data: any = {};
+      if (contentType && contentType.includes("application/json")) {
+        data = await response.json();
+      } else {
+        const text = await response.text();
+        console.error("Non-JSON login response received:", response.status, text);
+        throw new Error(
+          `Server returned an unexpected response (${response.status}). Please try again later.`
+        );
+      }
 
       if (!response.ok || !data.success) {
         throw new Error(data.error || "Invalid email or password.");

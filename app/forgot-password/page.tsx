@@ -63,7 +63,10 @@ export default function ForgotPasswordPage() {
         body: JSON.stringify({ email: cleanEmail }),
       });
 
-      const data = await res.json();
+      const contentType = res.headers.get("content-type");
+      const data = contentType && contentType.includes("application/json")
+        ? await res.json()
+        : { success: false, error: `Server error (${res.status}). Please try again.` };
 
       if (!res.ok || !data.success) {
         throw new Error(data.error || "Contact your organization admin for password reset.");
@@ -103,7 +106,10 @@ export default function ForgotPasswordPage() {
         }),
       });
 
-      const data = await res.json();
+      const contentType = res.headers.get("content-type");
+      const data = contentType && contentType.includes("application/json")
+        ? await res.json()
+        : { success: false, error: `Server error (${res.status}). Please try again.` };
 
       if (!res.ok || !data.success) {
         throw new Error(data.error || "Invalid OTP code. Please check and try again.");
@@ -177,7 +183,10 @@ export default function ForgotPasswordPage() {
         }),
       });
 
-      const data = await res.json();
+      const contentType = res.headers.get("content-type");
+      const data = contentType && contentType.includes("application/json")
+        ? await res.json()
+        : { success: false, error: `Server error (${res.status}). Please try again.` };
 
       if (!res.ok || !data.success) {
         throw new Error(data.error || "Could not reset password. Please try again.");
