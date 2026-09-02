@@ -93,10 +93,16 @@ function DownloadReceiptContent() {
   }
 
   async function handleShareWhatsApp(item: ReceiptSearchResult) {
+    setDownloadingId(item.id)
     try {
+      // 1. Auto-download PDF locally onto user's device
+      await downloadReceipt(item.receipt_data)
+      // 2. Redirect to WhatsApp / share with custom bilingual message & receipt link
       await shareReceipt(item.receipt_data)
     } catch (err) {
       console.error('Share error:', err)
+    } finally {
+      setDownloadingId(null)
     }
   }
 
@@ -382,9 +388,19 @@ function DownloadReceiptContent() {
                         </button>
                         <button
                           onClick={() => handleShareWhatsApp(item)}
-                          className="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold py-2.5 px-3 rounded-lg text-xs transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+                          disabled={downloadingId === item.id}
+                          className="bg-emerald-600 hover:bg-emerald-700 disabled:opacity-60 text-white font-semibold py-2.5 px-3 rounded-lg text-xs transition-all flex items-center justify-center gap-1.5 cursor-pointer"
                         >
-                          <span>💬 WhatsApp</span>
+                          {downloadingId === item.id ? (
+                            <>
+                              <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                              <span>Preparing...</span>
+                            </>
+                          ) : (
+                            <>
+                              <span>💬 WhatsApp</span>
+                            </>
+                          )}
                         </button>
                       </div>
                     </div>
