@@ -2,6 +2,8 @@ import { createClient } from '@supabase/supabase-js'
 import { NextResponse } from 'next/server'
 import { buildReceiptData } from '@/lib/receiptData'
 import { resolveScreenshotUrls } from '@/lib/resolveScreenshotUrl'
+import { getCachedAuthUserAndProfile, isAuthError } from '@/lib/auth-cache'
+import { invalidateCacheByPrefix } from '@/lib/cache'
 
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL,
@@ -25,23 +27,15 @@ export async function POST(request) {
 
     // Verify token if collected_by is provided
     if (collected_by) {
-      const authHeader = request.headers.get('Authorization')
-      if (!authHeader || !authHeader.startsWith('Bearer ')) {
-        return NextResponse.json({ error: 'Unauthorized: Missing or invalid token' }, { status: 401 })
+      const authResult = await getCachedAuthUserAndProfile(request, supabaseAdmin)
+      if (isAuthError(authResult)) {
+        return NextResponse.json({ error: authResult.error }, { status: authResult.status })
       }
-      const token = authHeader.split(' ')[1]
-      const { data: { user: authUser }, error: authError } = await supabaseAdmin.auth.getUser(token)
-      if (authError || !authUser) {
-        return NextResponse.json({ error: 'Unauthorized: Invalid session' }, { status: 401 })
-      }
+      const authUser = authResult.user
+      const profile = authResult.profile
 
       if (authUser.id !== collected_by) {
-        const { data: verifier } = await supabaseAdmin
-          .from('users')
-          .select('role, mandal_id')
-          .eq('id', authUser.id)
-          .single()
-        if (!verifier || !['admin', 'manager'].includes(verifier.role) || verifier.mandal_id !== mandal_id) {
+        if (!profile || !['admin', 'manager'].includes(profile.role) || profile.mandal_id !== mandal_id) {
           return NextResponse.json({ error: 'Forbidden: Cannot submit donation on behalf of this collector' }, { status: 403 })
         }
       }
@@ -218,6 +212,9 @@ export async function POST(request) {
       console.error('Receipt data update error:', updateError)
     }
 
+    // Invalidate cached rankings / collection summaries for this mandal
+    invalidateCacheByPrefix(`rankings:${mandal_id}`)
+
     // ── 8. Return response ────────────────────────────────────
     return NextResponse.json({
       success: true,
@@ -256,22 +253,14 @@ export async function GET(request) {
       return NextResponse.json({ error: 'mandal_id is required' }, { status: 400 })
     }
 
-    // Authenticate token
-    const authHeader = request.headers.get('Authorization')
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      return NextResponse.json({ error: 'Unauthorized: Missing or invalid token' }, { status: 401 })
-    }
-    const token = authHeader.split(' ')[1]
-    const { data: { user: authUser }, error: authError } = await supabaseAdmin.auth.getUser(token)
-    if (authError || !authUser) {
-      return NextResponse.json({ error: 'Unauthorized: Invalid session' }, { status: 401 })
+    // Authenticate token using auth-cache
+    const authResult = await getCachedAuthUserAndProfile(request, supabaseAdmin)
+    if (isAuthError(authResult)) {
+      return NextResponse.json({ error: authResult.error }, { status: authResult.status })
     }
 
-    const { data: profile } = await supabaseAdmin
-      .from('users')
-      .select('role, mandal_id')
-      .eq('id', authUser.id)
-      .single()
+    const authUser = authResult.user
+    const profile = authResult.profile
 
     if (!profile || profile.mandal_id !== mandal_id) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })

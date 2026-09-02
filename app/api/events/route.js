@@ -1,5 +1,7 @@
 import { createClient } from '@supabase/supabase-js'
 import { NextResponse } from 'next/server'
+import { getCachedAuthUserAndProfile, isAuthError } from '@/lib/auth-cache'
+import { getOrSetCache, invalidateCacheByPrefix } from '@/lib/cache'
 
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL,
@@ -8,22 +10,12 @@ const supabaseAdmin = createClient(
 
 // Helper to authenticate the admin caller and verify they belong to the correct mandal
 async function verifyMandalAdmin(request, mandalIdToCheck) {
-  const authHeader = request.headers.get('Authorization')
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    return { error: 'Unauthorized: Missing or invalid token', status: 401 }
-  }
-  const token = authHeader.split(' ')[1]
-  const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(token)
-  if (authError || !user) {
-    return { error: 'Unauthorized: Invalid session', status: 401 }
+  const authResult = await getCachedAuthUserAndProfile(request, supabaseAdmin)
+  if (isAuthError(authResult)) {
+    return { error: authResult.error, status: authResult.status }
   }
 
-  const { data: profile } = await supabaseAdmin
-    .from('users')
-    .select('role, mandal_id')
-    .eq('id', user.id)
-    .single()
-
+  const profile = authResult.profile
   if (!profile || profile.role !== 'admin' || profile.mandal_id !== mandalIdToCheck) {
     return { error: 'Forbidden: Admin access only', status: 403 }
   }
@@ -48,13 +40,13 @@ function validateEventFields({ name, year, upi_id, start_date, end_date, isEdit,
   if (isNaN(end.getTime())) return 'End date is invalid'
   if (end <= start) return 'End date must be after start date'
 
-  const durationDays = Math.round((end - start) / (1000 * 60 * 60 * 24))
+  const durationDays = Math.round((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24))
   if (durationDays > 50) return `Event duration cannot exceed 50 days (you entered ${durationDays} days)`
 
   if (!isEdit && start < today) return 'Start date cannot be in the past'
   if (isEdit && start_date !== existingStartDate && start < today) return 'Start date cannot be in the past'
 
-  return null // no error
+  return null
 }
 
 // ── GET — fetch all events for a mandal ───────────────────────
@@ -66,54 +58,52 @@ export async function GET(request) {
     return NextResponse.json({ error: 'mandal_id is required' }, { status: 400 })
   }
 
-  // Authenticate token
-  const authHeader = request.headers.get('Authorization')
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    return NextResponse.json({ error: 'Unauthorized: Missing or invalid token' }, { status: 401 })
-  }
-  const token = authHeader.split(' ')[1]
-  const { data: { user: authUser }, error: authError } = await supabaseAdmin.auth.getUser(token)
-  if (authError || !authUser) {
-    return NextResponse.json({ error: 'Unauthorized: Invalid session' }, { status: 401 })
+  // Authenticate token using auth-cache
+  const authResult = await getCachedAuthUserAndProfile(request, supabaseAdmin)
+  if (isAuthError(authResult)) {
+    return NextResponse.json({ error: authResult.error }, { status: authResult.status })
   }
 
-  const { data: profile } = await supabaseAdmin
-    .from('users')
-    .select('role, mandal_id')
-    .eq('id', authUser.id)
-    .single()
-
+  const profile = authResult.profile
   if (!profile || profile.mandal_id !== mandal_id || !['admin', 'manager', 'collector'].includes(profile.role)) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
   }
 
-  // Auto-deactivate any events that have passed their end_date before returning
   const today = new Date().toISOString().split('T')[0]
-  await supabaseAdmin
-    .from('events')
-    .update({ is_active: false })
-    .eq('mandal_id', mandal_id)
-    .lt('end_date', today)
-    .eq('is_active', true)
 
-  const { data: events, error } = await supabaseAdmin
-    .from('events')
-    .select('*')
-    .eq('mandal_id', mandal_id)
-    .order('start_date', { ascending: false })
+  // Use in-memory cache for event list queries
+  const cacheKey = `events:${mandal_id}`
+  const events = await getOrSetCache(cacheKey, async () => {
+    // Auto-deactivate any events that have passed their end_date before returning
+    await supabaseAdmin
+      .from('events')
+      .update({ is_active: false })
+      .eq('mandal_id', mandal_id)
+      .lt('end_date', today)
+      .eq('is_active', true)
 
-  if (error) return NextResponse.json({ error: 'Could not fetch events' }, { status: 500 })
+    const { data, error } = await supabaseAdmin
+      .from('events')
+      .select('*')
+      .eq('mandal_id', mandal_id)
+      .order('start_date', { ascending: false })
 
-  // Add a human-readable status to each event
+    if (error) throw new Error('Could not fetch events')
+    return data || []
+  }, 30)
+
+  // Enrich with dynamic dates
   const enriched = events.map(ev => ({
     ...ev,
     is_expired: ev.end_date < today,
     days_remaining: ev.end_date >= today
-      ? Math.ceil((new Date(ev.end_date) - new Date(today)) / (1000 * 60 * 60 * 24))
+      ? Math.ceil((new Date(ev.end_date).getTime() - new Date(today).getTime()) / (1000 * 60 * 60 * 24))
       : 0
   }))
 
-  return NextResponse.json({ events: enriched })
+  return NextResponse.json({ events: enriched }, {
+    headers: { 'Cache-Control': 'private, max-age=10, stale-while-revalidate=30' }
+  })
 }
 
 // ── POST — create a new event ─────────────────────────────────
@@ -131,13 +121,11 @@ export async function POST(request) {
       return NextResponse.json({ error: authCheck.error }, { status: authCheck.status })
     }
 
-    // Validate all fields
     const validationError = validateEventFields({ name, year, upi_id, start_date, end_date })
     if (validationError) {
       return NextResponse.json({ error: validationError }, { status: 400 })
     }
 
-    // Check mandal is active
     const { data: mandal } = await supabaseAdmin
       .from('mandals')
       .select('status')
@@ -148,12 +136,10 @@ export async function POST(request) {
       return NextResponse.json({ error: 'Mandal is not active' }, { status: 403 })
     }
 
-    // Determine initial is_active — true only if start_date is today or past
     const today = new Date().toISOString().split('T')[0]
     const isActiveNow = start_date <= today
 
     if (isActiveNow) {
-      // Deactivate all other active events for this mandal since only a single event can be active
       await supabaseAdmin
         .from('events')
         .update({ is_active: false })
@@ -176,7 +162,6 @@ export async function POST(request) {
 
     if (error) {
       console.error('Event insert error:', error)
-      // Surface DB constraint violations cleanly
       if (error.message.includes('events_max_50_days')) {
         return NextResponse.json({ error: 'Event duration cannot exceed 50 days' }, { status: 400 })
       }
@@ -186,7 +171,9 @@ export async function POST(request) {
       return NextResponse.json({ error: 'Could not create event' }, { status: 500 })
     }
 
-    // Enrich the newly created event with computed values
+    // Invalidate events cache
+    invalidateCacheByPrefix(`events:${mandal_id}`)
+
     const enriched = {
       ...event,
       is_expired: event.end_date < today,
@@ -211,7 +198,6 @@ export async function PATCH(request) {
       return NextResponse.json({ error: 'event_id and is_active are required' }, { status: 400 })
     }
 
-    // Fetch event to check dates before allowing toggle
     const { data: event } = await supabaseAdmin
       .from('events')
       .select('end_date, start_date, is_active, mandal_id, is_suspended')
@@ -229,7 +215,6 @@ export async function PATCH(request) {
 
     const today = new Date().toISOString().split('T')[0]
 
-    // Cannot activate a suspended event
     if (is_active === true && event.is_suspended) {
       return NextResponse.json(
         { error: 'This event is suspended and cannot be activated' },
@@ -237,7 +222,6 @@ export async function PATCH(request) {
       )
     }
 
-    // Cannot reactivate an expired event
     if (is_active === true && event.end_date < today) {
       return NextResponse.json(
         { error: 'This event has passed its end date and cannot be reactivated' },
@@ -245,7 +229,6 @@ export async function PATCH(request) {
       )
     }
 
-    // Cannot activate before start date
     if (is_active === true && event.start_date > today) {
       return NextResponse.json(
         { error: `Could not activate event because the start date is in the future (starts on ${event.start_date})` },
@@ -254,7 +237,6 @@ export async function PATCH(request) {
     }
 
     if (is_active === true) {
-      // Deactivate all other active events for this mandal since only a single event can be active
       await supabaseAdmin
         .from('events')
         .update({ is_active: false })
@@ -268,6 +250,8 @@ export async function PATCH(request) {
       .eq('id', event_id)
 
     if (error) return NextResponse.json({ error: 'Could not update event' }, { status: 500 })
+
+    invalidateCacheByPrefix(`events:${event.mandal_id}`)
 
     return NextResponse.json({ success: true })
   } catch (err) {
@@ -285,7 +269,6 @@ export async function PUT(request) {
       return NextResponse.json({ error: 'event_id is required' }, { status: 400 })
     }
 
-    // Fetch existing event
     const { data: event } = await supabaseAdmin
       .from('events')
       .select('*')
@@ -301,19 +284,16 @@ export async function PUT(request) {
       return NextResponse.json({ error: authCheck.error }, { status: authCheck.status })
     }
 
-    // Cannot edit a suspended event
     if (event.is_suspended) {
       return NextResponse.json({ error: 'This event is suspended and cannot be edited' }, { status: 403 })
     }
 
     const today = new Date().toISOString().split('T')[0]
 
-    // Cannot edit an expired event
     if (event.end_date < today) {
       return NextResponse.json({ error: 'Expired events cannot be edited' }, { status: 400 })
     }
 
-    // Validate fields
     const validationError = validateEventFields({
       name,
       year,
@@ -327,14 +307,11 @@ export async function PUT(request) {
       return NextResponse.json({ error: validationError }, { status: 400 })
     }
 
-    // Determine if is_active needs to be adjusted
-    // If start_date is updated to be in the future, it should be set to active: false.
     let nextActive = event.is_active
     if (start_date > today) {
       nextActive = false
     }
 
-    // If it becomes active, deactivate other events for this mandal
     if (nextActive === true && event.is_active === false) {
       await supabaseAdmin
         .from('events')
@@ -367,6 +344,8 @@ export async function PUT(request) {
       }
       return NextResponse.json({ error: 'Could not update event' }, { status: 500 })
     }
+
+    invalidateCacheByPrefix(`events:${event.mandal_id}`)
 
     const enriched = {
       ...updatedEvent,
