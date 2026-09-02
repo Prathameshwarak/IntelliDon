@@ -55,102 +55,39 @@ export async function downloadReceipt(receiptData: ReceiptData) {
   triggerDownload(blob, `Receipt-${receiptData.receiptNumber}.pdf`)
 }
 
-let activeSharePromise: Promise<void> | null = null
-
 export async function shareReceipt(receiptData: ReceiptData) {
-  if (activeSharePromise) {
-    return
+  const formattedAmount = `₹${Number(receiptData.amount || 0).toLocaleString('en-IN')}`
+
+  const origin = typeof window !== 'undefined' ? window.location.origin : ''
+  const receiptLink = receiptData.receiptCode && origin
+    ? `${origin}/download-receipt?q=${encodeURIComponent(receiptData.receiptCode)}`
+    : ''
+
+  let shareText = `*🙏 ${receiptData.mandalName}*\n` +
+    `*देणगी पावती / Donation Receipt*\n` +
+    `🚩 *कार्यक्रम / Event:* ${receiptData.eventName}\n\n` +
+    `📌 *पावती क्र. / Receipt No:* ${receiptData.receiptNumber}\n`
+
+  if (receiptData.receiptCode) {
+    shareText += `🔑 *४-अंकी कोड / Code:* ${receiptData.receiptCode}\n`
   }
 
-  activeSharePromise = (async () => {
-    const fileName = `Receipt-${receiptData.receiptNumber}.pdf`
-    const formattedAmount = `₹${Number(receiptData.amount || 0).toLocaleString('en-IN')}`
+  shareText += `👤 *देणगीदार / Donor:* ${receiptData.donorName}\n` +
+    `💰 *रक्कम / Amount:* ${formattedAmount}\n` +
+    `💳 *भरणा प्रकार / Mode:* ${receiptData.paymentMode}\n`
 
-    const origin = typeof window !== 'undefined' ? window.location.origin : ''
-    const receiptLink = receiptData.receiptCode && origin
-      ? `${origin}/download-receipt?q=${encodeURIComponent(receiptData.receiptCode)}`
-      : ''
-
-    let shareText = `*🙏 ${receiptData.mandalName}*\n` +
-      `*देणगी पावती / Donation Receipt*\n` +
-      `🚩 *कार्यक्रम / Event:* ${receiptData.eventName}\n\n` +
-      `📌 *पावती क्र. / Receipt No:* ${receiptData.receiptNumber}\n`
-
-    if (receiptData.receiptCode) {
-      shareText += `🔑 *४-अंकी कोड / Code:* ${receiptData.receiptCode}\n`
-    }
-
-    shareText += `👤 *देणगीदार / Donor:* ${receiptData.donorName}\n` +
-      `💰 *रक्कम / Amount:* ${formattedAmount}\n` +
-      `💳 *भरणा प्रकार / Mode:* ${receiptData.paymentMode}\n`
-
-    if (receiptLink) {
-      shareText += `\n📄 *पावती डाउनलोड करा / Download Receipt:*\n${receiptLink}\n`
-    }
-
-    shareText += `\nआपल्या मोलाच्या सहकार्याबद्दल मनःपूर्वक धन्यवाद! 🙏\nThank you for your generous contribution!`
-
-    const cleanPhone = (receiptData.donorPhone || '').replace(/\D/g, '')
-    const targetPhone = cleanPhone.length >= 10 ? (cleanPhone.length === 10 ? `91${cleanPhone}` : cleanPhone) : ''
-
-    // 1. Generate the PDF blob dynamically on-the-fly with all details
-    let pdfFile: File | null = null
-    try {
-      const blob = await buildPdfBlob(receiptData)
-      pdfFile = new File([blob], fileName, { type: 'application/pdf' })
-    } catch (e) {
-      console.warn('PDF blob generation for share warning:', e)
-    }
-
-    const shareData: ShareData | null = pdfFile ? {
-      files: [pdfFile],
-      title: `Donation Receipt ${receiptData.receiptNumber}`,
-      text: shareText
-    } : null
-
-    const canUseNativeFileShare =
-      shareData &&
-      typeof navigator !== 'undefined' &&
-      typeof navigator.share === 'function' &&
-      typeof navigator.canShare === 'function' &&
-      navigator.canShare(shareData)
-
-    // 2. If the device/browser supports native file sharing (Mobile Web/Safari/Chrome),
-    // share the actual generated .pdf file directly along with the custom text!
-    if (canUseNativeFileShare && shareData) {
-      try {
-        await navigator.share(shareData)
-        return
-      } catch (err: any) {
-        if (err?.name === 'AbortError' || err?.name === 'InvalidStateError') {
-          return
-        }
-        console.warn('Native file share skipped, using direct WhatsApp redirect:', err)
-      }
-    }
-
-    // 3. Direct WhatsApp redirect to donor phone number if provided in collection form
-    if (targetPhone) {
-      // Auto-trigger PDF download locally so collector has the file saved on device
-      try {
-        await downloadReceipt(receiptData)
-      } catch (err) {
-        console.warn('PDF auto-download before WhatsApp redirect error:', err)
-      }
-
-      const waUrl = `https://api.whatsapp.com/send?phone=${targetPhone}&text=${encodeURIComponent(shareText)}`
-      window.open(waUrl, '_blank')
-      return
-    }
-
-    // 4. Fallback if no phone number was entered in collection form
-    const waUrl = `https://api.whatsapp.com/send?text=${encodeURIComponent(shareText)}`
-    window.open(waUrl, '_blank')
-  })()
-
-  try {
-    await activeSharePromise
-  } finally {
-    activeSharePromise = null
+  if (receiptLink) {
+    shareText += `\n📄 *पावती डाउनलोड करा / Download Receipt:*\n${receiptLink}\n`
   }
+
+  shareText += `\nआपल्या मोलाच्या सहकार्याबद्दल मनःपूर्वक धन्यवाद! 🙏\nThank you for your generous contribution!`
+
+  const cleanPhone = (receiptData.donorPhone || '').replace(/\D/g, '')
+  const targetPhone = cleanPhone.length >= 10 ? (cleanPhone.length === 10 ? `91${cleanPhone}` : cleanPhone) : ''
+
+  const waUrl = targetPhone
+    ? `https://api.whatsapp.com/send?phone=${targetPhone}&text=${encodeURIComponent(shareText)}`
+    : `https://api.whatsapp.com/send?text=${encodeURIComponent(shareText)}`
+
+  window.open(waUrl, '_blank')
 }
