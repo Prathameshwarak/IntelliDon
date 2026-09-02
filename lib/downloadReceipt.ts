@@ -55,8 +55,19 @@ export async function downloadReceipt(receiptData: ReceiptData) {
   triggerDownload(blob, `Receipt-${receiptData.receiptNumber}.pdf`)
 }
 
+export function formatPaymentModeLabel(mode?: string | null): string {
+  if (!mode) return 'UPI / Digital'
+  const m = mode.toLowerCase().trim()
+  if (m === 'cash') return 'Cash'
+  if (m.includes('upi') || m === 'online' || m === 'qr') {
+    return 'UPI / Digital'
+  }
+  return mode.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())
+}
+
 export async function shareReceipt(receiptData: ReceiptData) {
   const formattedAmount = `₹${Number(receiptData.amount || 0).toLocaleString('en-IN')}`
+  const displayPaymentMode = formatPaymentModeLabel(receiptData.paymentMode)
 
   const origin = typeof window !== 'undefined' ? window.location.origin : ''
   const receiptLink = receiptData.receiptCode && origin
@@ -74,7 +85,7 @@ export async function shareReceipt(receiptData: ReceiptData) {
 
   shareText += `👤 *देणगीदार / Donor:* ${receiptData.donorName}\n` +
     `💰 *रक्कम / Amount:* ${formattedAmount}\n` +
-    `💳 *भरणा प्रकार / Mode:* ${receiptData.paymentMode}\n`
+    `💳 *भरणा प्रकार / Mode:* ${displayPaymentMode}\n`
 
   if (receiptLink) {
     shareText += `\n📄 *पावती डाउनलोड करा / Download Receipt:*\n${receiptLink}\n`
