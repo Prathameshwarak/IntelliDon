@@ -72,69 +72,78 @@ export async function shareReceipt(receiptData: ReceiptData) {
       : ''
 
     let shareText = `*🙏 ${receiptData.mandalName}*\n` +
-      `*Donation Receipt* — ${receiptData.eventName}\n\n` +
-      `📌 *Receipt No:* ${receiptData.receiptNumber}\n`
+      `*देणगी पावती / Donation Receipt*\n` +
+      `🚩 *कार्यक्रम / Event:* ${receiptData.eventName}\n\n` +
+      `📌 *पावती क्र. / Receipt No:* ${receiptData.receiptNumber}\n`
 
     if (receiptData.receiptCode) {
-      shareText += `🔑 *4-Digit Code:* ${receiptData.receiptCode}\n`
+      shareText += `🔑 *४-अंकी कोड / Code:* ${receiptData.receiptCode}\n`
     }
 
-    shareText += `👤 *Donor Name:* ${receiptData.donorName}\n` +
-      `💰 *Amount:* ${formattedAmount}\n` +
-      `💳 *Payment Mode:* ${receiptData.paymentMode}\n`
+    shareText += `👤 *देणगीदार / Donor:* ${receiptData.donorName}\n` +
+      `💰 *रक्कम / Amount:* ${formattedAmount}\n` +
+      `💳 *भरणा प्रकार / Mode:* ${receiptData.paymentMode}\n`
 
     if (receiptLink) {
-      shareText += `\n📄 *View / Download Receipt:* ${receiptLink}\n`
+      shareText += `\n📄 *पावती डाउनलोड करा / Download Receipt:*\n${receiptLink}\n`
     }
 
-    shareText += `\nThank you for your generous contribution!`
+    shareText += `\nआपल्या मोलाच्या सहकार्याबद्दल मनःपूर्वक धन्यवाद! 🙏\nThank you for your generous contribution!`
 
     const cleanPhone = (receiptData.donorPhone || '').replace(/\D/g, '')
     const targetPhone = cleanPhone.length >= 10 ? (cleanPhone.length === 10 ? `91${cleanPhone}` : cleanPhone) : ''
 
-    // Direct WhatsApp redirect to donor phone number if provided in collection form
+    // 1. Generate the PDF blob dynamically on-the-fly with all details
+    let pdfFile: File | null = null
+    try {
+      const blob = await buildPdfBlob(receiptData)
+      pdfFile = new File([blob], fileName, { type: 'application/pdf' })
+    } catch (e) {
+      console.warn('PDF blob generation for share warning:', e)
+    }
+
+    const shareData: ShareData | null = pdfFile ? {
+      files: [pdfFile],
+      title: `Donation Receipt ${receiptData.receiptNumber}`,
+      text: shareText
+    } : null
+
+    const canUseNativeFileShare =
+      shareData &&
+      typeof navigator !== 'undefined' &&
+      typeof navigator.share === 'function' &&
+      typeof navigator.canShare === 'function' &&
+      navigator.canShare(shareData)
+
+    // 2. If the device/browser supports native file sharing (Mobile Web/Safari/Chrome),
+    // share the actual generated .pdf file directly along with the custom text!
+    if (canUseNativeFileShare && shareData) {
+      try {
+        await navigator.share(shareData)
+        return
+      } catch (err: any) {
+        if (err?.name === 'AbortError' || err?.name === 'InvalidStateError') {
+          return
+        }
+        console.warn('Native file share skipped, using direct WhatsApp redirect:', err)
+      }
+    }
+
+    // 3. Direct WhatsApp redirect to donor phone number if provided in collection form
     if (targetPhone) {
-      // 1. Download PDF locally so collector has the file ready
+      // Auto-trigger PDF download locally so collector has the file saved on device
       try {
         await downloadReceipt(receiptData)
       } catch (err) {
         console.warn('PDF auto-download before WhatsApp redirect error:', err)
       }
 
-      // 2. Open WhatsApp directly to donor contact with custom message & receipt link
       const waUrl = `https://api.whatsapp.com/send?phone=${targetPhone}&text=${encodeURIComponent(shareText)}`
       window.open(waUrl, '_blank')
       return
     }
 
-    // Fallback if no phone number was entered in form
-    try {
-      const blob = await buildPdfBlob(receiptData)
-      const file = new File([blob], fileName, { type: 'application/pdf' })
-
-      const shareData: ShareData = {
-        files: [file],
-        title: `Donation Receipt ${receiptData.receiptNumber}`,
-        text: shareText
-      }
-
-      const canUseNativeShare =
-        typeof navigator !== 'undefined' &&
-        typeof navigator.share === 'function' &&
-        typeof navigator.canShare === 'function' &&
-        navigator.canShare(shareData)
-
-      if (canUseNativeShare) {
-        await navigator.share(shareData)
-        return
-      }
-    } catch (err: any) {
-      if (err?.name === 'AbortError' || err?.name === 'InvalidStateError') {
-        return
-      }
-      console.warn('Native file share failed:', err)
-    }
-
+    // 4. Fallback if no phone number was entered in collection form
     const waUrl = `https://api.whatsapp.com/send?text=${encodeURIComponent(shareText)}`
     window.open(waUrl, '_blank')
   })()
