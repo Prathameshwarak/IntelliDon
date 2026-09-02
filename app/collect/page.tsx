@@ -1315,20 +1315,39 @@ export default function CollectPage() {
                 <div className="flex flex-col gap-3 sm:gap-4">
                   <div className="relative bg-[#F5EDE2] dark:bg-gray-900 border border-[#1A1208]/10 dark:border-gray-800 rounded-2xl p-3 sm:p-8 shadow-sm overflow-hidden">
 
-                    {/* Download icon - top right, immediate access to the receipt PDF */}
+                    {/* Top right action buttons: Share (left) & Download (right) */}
                     {finalReceiptData && (
-                      <button
-                        onClick={() => downloadReceipt(finalReceiptData)}
-                        title="Download Receipt PDF"
-                        aria-label="Download Receipt PDF"
-                        className="absolute top-2.5 right-2.5 sm:top-6 sm:right-6 w-7 h-7 sm:w-10 sm:h-10 flex-shrink-0 flex items-center justify-center rounded-full bg-white/70 dark:bg-gray-800 border border-[#1A1208]/10 dark:border-gray-700 text-[#E8650A] dark:text-orange-400 hover:bg-white dark:hover:bg-gray-700 shadow-xs transition-colors cursor-pointer text-sm sm:text-lg"
-                      >
-                        ↓
-                      </button>
+                      <div className="absolute top-2.5 right-2.5 sm:top-6 sm:right-6 flex items-center gap-1.5 sm:gap-2 z-10">
+                        {/* Share Button (Left) */}
+                        <button
+                          onClick={() => shareReceipt(finalReceiptData)}
+                          title="Share Receipt"
+                          aria-label="Share Receipt"
+                          className="w-7 h-7 sm:w-10 sm:h-10 flex-shrink-0 flex items-center justify-center rounded-full bg-white/70 dark:bg-gray-800 border border-[#1A1208]/10 dark:border-gray-700 text-[#E8650A] dark:text-orange-400 hover:bg-white dark:hover:bg-gray-700 shadow-xs transition-colors cursor-pointer text-xs sm:text-base"
+                        >
+                          <svg className="w-3.5 h-3.5 sm:w-5 sm:h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <circle cx="18" cy="5" r="3"/>
+                            <circle cx="6" cy="12" r="3"/>
+                            <circle cx="18" cy="19" r="3"/>
+                            <line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/>
+                            <line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/>
+                          </svg>
+                        </button>
+
+                        {/* Download Button (Right) */}
+                        <button
+                          onClick={() => downloadReceipt(finalReceiptData)}
+                          title="Download Receipt PDF"
+                          aria-label="Download Receipt PDF"
+                          className="w-7 h-7 sm:w-10 sm:h-10 flex-shrink-0 flex items-center justify-center rounded-full bg-white/70 dark:bg-gray-800 border border-[#1A1208]/10 dark:border-gray-700 text-[#E8650A] dark:text-orange-400 hover:bg-white dark:hover:bg-gray-700 shadow-xs transition-colors cursor-pointer text-sm sm:text-lg"
+                        >
+                          ↓
+                        </button>
+                      </div>
                     )}
 
                     {/* Heading */}
-                    <h2 className="text-center text-emerald-700 dark:text-green-400 font-extrabold text-base sm:text-2xl mb-2.5 sm:mb-8 pr-9 sm:pr-0">
+                    <h2 className="text-center text-emerald-700 dark:text-green-400 font-extrabold text-base sm:text-2xl mb-2.5 sm:mb-8 px-16 sm:px-0">
                       Donation Recorded!
                     </h2>
 

@@ -2,15 +2,23 @@ import { createClient } from '@supabase/supabase-js'
 import { NextResponse } from 'next/server'
 import { checkLoginRateLimit, recordFailedAttempt, resetFailedAttempts } from '@/lib/login-rate-limiter'
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY!
+function getSupabaseAuth() {
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+  if (!supabaseUrl || !supabaseAnonKey) {
+    throw new Error('Supabase configuration missing (NEXT_PUBLIC_SUPABASE_URL or NEXT_PUBLIC_SUPABASE_ANON_KEY).')
+  }
+  return createClient(supabaseUrl, supabaseAnonKey)
+}
 
-// Standard client for user authentication
-const supabaseAuth = createClient(supabaseUrl, supabaseAnonKey)
-
-// Admin client to query user profiles bypassing RLS
-const supabaseAdmin = createClient(supabaseUrl, supabaseServiceRoleKey)
+function getSupabaseAdmin() {
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+  const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+  if (!supabaseUrl || !supabaseServiceRoleKey) {
+    throw new Error('Supabase admin configuration missing (SUPABASE_SERVICE_ROLE_KEY).')
+  }
+  return createClient(supabaseUrl, supabaseServiceRoleKey)
+}
 
 export async function POST(request: Request) {
   try {
@@ -23,6 +31,9 @@ export async function POST(request: Request) {
         { status: 400 }
       )
     }
+
+    const supabaseAuth = getSupabaseAuth()
+    const supabaseAdmin = getSupabaseAdmin()
 
     // Extract IP address from request headers
     const forwarded = request.headers.get('x-forwarded-for')
@@ -90,7 +101,7 @@ export async function POST(request: Request) {
       .single()
 
     let userProfile = profile
-    if (profileError && profileError.message.includes('is_active')) {
+    if (profileError && profileError.message?.includes('is_active')) {
       // Fallback if is_active column is not present
       const { data: fallbackProfile } = await supabaseAdmin
         .from('users')
@@ -146,8 +157,9 @@ export async function POST(request: Request) {
   } catch (err: any) {
     console.error('Unexpected error in /api/auth/login:', err)
     return NextResponse.json(
-      { success: false, error: 'Internal server error during authentication.' },
+      { success: false, error: err?.message || 'Internal server error during authentication.' },
       { status: 500 }
     )
   }
 }
+

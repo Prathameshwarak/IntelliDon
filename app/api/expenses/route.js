@@ -1,6 +1,8 @@
 import { createClient } from '@supabase/supabase-js'
 import { NextResponse } from 'next/server'
 import { EXPENSE_PAYMENT_MODE_VALUES, EXPENSE_AMOUNT_REGEX, roundToTwoDecimals, isExpenseActionWindowClosed, EXPENSE_ACTION_GRACE_DAYS } from '@/lib/expensePaymentModes'
+import { getCachedAuthUserAndProfile, isAuthError } from '@/lib/auth-cache'
+import { getOrSetCache, invalidateCacheByPrefix } from '@/lib/cache'
 
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL,
@@ -8,26 +10,14 @@ const supabaseAdmin = createClient(
 )
 
 // Admin (Adhyaksha) and Manager (Khajindar) can manage expenses.
-// Collectors (Sevak) have no access to this endpoint.
 async function verifyCaller(request, mandalIdToCheck) {
-  const authHeader = request.headers.get('Authorization')
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    return { error: 'Unauthorized: Missing or invalid token', status: 401 }
+  const authResult = await getCachedAuthUserAndProfile(request, supabaseAdmin)
+  if (isAuthError(authResult)) {
+    return { error: authResult.error, status: authResult.status }
   }
 
-  const token = authHeader.split(' ')[1]
-  const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(token)
-  if (authError || !user) {
-    return { error: 'Unauthorized: Invalid session', status: 401 }
-  }
-
-  const { data: profile, error: profileError } = await supabaseAdmin
-    .from('users')
-    .select('role, mandal_id')
-    .eq('id', user.id)
-    .single()
-
-  if (profileError || !profile) {
+  const profile = authResult.profile
+  if (!profile) {
     return { error: 'Forbidden: Requester profile not found', status: 403 }
   }
 
@@ -39,11 +29,9 @@ async function verifyCaller(request, mandalIdToCheck) {
     return { error: 'Forbidden: You do not belong to this mandal', status: 403 }
   }
 
-  return { caller: profile, callerId: user.id }
+  return { caller: profile, callerId: authResult.user.id }
 }
 
-// ── Field validation (mirrors the DB-level CHECK constraints — this
-//    is the primary line of defense; the DB constraints are the backstop) ──
 const MAX_AMOUNT = 999999999 // 9 digits
 
 function validateExpenseFields({ expense_date, vendor_name, vendor_phone, title, description, amount, transaction_id, payment_mode }) {
@@ -104,73 +92,74 @@ export async function GET(request) {
     return NextResponse.json({ error: authCheck.error }, { status: authCheck.status })
   }
 
-  let query = supabaseAdmin
-    .from('event_expenses')
-    .select('*')
-    .eq('event_id', event_id)
-    .eq('mandal_id', mandal_id)
+  const cacheKey = `expenses:${mandal_id}:${event_id}:${from_date || ''}:${to_date || ''}`
+  const result = await getOrSetCache(cacheKey, async () => {
+    let query = supabaseAdmin
+      .from('event_expenses')
+      .select('*')
+      .eq('event_id', event_id)
+      .eq('mandal_id', mandal_id)
 
-  if (from_date && !isNaN(new Date(from_date).getTime())) query = query.gte('expense_date', from_date)
-  if (to_date && !isNaN(new Date(to_date).getTime())) query = query.lte('expense_date', to_date)
+    if (from_date && !isNaN(new Date(from_date).getTime())) query = query.gte('expense_date', from_date)
+    if (to_date && !isNaN(new Date(to_date).getTime())) query = query.lte('expense_date', to_date)
 
-  const { data: expenses, error: expenseError } = await query.order('expense_date', { ascending: false })
+    const { data: expenses, error: expenseError } = await query.order('expense_date', { ascending: false })
 
-  if (expenseError) {
-    return NextResponse.json({ error: 'Could not fetch expenses' }, { status: 500 })
-  }
-
-  if (expenses.length === 0) {
-    return NextResponse.json({ expenses: [], summary: { total_amount: 0, total_paid: 0, count: 0 } })
-  }
-
-  // Resolve created_by / updated_by ids to display names in one batch query
-  const userIds = [...new Set(expenses.flatMap(e => [e.created_by, e.updated_by]).filter(Boolean))]
-  let namesById = {}
-  if (userIds.length > 0) {
-    const { data: creators } = await supabaseAdmin.from('users').select('id, full_name').in('id', userIds)
-    namesById = Object.fromEntries((creators || []).map(u => [u.id, u.full_name]))
-  }
-
-  // Each expense can have zero or more expense_payments rows (installments
-  // recorded against its Estimated Amount) — mirrors how sponsor_payments
-  // is aggregated per sponsor in the Sponsorship module. Resolve all of
-  // them in one batch query and attach the full list + computed totals to
-  // each expense.
-  const expenseIds = expenses.map(e => e.id)
-  const { data: payments } = await supabaseAdmin
-    .from('expense_payments')
-    .select('*')
-    .in('expense_id', expenseIds)
-
-  const paymentsByExpenseId = {}
-  for (const p of payments || []) {
-    if (!paymentsByExpenseId[p.expense_id]) paymentsByExpenseId[p.expense_id] = []
-    paymentsByExpenseId[p.expense_id].push(p)
-  }
-
-  const fullExpenses = expenses.map(e => {
-    const expensePayments = (paymentsByExpenseId[e.id] || []).sort((a, b) => new Date(b.paid_at) - new Date(a.paid_at))
-    const amountPaid = roundToTwoDecimals(expensePayments.reduce((sum, p) => sum + Number(p.amount), 0))
-    const amountPending = roundToTwoDecimals(Math.max(0, Number(e.amount) - amountPaid))
-    const paymentStatus = amountPaid <= 0 ? 'pending' : amountPending > 0 ? 'partially_paid' : 'completed'
-    return {
-      ...e,
-      created_by_name: e.created_by ? (namesById[e.created_by] || 'Unknown') : null,
-      updated_by_name: e.updated_by ? (namesById[e.updated_by] || 'Unknown') : null,
-      amount_paid: amountPaid,
-      amount_pending: amountPending,
-      payment_status: paymentStatus,
-      payments: expensePayments
+    if (expenseError) {
+      throw new Error('Could not fetch expenses')
     }
+
+    if (expenses.length === 0) {
+      return { expenses: [], summary: { total_amount: 0, total_paid: 0, count: 0 } }
+    }
+
+    const userIds = [...new Set(expenses.flatMap(e => [e.created_by, e.updated_by]).filter(Boolean))]
+    let namesById = {}
+    if (userIds.length > 0) {
+      const { data: creators } = await supabaseAdmin.from('users').select('id, full_name').in('id', userIds)
+      namesById = Object.fromEntries((creators || []).map(u => [u.id, u.full_name]))
+    }
+
+    const expenseIds = expenses.map(e => e.id)
+    const { data: payments } = await supabaseAdmin
+      .from('expense_payments')
+      .select('*')
+      .in('expense_id', expenseIds)
+
+    const paymentsByExpenseId = {}
+    for (const p of payments || []) {
+      if (!paymentsByExpenseId[p.expense_id]) paymentsByExpenseId[p.expense_id] = []
+      paymentsByExpenseId[p.expense_id].push(p)
+    }
+
+    const fullExpenses = expenses.map(e => {
+      const expensePayments = (paymentsByExpenseId[e.id] || []).sort((a, b) => new Date(b.paid_at).getTime() - new Date(a.paid_at).getTime())
+      const amountPaid = roundToTwoDecimals(expensePayments.reduce((sum, p) => sum + Number(p.amount), 0))
+      const amountPending = roundToTwoDecimals(Math.max(0, Number(e.amount) - amountPaid))
+      const paymentStatus = amountPaid <= 0 ? 'pending' : amountPending > 0 ? 'partially_paid' : 'completed'
+      return {
+        ...e,
+        created_by_name: e.created_by ? (namesById[e.created_by] || 'Unknown') : null,
+        updated_by_name: e.updated_by ? (namesById[e.updated_by] || 'Unknown') : null,
+        amount_paid: amountPaid,
+        amount_pending: amountPending,
+        payment_status: paymentStatus,
+        payments: expensePayments
+      }
+    })
+
+    const summary = {
+      total_amount: roundToTwoDecimals(fullExpenses.reduce((sum, e) => sum + Number(e.amount), 0)),
+      total_paid: roundToTwoDecimals(fullExpenses.reduce((sum, e) => sum + e.amount_paid, 0)),
+      count: fullExpenses.length
+    }
+
+    return { expenses: fullExpenses, summary }
+  }, 20)
+
+  return NextResponse.json(result, {
+    headers: { 'Cache-Control': 'private, max-age=5, stale-while-revalidate=20' }
   })
-
-  const summary = {
-    total_amount: roundToTwoDecimals(fullExpenses.reduce((sum, e) => sum + Number(e.amount), 0)),
-    total_paid: roundToTwoDecimals(fullExpenses.reduce((sum, e) => sum + e.amount_paid, 0)),
-    count: fullExpenses.length
-  }
-
-  return NextResponse.json({ expenses: fullExpenses, summary })
 }
 
 // POST — create a new (flat) expense
@@ -193,8 +182,6 @@ export async function POST(request) {
       return NextResponse.json({ error: authCheck.error }, { status: authCheck.status })
     }
 
-    // Confirm the event actually belongs to this mandal (prevents IDOR
-    // via a crafted event_id from another organization)
     const { data: event, error: eventError } = await supabaseAdmin
       .from('events')
       .select('id, end_date')
@@ -206,16 +193,10 @@ export async function POST(request) {
       return NextResponse.json({ error: 'Event not found' }, { status: 404 })
     }
 
-    // Expenses can be added until (Event End Date + 30 days) — after that
-    // the event's expenses become view/search/filter/export-only.
     if (isExpenseActionWindowClosed(event.end_date)) {
       return NextResponse.json({ error: `The ${EXPENSE_ACTION_GRACE_DAYS}-day window to add expenses for this event has closed (event ended on ${event.end_date}). You can still view, search, filter, and download existing records.` }, { status: 403 })
     }
 
-    // Note: amount here is the expense's Estimated Amount. How/when it was
-    // actually paid is tracked separately as one or more installments in
-    // expense_payments via /api/expenses/[id]/payments, the same way a
-    // sponsor's committed_amount is tracked separately from sponsor_payments.
     const { data: expense, error: insertError } = await supabaseAdmin
       .from('event_expenses')
       .insert({
@@ -237,6 +218,8 @@ export async function POST(request) {
     if (insertError) {
       return NextResponse.json({ error: 'Could not create expense' }, { status: 500 })
     }
+
+    invalidateCacheByPrefix(`expenses:${mandal_id}`)
 
     return NextResponse.json({
       success: true,
