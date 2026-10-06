@@ -37,7 +37,7 @@ export async function GET(request) {
 
     const { data: subscription, error } = await supabaseAdmin
       .from('subscriptions')
-      .select('plan, status, ends_at, notes')
+      .select('plan, status, starts_at, ends_at, notes, amount, last_payment_at, last_payment_amount')
       .eq('mandal_id', mandal_id)
       .maybeSingle()
 

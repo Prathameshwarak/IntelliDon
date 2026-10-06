@@ -10,7 +10,7 @@ import KycVerificationPanel from '@/components/dashboard/KycVerificationPanel'
 import SponsorshipSection from '@/components/dashboard/SponsorshipSection'
 import ExpenseManagerPanel from '@/components/dashboard/ExpenseManagerPanel'
 import { isExpenseActionWindowClosed } from '@/lib/expensePaymentModes'
-import ThemeToggle from '@/components/ThemeToggle'
+import ProfileDropdown from '@/components/dashboard/ProfileDropdown'
 import { downloadReceipt, shareReceipt, type ReceiptData } from '@/lib/downloadReceipt'
 
 // ── TESTING / MIGRATION CONFIGURATION ──────────────────────────
@@ -100,6 +100,7 @@ export default function DashboardPage() {
   const [mandalId, setMandalId] = useState<string | null>(null)
   const [mandalName, setMandalName] = useState('')
   const [mandalKyc, setMandalKyc] = useState<any>(null)
+  const [adminName, setAdminName] = useState('')
 
   // Theme State (Syncs with Landing / Login / Register light/dark theme)
   const [theme, setTheme] = useState<'light' | 'dark'>('light')
@@ -643,6 +644,15 @@ export default function DashboardPage() {
       setMandalId(meData.profile.mandal_id)
       setMandalName(meData.mandal?.name || '')
       setMandalKyc(meData.mandal)
+      setAdminName(meData.profile.full_name || '')
+
+      // Support deep-linking a specific tab, e.g. from Organization > Team Management
+      try {
+        const requestedTab = new URLSearchParams(window.location.search).get('tab') as Tab | null
+        if (requestedTab && ['donations', 'ranking', 'history', 'events', 'team'].includes(requestedTab)) {
+          if (requestedTab !== 'team' || role === 'admin') setTab(requestedTab)
+        }
+      } catch {}
 
       if (meData.user.user_metadata?.requires_password_change) {
         setRequiresPasswordChange(true)
@@ -1721,33 +1731,17 @@ export default function DashboardPage() {
               : 'bg-blue-500/10 text-blue-600 dark:bg-blue-900/50 dark:text-blue-400 border border-blue-500/20'}`}>
             {userRole === 'admin' ? 'Adhyaksha' : 'Khajindar'}
           </span>
-          <button
-            onClick={() => router.push('/share')}
-            className="text-[10px] sm:text-xs bg-[#FDF8F3] dark:bg-gray-700 hover:bg-[#ebdcc9] dark:hover:bg-gray-600 text-[#1A1208] dark:text-white border border-[#1A1208]/10 dark:border-gray-600 px-2 sm:px-3 py-1.5 rounded-lg transition-colors whitespace-nowrap font-medium"
-          >
-            🔗 <span className="hidden sm:inline">Share Link</span>
-          </button>
-          <button
-            onClick={() => router.push('/dashboard/subscription')}
-            className={`text-[10px] sm:text-xs px-2 sm:px-3 py-1.5 rounded-lg transition-colors font-medium whitespace-nowrap
-              ${sub.isExpired
-                ? 'bg-red-600 hover:bg-red-500 text-white'
-                : sub.daysRemaining <= 7
-                  ? 'bg-yellow-600 hover:bg-yellow-500 text-white'
-                  : 'bg-[#FDF8F3] dark:bg-gray-700 hover:bg-[#ebdcc9] dark:hover:bg-gray-600 text-[#1A1208] dark:text-white border border-[#1A1208]/10 dark:border-gray-600'}`}
-          >
-            {sub.isExpired ? '⚠ Expired' : sub.daysRemaining <= 7 ? `⚠ ${sub.daysRemaining}d` : '📋 Plan'}
-          </button>
 
-          {/* Theme Toggle Button */}
-          <ThemeToggle />
-
-          <button
-            onClick={() => supabase.auth.signOut().then(() => router.push('/login'))}
-            className="text-[10px] sm:text-xs text-red-600 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300 font-semibold transition-colors whitespace-nowrap"
-          >
-            Sign out
-          </button>
+          {/* Profile dropdown — Organization Name, Current Plan, Theme, Manage Organization,
+              Team Management, Billing & Plans, Share & Public Links, Settings, Help & Support, Logout */}
+          <ProfileDropdown
+            mandalName={mandalName}
+            adminName={adminName}
+            userRole={userRole}
+            planLabel={sub.isExpired ? 'Expired' : sub.subscription ? `${sub.subscription.plan.charAt(0).toUpperCase() + sub.subscription.plan.slice(1)} · ${sub.daysRemaining}d` : 'No plan'}
+            planIsExpired={sub.isExpired}
+            planDaysRemaining={sub.daysRemaining}
+          />
         </div>
       </div>
 
